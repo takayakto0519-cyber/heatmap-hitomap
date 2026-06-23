@@ -125,6 +125,12 @@ export default function App() {
 
   useEffect(() => { fetchTraces(); }, [fetchTraces]);
 
+  // 起動時にスキーマ自動マイグレーション（ensure_schema RPC）
+  useEffect(() => {
+    fetch('/api/migrate').catch(() => { /* サイレント失敗 */ });
+  }, []);
+
+
   // フィルタリング
   const filtered = traces.filter(t => {
     if (filterEmotion && t.emotion_key !== filterEmotion) return false;
