@@ -1,0 +1,22 @@
+import { supabase } from '@/lib/supabase/client';
+import { compressImage } from '@/lib/compressImage';
+
+const BUCKET = 'trace-photos';
+
+export async function uploadTracePhoto(file: File): Promise<string> {
+  // HEIC・大容量をJPEG 1200px以内に圧縮してからアップロード
+  const compressed = await compressImage(file);
+  const ext = 'jpg';
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: 'image/jpeg',
+  });
+
+  if (error) throw new Error(`写真のアップロードに失敗: ${error.message}`);
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}

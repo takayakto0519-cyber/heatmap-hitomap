@@ -1,0 +1,41 @@
+# 環境変数（Supabaseキーが入るので絶対にGitに含めない）
+.env.local
+.env*.local
+.env
+
+# Next.js
+.next/
+out/
+node_modules/
+
+# ビルド成果物
+build/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+~$*
+
+# Claude / エディタ設定
+.claude/
+
+# Google Apps Script
+.clasp.json
+appsscript.json
+コード.js
+
+# ヒトマップ事業書類（アプリと分けて管理）
+01_経営幹部_Executive/
+02_秘書_Secretary/
+03_マーケティング_Marketing/
+04_人事クライアント管理_HR_Client/
+05_広報コンテンツ_PR_Content/
+06_実行待機_Approval/
+
+# その他の開発スクリプト（アプリ外）
+discord_bot.py
+report.py
+report.ps1
+index.html
+説明書_*.md

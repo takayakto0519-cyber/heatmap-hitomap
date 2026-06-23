@@ -1,0 +1,18 @@
+{
+  "name": "ヒトマップ",
+  "short_name": "ヒトマップ",
+  "description": "まちの痕跡を記録し、感情で地域を読み解く",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF6B9D",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
