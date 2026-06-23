@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import type { Trace, ListTracesResponse, CreateTraceResponse } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
 import { CATEGORIES, getCategory } from '@/lib/categories';
+import { TRACE_TYPES } from '@/lib/traceTypes';
 import EmotionPicker from '@/components/form/EmotionPicker';
 import IntensityPicker from '@/components/form/IntensityPicker';
 import TraceCard from '@/components/report/TraceCard';
@@ -85,6 +86,13 @@ export default function App() {
   const [uploadProgress, setUploadProgress] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitDone, setSubmitDone] = useState(false);
+
+  // 新フィールド
+  const [traceTypeKey, setTraceTypeKey] = useState<string | null>(null);
+  const [isPastMemory, setIsPastMemory] = useState(false);
+  const [memoryDate, setMemoryDate] = useState('');
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
 
   // localStorage 初期化
   useEffect(() => {
@@ -184,6 +192,10 @@ export default function App() {
           want_revisit: wantRevisit, want_to_share: wantToShare,
           emotion_key: emotionKey, intensity,
           category: categoryKey,
+          trace_type: traceTypeKey,
+          is_past_memory: isPastMemory,
+          memory_date: isPastMemory && memoryDate ? memoryDate : null,
+          custom_tags: customTags.length > 0 ? customTags : null,
           session_code: sessionCode.trim() || null,  // ① session_code を投稿に含める
           nickname: nickname.trim() || null,
         }),
@@ -207,7 +219,9 @@ export default function App() {
           setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
           setPhotoPreview(null); setPhotoFile(null); setLat(null); setLng(null);
           setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
-          setNickname(''); setCategoryKey(null); setSubmitDone(false);
+          setNickname(''); setCategoryKey(null);
+          setTraceTypeKey(null); setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
+          setSubmitDone(false);
           fetchTraces(); setTab('map');
         }, 1200);
       } else {
@@ -470,6 +484,96 @@ export default function App() {
                 <section style={secStyle}>
                   <label style={labelStyle}>💫 どのくらい強く？</label>
                   <IntensityPicker value={intensity} onChange={setIntensity} />
+                </section>
+
+                {/* 人・もの・こと */}
+                <section style={secStyle}>
+                  <label style={labelStyle}>👤 人・もの・こと？</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {TRACE_TYPES.map(t => (
+                      <button key={t.key} type="button"
+                        onClick={() => setTraceTypeKey(traceTypeKey === t.key ? null : t.key)}
+                        style={{
+                          flex: 1, padding: '10px 6px', borderRadius: 10, fontSize: 14, cursor: 'pointer',
+                          border: `2px solid ${traceTypeKey === t.key ? t.color : '#ddd'}`,
+                          background: traceTypeKey === t.key ? t.color + '18' : '#fff',
+                          color: traceTypeKey === t.key ? t.color : '#666',
+                          fontWeight: traceTypeKey === t.key ? 700 : 400,
+                        }}>
+                        {t.emoji} {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 過去の記憶トグル */}
+                <section style={secStyle}>
+                  <label style={labelStyle}>🕰 過去の思い出？</label>
+                  <button type="button" onClick={() => setIsPastMemory(v => !v)} style={{
+                    width: '100%', padding: '12px', borderRadius: 10, fontSize: 14, cursor: 'pointer',
+                    border: `2px solid ${isPastMemory ? '#F6B93B' : '#ddd'}`,
+                    background: isPastMemory ? '#FFFBF0' : '#fff',
+                    color: isPastMemory ? '#856404' : '#aaa',
+                    fontWeight: isPastMemory ? 700 : 400,
+                  }}>
+                    {isPastMemory ? '🕰 過去の記憶として登録する' : '📍 今の記録として登録する'}
+                  </button>
+                  {isPastMemory && (
+                    <div style={{ marginTop: 8 }}>
+                      <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>いつの記憶か（任意）</label>
+                      <input
+                        type="date"
+                        value={memoryDate}
+                        onChange={e => setMemoryDate(e.target.value)}
+                        style={{ ...inputStyle, fontSize: 14 }}
+                      />
+                    </div>
+                  )}
+                </section>
+
+                {/* カスタムタグ */}
+                <section style={secStyle}>
+                  <label style={labelStyle}>🏷️ タグ（自由入力・ Enterで追加）</label>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {customTags.map(tag => (
+                      <span key={tag} style={{
+                        padding: '4px 10px', borderRadius: 20, fontSize: 12,
+                        background: '#f0f0f0', color: '#444',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                        #{tag}
+                        <button type="button" onClick={() => setCustomTags(tags => tags.filter(t => t !== tag))}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, color: '#aaa', padding: 0 }}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const t = tagInput.trim();
+                          if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]);
+                          setTagInput('');
+                        }
+                      }}
+                      placeholder="例: 木造り、昔の山手線…"
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <button type="button" onClick={() => {
+                      const t = tagInput.trim();
+                      if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]);
+                      setTagInput('');
+                    }} style={{
+                      padding: '0 14px', borderRadius: 10, border: '1.5px solid #ddd',
+                      background: '#fff', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
+                    }}>追加</button>
+                  </div>
                 </section>
 
                 {/* カテゴリ */}

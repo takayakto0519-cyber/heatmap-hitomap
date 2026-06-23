@@ -27,6 +27,11 @@ export interface Trace {
 
   category: string | null;        // 何に心が動いたか（建物・植物・道具など）
 
+  trace_type: string | null;      // 人・もの・こと
+  is_past_memory: boolean;        // 過去の記憶フラグ
+  memory_date: string | null;     // いつの記憶か（ISO8601 date）
+  custom_tags: string[] | null;   // カスタムタグ
+
   session_code: string | null;    // 実験回の識別
   nickname: string | null;        // 任意ニックネーム（匿名可）
 }
@@ -54,6 +59,11 @@ export interface TraceInput {
   intensity?: number | null;
 
   category?: string | null;
+
+  trace_type?: string | null;
+  is_past_memory?: boolean;
+  memory_date?: string | null;
+  custom_tags?: string[] | null;
 
   session_code?: string;
   nickname?: string;

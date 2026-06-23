@@ -57,6 +57,10 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         emotion_key: body.emotion_key ?? null,
         intensity: body.intensity ?? 3,
         category: body.category ?? null,
+        trace_type: body.trace_type ?? null,
+        is_past_memory: body.is_past_memory ?? false,
+        memory_date: body.memory_date ?? null,
+        custom_tags: body.custom_tags ?? null,
         session_code: body.session_code ?? null,
         nickname: body.nickname ?? null,
       })

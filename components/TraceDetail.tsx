@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Trace } from '@/lib/types';
 import { getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
+import { getTraceType } from '@/lib/traceTypes';
 
 interface Props {
   trace: Trace;
@@ -25,6 +26,8 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteNickname, setDeleteNickname] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const [editTitle, setEditTitle] = useState(trace.title);
   const [editWhy, setEditWhy] = useState(trace.why ?? '');
@@ -35,6 +38,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
   const emotion = getEmotion(trace.emotion_key);
   const category = getCategory(trace.category);
+  const traceType = getTraceType(trace.trace_type);
 
   async function handleSave() {
     if (!editTitle.trim()) return;
@@ -65,10 +69,19 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
   async function handleDelete() {
     setDeleting(true);
+    setDeleteError('');
     try {
-      const res = await fetch(`/api/traces/${trace.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/traces/${trace.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: deleteNickname }),
+      });
       const data = await res.json();
-      if (data.ok) onDelete(trace.id);
+      if (data.ok) {
+        onDelete(trace.id);
+      } else {
+        setDeleteError(data.error ?? '削除に失敗しました');
+      }
     } finally {
       setDeleting(false);
     }
@@ -148,6 +161,20 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
             {/* タグ行 */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {traceType && (
+                <span style={{
+                  padding: '4px 10px', borderRadius: 20,
+                  background: traceType.color + '22', color: traceType.color,
+                  fontSize: 13, fontWeight: 700,
+                }}>{traceType.emoji} {traceType.label}</span>
+              )}
+              {trace.is_past_memory && (
+                <span style={{
+                  padding: '4px 10px', borderRadius: 20,
+                  background: '#FFF3CD', color: '#856404',
+                  fontSize: 13, fontWeight: 700,
+                }}>🕰 過去の記憶{trace.memory_date ? `（${trace.memory_date}）` : ''}</span>
+              )}
               {emotion && (
                 <span style={{
                   padding: '4px 10px', borderRadius: 20,
@@ -166,6 +193,12 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                   {'●'.repeat(trace.intensity)}{'○'.repeat(5 - trace.intensity)}
                 </span>
               )}
+              {(trace.custom_tags ?? []).map(tag => (
+                <span key={tag} style={{
+                  padding: '3px 9px', borderRadius: 20,
+                  background: '#f5f5f5', color: '#555', fontSize: 12, border: '1px solid #e0e0e0',
+                }}>#{tag}</span>
+              ))}
             </div>
 
             {/* タイトル */}
@@ -267,25 +300,43 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             position: 'absolute', bottom: 0, left: 0, right: 0,
             padding: '12px 16px', background: '#fff',
             borderTop: '1px solid #f0f0f0',
-            display: 'flex', gap: 10,
+            display: 'flex', flexDirection: 'column', gap: 8,
             paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
           }}>
             {confirmDelete ? (
               <>
-                <p style={{ flex: 1, margin: 0, fontSize: 13, color: '#E55039', display: 'flex', alignItems: 'center' }}>
-                  本当に削除しますか？
+                <p style={{ margin: 0, fontSize: 13, color: '#E55039', fontWeight: 700 }}>
+                  🔐 削除するにはニックネームを入力してください
                 </p>
-                <button onClick={() => setConfirmDelete(false)} style={{
-                  padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd',
-                  background: '#fff', cursor: 'pointer', fontSize: 13,
-                }}>いいえ</button>
-                <button onClick={handleDelete} disabled={deleting} style={{
-                  padding: '10px 14px', borderRadius: 10, border: 'none',
-                  background: '#E55039', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                }}>{deleting ? '削除中…' : '削除する'}</button>
+                {trace.nickname && (
+                  <input
+                    placeholder={`ニックネームを入力（例: ${trace.nickname}）`}
+                    value={deleteNickname}
+                    onChange={e => { setDeleteNickname(e.target.value); setDeleteError(''); }}
+                    style={{
+                      padding: '9px 12px', borderRadius: 8, fontSize: 13,
+                      border: `1.5px solid ${deleteError ? '#E55039' : '#ddd'}`,
+                      outline: 'none', width: '100%', boxSizing: 'border-box' as const,
+                    }}
+                  />
+                )}
+                {deleteError && (
+                  <p style={{ margin: 0, fontSize: 12, color: '#E55039' }}>{deleteError}</p>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setConfirmDelete(false); setDeleteNickname(''); setDeleteError(''); }} style={{
+                    flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd',
+                    background: '#fff', cursor: 'pointer', fontSize: 13,
+                  }}>キャンセル</button>
+                  <button onClick={handleDelete} disabled={deleting || (!!trace.nickname && !deleteNickname)} style={{
+                    flex: 2, padding: '10px 14px', borderRadius: 10, border: 'none',
+                    background: (deleting || (!!trace.nickname && !deleteNickname)) ? '#ddd' : '#E55039',
+                    color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                  }}>{deleting ? '削除中…' : '削除する'}</button>
+                </div>
               </>
             ) : (
-              <>
+              <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => setConfirmDelete(true)} style={{
                   flex: 1, padding: '12px', borderRadius: 10,
                   border: '1.5px solid #ddd', background: '#fff',
@@ -296,7 +347,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                   border: 'none', background: '#FF6B9D',
                   color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
                 }}>✏️ 編集する</button>
-              </>
+              </div>
             )}
           </div>
         )}

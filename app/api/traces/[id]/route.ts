@@ -36,7 +36,7 @@ export async function PATCH(
 
 // DELETE /api/traces/[id] — 削除＋写真のStorageクリーンアップ
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: { id: string } }
 ) {
   if (!SUPABASE_READY) {
@@ -44,9 +44,23 @@ export async function DELETE(
   }
   try {
     const { id } = context.params;
+    const body = await req.json().catch(() => ({})) as { nickname?: string };
     const supabase = await getServerClient();
+
+    // 削除前にニックネーム照合
     const { data: trace } = await supabase
-      .from('traces').select('photo_url').eq('id', id).single();
+      .from('traces').select('photo_url, nickname').eq('id', id).single();
+
+    if (trace?.nickname) {
+      // 投稿にニックネームが設定されている場合は一致確認
+      if (!body.nickname || body.nickname.trim() !== trace.nickname.trim()) {
+        return NextResponse.json(
+          { ok: false, error: 'ニックネームが一致しません' },
+          { status: 403 }
+        );
+      }
+    }
+
     const { error } = await supabase.from('traces').delete().eq('id', id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (trace?.photo_url) {
@@ -58,3 +72,4 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: String(e) }, { status: 400 });
   }
 }
+
