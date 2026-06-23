@@ -72,6 +72,11 @@ export default function App() {
   const [lng, setLng] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
+  // 住所検索
+  const [addressQuery, setAddressQuery] = useState('');
+  const [addressSearching, setAddressSearching] = useState(false);
+  const [addressError, setAddressError] = useState('');
+  const [addressCandidates, setAddressCandidates] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
   const [emotionKey, setEmotionKey] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(3);
   const [categoryKey, setCategoryKey] = useState<string | null>(null);
@@ -150,6 +155,34 @@ export default function App() {
   })).filter(e => e.count > 0).sort((a, b) => b.count - a.count);
 
   // ⑦ 高精度GPS
+  // 住所検索（Nominatim / OSM）
+  async function searchAddress() {
+    const q = addressQuery.trim();
+    if (!q) return;
+    setAddressSearching(true);
+    setAddressError('');
+    setAddressCandidates([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+      const results = await res.json() as { display_name: string; lat: string; lon: string }[];
+      if (results.length === 0) {
+        setAddressError('住所が見つかりませんでした。別のキーワードで試してください。');
+      } else if (results.length === 1) {
+        setLat(parseFloat(results[0].lat));
+        setLng(parseFloat(results[0].lon));
+        setAddressQuery(results[0].display_name.split(',')[0]);
+        setAddressCandidates([]);
+      } else {
+        setAddressCandidates(results);
+      }
+    } catch {
+      setAddressError('検索に失敗しました。ネットワークを確認してください。');
+    } finally {
+      setAddressSearching(false);
+    }
+  }
+
   function detectGPS() {
     if (!navigator.geolocation) { setGpsError('GPSが使えません'); return; }
     setGpsLoading(true); setGpsError('');
@@ -227,6 +260,7 @@ export default function App() {
           setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
           setNickname(''); setCategoryKey(null);
           setTraceTypeKey(null); setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
+          setAddressQuery(''); setAddressCandidates([]); setAddressError('');
           setSubmitDone(false);
           fetchTraces(); setTab('map');
         }, 1200);
@@ -454,22 +488,66 @@ export default function App() {
 
                 {/* 位置情報 */}
                 <section style={secStyle}>
-                  <label style={labelStyle}>📍 いまいる場所 <span style={{ color: '#E55039' }}>*</span></label>
-                  {!lat ? (
-                    <button type="button" onClick={detectGPS} disabled={gpsLoading} style={{
-                      width: '100%', padding: '13px', borderRadius: 10,
-                      border: '2px solid #4A90E2', background: '#EEF4FF',
-                      color: '#4A90E2', fontSize: 14, fontWeight: 700,
-                      cursor: gpsLoading ? 'wait' : 'pointer',
-                    }}>{gpsLoading ? '取得中（GPS精度優先）…' : '📡 現在地を自動取得'}</button>
-                  ) : (
+                  <label style={labelStyle}>📍 場所 <span style={{ color: '#E55039' }}>*</span></label>
+
+                  {/* 住所検索 */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    <input
+                      type="text"
+                      value={addressQuery}
+                      onChange={e => setAddressQuery(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchAddress(); } }}
+                      placeholder="住所・地名で検索（例: 谷中銀座、東京都台東区谷中3丁目）"
+                      style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+                    />
+                    <button type="button" onClick={searchAddress} disabled={addressSearching} style={{
+                      padding: '0 14px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
+                      border: '1.5px solid #4A90E2', background: '#EEF4FF', color: '#4A90E2',
+                      fontWeight: 700, whiteSpace: 'nowrap',
+                    }}>{addressSearching ? '🔍…' : '🔍 検索'}</button>
+                  </div>
+
+                  {/* 候補リスト */}
+                  {addressCandidates.length > 1 && (
+                    <div style={{
+                      border: '1.5px solid #e0e0e0', borderRadius: 10, overflow: 'hidden', marginBottom: 8,
+                    }}>
+                      {addressCandidates.map((c, i) => (
+                        <button key={i} type="button" onClick={() => {
+                          setLat(parseFloat(c.lat));
+                          setLng(parseFloat(c.lon));
+                          setAddressQuery(c.display_name.split(',')[0]);
+                          setAddressCandidates([]);
+                        }} style={{
+                          width: '100%', padding: '9px 12px', background: '#fff',
+                          border: 'none', borderBottom: i < addressCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
+                          cursor: 'pointer', textAlign: 'left' as const, fontSize: 12, color: '#333',
+                          display: 'block',
+                        }}>
+                          📍 {c.display_name.split(',').slice(0, 3).join(', ')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {addressError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px' }}>{addressError}</p>}
+
+                  {/* GPSボタン */}
+                  <button type="button" onClick={detectGPS} disabled={gpsLoading} style={{
+                    width: '100%', padding: '10px', borderRadius: 10, marginBottom: 8,
+                    border: '1.5px solid #ddd', background: '#fafafa',
+                    color: '#666', fontSize: 13, cursor: gpsLoading ? 'wait' : 'pointer',
+                  }}>{gpsLoading ? '取得中…' : '📡 現在地を自動取得'}</button>
+
+                  {/* 座標・地図 */}
+                  {lat && (
                     <>
                       <p style={{ fontSize: 12, color: '#888', margin: '0 0 6px' }}>
                         {lat.toFixed(5)}, {lng!.toFixed(5)}
-                        <button type="button" onClick={detectGPS} style={{
-                          background: 'none', border: 'none', color: '#4A90E2',
+                        <button type="button" onClick={() => { setLat(null); setLng(null); setAddressQuery(''); }} style={{
+                          background: 'none', border: 'none', color: '#E55039',
                           cursor: 'pointer', fontSize: 12, marginLeft: 8,
-                        }}>再取得</button>
+                        }}>リセット</button>
                       </p>
                       <div style={{ height: 180, borderRadius: 10, overflow: 'hidden' }}>
                         <LocationPickerMap lat={lat} lng={lng!} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
