@@ -32,6 +32,15 @@ export interface Trace {
   memory_date: string | null;     // いつの記憶か（ISO8601 date）
   custom_tags: string[] | null;   // カスタムタグ
 
+  // 地域×アーカイブ（archive_type が null なら従来の痕跡投稿）
+  archive_type: string | null;    // chimei | denshou | bunken | koe
+  yomi: string | null;            // 地名の読み
+  alt_names: string | null;       // 別名・旧称（カンマ区切り）
+  era_label: string | null;       // 時代・年代（自由記述）
+  source_ref: string | null;      // 文献の出典・URL
+  voice_relation: string | null;  // resident | former_resident | visitor | heard
+  audio_url: string | null;       // 言い伝え・人の声の録音
+
   session_code: string | null;    // 実験回の識別
   nickname: string | null;        // 任意ニックネーム（匿名可）
 }
@@ -64,6 +73,14 @@ export interface TraceInput {
   is_past_memory?: boolean;
   memory_date?: string | null;
   custom_tags?: string[] | null;
+
+  archive_type?: string | null;
+  yomi?: string | null;
+  alt_names?: string | null;
+  era_label?: string | null;
+  source_ref?: string | null;
+  voice_relation?: string | null;
+  audio_url?: string | null;
 
   session_code?: string;
   nickname?: string;

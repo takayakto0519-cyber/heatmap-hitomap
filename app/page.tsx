@@ -4,27 +4,31 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type { Trace, ListTracesResponse, CreateTraceResponse } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
-import { CATEGORIES, getCategory } from '@/lib/categories';
+import { CATEGORIES } from '@/lib/categories';
 import { TRACE_TYPES } from '@/lib/traceTypes';
+import { ARCHIVE_TYPES, getArchiveType, VOICE_RELATIONS } from '@/lib/archiveTypes';
 import EmotionPicker from '@/components/form/EmotionPicker';
 import IntensityPicker from '@/components/form/IntensityPicker';
+import AudioRecorder from '@/components/form/AudioRecorder';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
-import QRModal from '@/components/QRModal';
+import StatsPanel from '@/components/list/StatsPanel';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
-  loading: () => <div style={mapLoading}>地図を読み込み中…</div>,
+  loading: () => <div style={mapLoadingStyle}>地図を読み込み中…</div>,
 });
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
   ssr: false,
-  loading: () => <div style={mapLoading}>地図を読み込み中…</div>,
+  loading: () => <div style={mapLoadingStyle}>地図を読み込み中…</div>,
 });
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 type Tab = 'map' | 'post' | 'list';
 type MapMode = 'pin' | 'heat';
+type SortOrder = 'new' | 'old';
 const NEARBY_RADIUS = 500;
+const DEFAULT_CENTER: [number, number] = [35.681236, 139.767125];
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000;
@@ -35,36 +39,44 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const mapLoading: React.CSSProperties = {
+const mapLoadingStyle: React.CSSProperties = {
   height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: '#f0f0f0', color: '#aaa', fontSize: 14,
 };
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '11px 13px', fontSize: 15,
-  border: '1.5px solid #ddd', borderRadius: 10, fontFamily: 'inherit',
+  border: '1.5px solid #e8e8e8', borderRadius: 10, fontFamily: 'inherit',
   resize: 'vertical' as const, outline: 'none', background: '#fff',
 };
-const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 6 };
-const secStyle: React.CSSProperties = { marginBottom: 22 };
+const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 6, color: '#333' };
 
 export default function App() {
+  // ── タブ・マップ ──────────────────────────
   const [tab, setTab] = useState<Tab>('map');
+  const [mapMode, setMapMode] = useState<MapMode>('pin');
+  const [userPos, setUserPos] = useState<[number, number] | null>(null);
+  const [nearbyOnly, setNearbyOnly] = useState(false);
+  const [filterEmotion, setFilterEmotion] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  // 'trace' = 痕跡のみ / それ以外は archive_type のキー / null = すべて
+  const [filterArchive, setFilterArchive] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('new');
+  const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
+
+  // ── データ ──────────────────────────────
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [mapMode, setMapMode] = useState<MapMode>('pin');
-  const [filterEmotion, setFilterEmotion] = useState<string | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [sessionCode, setSessionCode] = useState('');
-  const [userPos, setUserPos] = useState<[number, number] | null>(null);
-  const [nearbyOnly, setNearbyOnly] = useState(false);
-  const [quickMode, setQuickMode] = useState(true);
+
+  // ── モーダル ─────────────────────────────
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+
+  // ── ユーザー設定 ─────────────────────────
   const [myTraceIds, setMyTraceIds] = useState<string[]>([]);
   const [myEmotions, setMyEmotions] = useState<string[]>([]);
-  const [showQR, setShowQR] = useState(false);
 
-  // 投稿フォーム
+  // ── 投稿フォーム ─────────────────────────
   const fileRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -72,13 +84,21 @@ export default function App() {
   const [lng, setLng] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
-  // 住所検索
   const [addressQuery, setAddressQuery] = useState('');
   const [addressSearching, setAddressSearching] = useState(false);
   const [addressError, setAddressError] = useState('');
   const [addressCandidates, setAddressCandidates] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
+  const [showAddressSearch, setShowAddressSearch] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [emotionKey, setEmotionKey] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(3);
+  // 投稿タイプ：null = 痕跡 / chimei | denshou | bunken | koe = アーカイブ
+  const [archiveTypeKey, setArchiveTypeKey] = useState<string | null>(null);
+  const [yomi, setYomi] = useState('');
+  const [altNames, setAltNames] = useState('');
+  const [eraLabel, setEraLabel] = useState('');
+  const [sourceRef, setSourceRef] = useState('');
+  const [voiceRelation, setVoiceRelation] = useState<string | null>(null);
   const [categoryKey, setCategoryKey] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [why, setWhy] = useState('');
@@ -87,57 +107,63 @@ export default function App() {
   const [wantRevisit, setWantRevisit] = useState(false);
   const [wantToShare, setWantToShare] = useState(false);
   const [nickname, setNickname] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [submitDone, setSubmitDone] = useState(false);
-
-  // 新フィールド
   const [traceTypeKey, setTraceTypeKey] = useState<string | null>(null);
   const [isPastMemory, setIsPastMemory] = useState(false);
   const [memoryDate, setMemoryDate] = useState('');
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitDone, setSubmitDone] = useState(false);
 
-  // localStorage 初期化
+  // ── 初期化 ──────────────────────────────
   useEffect(() => {
     try {
-      const code = localStorage.getItem('hitomap_session_code') || '';
-      setSessionCode(code);
+      setSessionCode(localStorage.getItem('hitomap_session_code') || '');
       const ids = JSON.parse(localStorage.getItem('hitomap_my_traces') || '[]');
       setMyTraceIds(Array.isArray(ids) ? ids : []);
       const emo = JSON.parse(localStorage.getItem('hitomap_my_emotions') || '[]');
       setMyEmotions(Array.isArray(emo) ? emo : []);
     } catch { /* ignore */ }
+    fetch('/api/migrate').catch(() => {});
   }, []);
+
+  // 地図タブを開いたとき、まだ位置不明なら自動取得試みる
+  useEffect(() => {
+    if (tab === 'map' && !userPos && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        p => setUserPos([p.coords.latitude, p.coords.longitude]),
+        () => { /* サイレント失敗 */ },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    }
+  }, [tab, userPos]);
 
   function saveSessionCode(code: string) {
     setSessionCode(code);
     localStorage.setItem('hitomap_session_code', code);
   }
 
-  // データ取得
+  // ── データ取得（常に全件取得。session_codeフィルタはクライアント側で行う）──
   const fetchTraces = useCallback(() => {
-    const url = sessionCode ? `/api/traces?session_code=${encodeURIComponent(sessionCode)}` : '/api/traces';
     setLoading(true);
     setFetchError(null);
-    fetch(url)
+    fetch('/api/traces')
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() as Promise<ListTracesResponse>; })
       .then(d => setTraces(d.ok ? d.traces : []))
       .catch(e => setFetchError(e instanceof Error ? e.message : '通信エラー'))
       .finally(() => setLoading(false));
-  }, [sessionCode]);
+  }, []);
 
   useEffect(() => { fetchTraces(); }, [fetchTraces]);
 
-  // 起動時にスキーマ自動マイグレーション（ensure_schema RPC）
-  useEffect(() => {
-    fetch('/api/migrate').catch(() => { /* サイレント失敗 */ });
-  }, []);
-
-
-  // フィルタリング
-  const filtered = traces.filter(t => {
+  // ── フィルタ・ソート ─────────────────────
+  // マップ用：感情・カテゴリ・近くのみ（セッションコードでは絞らない→全件見える）
+  const filteredForMap = traces.filter(t => {
+    if (filterArchive === 'trace' && t.archive_type) return false;
+    if (filterArchive && filterArchive !== 'trace' && t.archive_type !== filterArchive) return false;
     if (filterEmotion && t.emotion_key !== filterEmotion) return false;
     if (filterCategory && t.category !== filterCategory) return false;
     if (nearbyOnly && userPos) {
@@ -146,41 +172,45 @@ export default function App() {
     return true;
   });
 
-  const emotionCounts = EMOTIONS.map(e => ({
-    ...e, count: traces.filter(t => t.emotion_key === e.key).length,
-  })).filter(e => e.count > 0);
+  // リスト用：上記＋セッションコードでクライアント側絞り込み
+  const filtered = filteredForMap.filter(t => {
+    if (sessionCode && t.session_code !== sessionCode) return false;
+    return true;
+  });
 
-  const myProfile = EMOTIONS.map(e => ({
-    ...e, count: myEmotions.filter(k => k === e.key).length,
-  })).filter(e => e.count > 0).sort((a, b) => b.count - a.count);
+  const sorted = [...filtered].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    return sortOrder === 'new' ? tb - ta : ta - tb;
+  });
 
-  // ⑦ 高精度GPS
-  // 住所検索（Nominatim / OSM）
+  const archiveCounts = ARCHIVE_TYPES
+    .map(a => ({ ...a, count: traces.filter(t => t.archive_type === a.key).length }))
+    .filter(a => a.count > 0);
+  const hasArchive = archiveCounts.length > 0;
+  const selectedArchiveType = getArchiveType(archiveTypeKey);
+
+  const emotionCounts = EMOTIONS
+    .map(e => ({ ...e, count: traces.filter(t => t.emotion_key === e.key).length }))
+    .filter(e => e.count > 0);
+
+  const myProfile = EMOTIONS
+    .map(e => ({ ...e, count: myEmotions.filter(k => k === e.key).length }))
+    .filter(e => e.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  // ── 住所検索 ────────────────────────────
   async function searchAddress() {
-    const q = addressQuery.trim();
-    if (!q) return;
-    setAddressSearching(true);
-    setAddressError('');
-    setAddressCandidates([]);
+    const q = addressQuery.trim(); if (!q) return;
+    setAddressSearching(true); setAddressError(''); setAddressCandidates([]);
     try {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
-      const results = await res.json() as { display_name: string; lat: string; lon: string }[];
-      if (results.length === 0) {
-        setAddressError('住所が見つかりませんでした。別のキーワードで試してください。');
-      } else if (results.length === 1) {
-        setLat(parseFloat(results[0].lat));
-        setLng(parseFloat(results[0].lon));
-        setAddressQuery(results[0].display_name.split(',')[0]);
-        setAddressCandidates([]);
-      } else {
-        setAddressCandidates(results);
-      }
-    } catch {
-      setAddressError('検索に失敗しました。ネットワークを確認してください。');
-    } finally {
-      setAddressSearching(false);
-    }
+      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { display_name: string; lat: string; lon: string }[];
+      if (results.length === 0) { setAddressError('住所が見つかりませんでした'); }
+      else if (results.length === 1) { setLat(parseFloat(results[0].lat)); setLng(parseFloat(results[0].lon)); setAddressQuery(results[0].display_name.split(',')[0]); }
+      else { setAddressCandidates(results); }
+    } catch { setAddressError('検索に失敗しました'); }
+    finally { setAddressSearching(false); }
   }
 
   function detectGPS() {
@@ -201,7 +231,7 @@ export default function App() {
     reader.readAsDataURL(file);
   }
 
-  // 送信（① session_code を含める）
+  // ── 投稿 ────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setSubmitError('タイトルを入力してください'); return; }
@@ -211,12 +241,21 @@ export default function App() {
       let photoUrl: string | null = null;
       if (photoFile) {
         if (SUPABASE_READY) {
-          setUploadProgress('写真を圧縮・アップロード中…');
+          setUploadProgress('写真をアップロード中…');
           const { uploadTracePhoto } = await import('@/lib/supabase/upload');
           photoUrl = await uploadTracePhoto(photoFile);
           setUploadProgress('');
         } else {
           photoUrl = photoPreview;
+        }
+      }
+      let audioUrl: string | null = null;
+      if (audioBlob) {
+        if (SUPABASE_READY) {
+          setUploadProgress('録音をアップロード中…');
+          const { uploadTraceAudio } = await import('@/lib/supabase/upload');
+          audioUrl = await uploadTraceAudio(audioBlob);
+          setUploadProgress('');
         }
       }
       const res = await fetch('/api/traces', {
@@ -226,55 +265,65 @@ export default function App() {
           photo_url: photoUrl, latitude: lat, longitude: lng,
           title: title.trim(),
           why: why.trim() || null,
-          interpretation: quickMode ? null : (interpretation.trim() || null),
-          self_reflection: quickMode ? null : (selfReflection.trim() || null),
+          interpretation: interpretation.trim() || null,
+          self_reflection: selfReflection.trim() || null,
           want_revisit: wantRevisit, want_to_share: wantToShare,
-          emotion_key: emotionKey, intensity,
-          category: categoryKey,
-          trace_type: traceTypeKey,
+          emotion_key: archiveTypeKey ? null : emotionKey,
+          intensity: archiveTypeKey ? null : intensity,
+          category: archiveTypeKey ? null : categoryKey,
+          trace_type: archiveTypeKey ? null : traceTypeKey,
+          archive_type: archiveTypeKey,
+          yomi: yomi.trim() || null,
+          alt_names: altNames.trim() || null,
+          era_label: eraLabel.trim() || null,
+          source_ref: sourceRef.trim() || null,
+          voice_relation: archiveTypeKey === 'koe' ? voiceRelation : null,
+          audio_url: audioUrl,
           is_past_memory: isPastMemory,
           memory_date: isPastMemory && memoryDate ? memoryDate : null,
           custom_tags: customTags.length > 0 ? customTags : null,
-          session_code: sessionCode.trim() || null,  // ① session_code を投稿に含める
+          session_code: sessionCode.trim() || null,
           nickname: nickname.trim() || null,
         }),
       });
       const data: CreateTraceResponse = await res.json();
       if (data.ok || res.status === 503) {
-        // ③ 自分の投稿IDをlocalStorageに記録
         if (data.trace?.id) {
           const updated = [...myTraceIds, data.trace.id];
           setMyTraceIds(updated);
           localStorage.setItem('hitomap_my_traces', JSON.stringify(updated));
         }
-        // マイ感情プロフィール更新
         if (emotionKey) {
           const updated = [...myEmotions, emotionKey];
           setMyEmotions(updated);
           localStorage.setItem('hitomap_my_emotions', JSON.stringify(updated));
         }
+        // 投稿位置を先に保存（setLatで消える前に）
+        const postedLat = lat;
+        const postedLng = lng;
         setSubmitDone(true);
         setTimeout(() => {
           setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
           setPhotoPreview(null); setPhotoFile(null); setLat(null); setLng(null);
           setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
-          setNickname(''); setCategoryKey(null);
-          setTraceTypeKey(null); setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
-          setAddressQuery(''); setAddressCandidates([]); setAddressError('');
-          setSubmitDone(false);
-          fetchTraces(); setTab('map');
-        }, 1200);
+          setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
+          setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
+          setArchiveTypeKey(null); setYomi(''); setAltNames(''); setEraLabel(''); setSourceRef(''); setVoiceRelation(null);
+          setAudioBlob(null);
+          setAddressQuery(''); setAddressCandidates([]); setAddressError(''); setShowAddressSearch(false);
+          setShowAdvanced(false); setSubmitDone(false);
+          fetchTraces();
+          if (postedLat && postedLng) setMapFlyTo([postedLat, postedLng]);
+          setTab('map');
+        }, 1500);
       } else {
         setSubmitError(data.error ?? '送信に失敗しました');
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : '送信に失敗しました');
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   }
 
-  // ③ 詳細モーダルのコールバック
   function handleTraceUpdate(updated: Trace) {
     setTraces(prev => prev.map(t => t.id === updated.id ? updated : t));
     setSelectedTrace(updated);
@@ -284,80 +333,118 @@ export default function App() {
     setSelectedTrace(null);
   }
 
+  // カードから地図へジャンプ
+  function handleShowOnMap(trace: Trace) {
+    setTab('map');
+    setMapFlyTo([trace.latitude, trace.longitude]);
+    setTimeout(() => setMapFlyTo(null), 2000);
+  }
+
   const canSubmit = Boolean(title.trim() && lat && lng && !submitting && !submitDone);
 
+  // ── 必須フィールド進捗 ───────────────────
+  const steps = [
+    { label: 'タイトル', done: !!title.trim() },
+    { label: '位置', done: !!(lat && lng) },
+  ];
+  const stepsDone = steps.filter(s => s.done).length;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
 
-      {/* ヘッダー */}
+      {/* ── ヘッダー ── */}
       <header style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>ヒトマップ</h1>
-            <button onClick={() => setShowQR(true)} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 18, padding: 0, lineHeight: 1, opacity: 0.6,
-            }} title="QRコード">⬛</button>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 6 }}>
 
+          {/* タブ別コントロール */}
           {tab === 'map' && (
             <div style={{ display: 'flex', gap: 5 }}>
               <button onClick={() => {
                 if (!nearbyOnly && !userPos) {
-                  navigator.geolocation.getCurrentPosition(p => {
-                    setUserPos([p.coords.latitude, p.coords.longitude]);
-                    setNearbyOnly(true);
-                  }, undefined, { enableHighAccuracy: true });
-                } else {
-                  setNearbyOnly(n => !n);
-                }
+                  navigator.geolocation.getCurrentPosition(
+                    p => { setUserPos([p.coords.latitude, p.coords.longitude]); setNearbyOnly(true); },
+                    undefined, { enableHighAccuracy: true }
+                  );
+                } else { setNearbyOnly(n => !n); }
               }} style={{
                 padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
                 border: `1.5px solid ${nearbyOnly ? '#38ADA9' : '#ddd'}`,
                 background: nearbyOnly ? '#E8F8F7' : '#fff',
-                color: nearbyOnly ? '#38ADA9' : '#666',
-                fontWeight: nearbyOnly ? 700 : 400,
-              }}>📍 近くのみ</button>
+                color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
+              }}>📍 近く</button>
               {(['pin', 'heat'] as MapMode[]).map(m => (
                 <button key={m} onClick={() => setMapMode(m)} style={{
                   padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
                   border: '1.5px solid #ddd',
                   background: mapMode === m ? '#222' : '#fff',
-                  color: mapMode === m ? '#fff' : '#666',
-                  fontWeight: mapMode === m ? 700 : 400,
+                  color: mapMode === m ? '#fff' : '#666', fontWeight: mapMode === m ? 700 : 400,
                 }}>{m === 'pin' ? '📍 ピン' : '🌡 ヒート'}</button>
               ))}
             </div>
           )}
 
-          {tab === 'post' && (
-            <div style={{ display: 'flex', borderRadius: 8, border: '1.5px solid #eee', overflow: 'hidden' }}>
-              {([['かんたん', true], ['くわしく', false]] as [string, boolean][]).map(([label, isQuick]) => (
-                <button key={label} onClick={() => setQuickMode(isQuick)} style={{
-                  padding: '5px 11px', fontSize: 12, border: 'none', cursor: 'pointer',
-                  background: quickMode === isQuick ? '#FF6B9D' : '#fff',
-                  color: quickMode === isQuick ? '#fff' : '#999',
-                  fontWeight: quickMode === isQuick ? 700 : 400,
-                }}>{label}</button>
-              ))}
+          {tab === 'list' && (
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: '#aaa' }}>{filtered.length}件</span>
+              <button onClick={() => setSortOrder(o => o === 'new' ? 'old' : 'new')} style={{
+                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                border: '1.5px solid #ddd', background: '#fff', color: '#555',
+              }}>
+                {sortOrder === 'new' ? '🕐 新しい順' : '🕰 古い順'}
+              </button>
             </div>
           )}
 
-          {tab === 'list' && <span style={{ fontSize: 13, color: '#aaa' }}>{filtered.length} 件</span>}
+          {tab === 'post' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* 進捗インジケーター */}
+              {stepsDone < steps.length && (
+                <span style={{ fontSize: 11, color: '#aaa' }}>
+                  必須 {stepsDone}/{steps.length}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* 感情フィルター */}
+        {/* アーカイブタイプフィルター（マップ・一覧） */}
+        {(tab === 'map' || tab === 'list') && hasArchive && (
+          <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+            <button onClick={() => setFilterArchive(null)} style={{
+              padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              border: `1.5px solid ${!filterArchive ? '#444' : '#ddd'}`,
+              background: !filterArchive ? '#444' : '#fff',
+              color: !filterArchive ? '#fff' : '#666',
+            }}>すべて</button>
+            <button onClick={() => setFilterArchive(filterArchive === 'trace' ? null : 'trace')} style={{
+              padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              border: `1.5px solid ${filterArchive === 'trace' ? '#FF6B9D' : '#ddd'}`,
+              background: filterArchive === 'trace' ? '#FF6B9D' : '#fff',
+              color: filterArchive === 'trace' ? '#fff' : '#666',
+            }}>📍 痕跡</button>
+            {archiveCounts.map(a => (
+              <button key={a.key} onClick={() => setFilterArchive(filterArchive === a.key ? null : a.key)} style={{
+                padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                border: `1.5px solid ${filterArchive === a.key ? a.color : '#ddd'}`,
+                background: filterArchive === a.key ? a.color : '#fff',
+                color: filterArchive === a.key ? '#fff' : '#666',
+              }}>{a.emoji} {a.label} {a.count}</button>
+            ))}
+          </div>
+        )}
+
+        {/* 感情フィルター（マップ・一覧） */}
         {(tab === 'map' || tab === 'list') && emotionCounts.length > 0 && (
-          <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 2 }}>
+          <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
             <button onClick={() => setFilterEmotion(null)} style={{
-              padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+              padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
               border: `1.5px solid ${!filterEmotion ? '#444' : '#ddd'}`,
               background: !filterEmotion ? '#444' : '#fff',
               color: !filterEmotion ? '#fff' : '#666',
             }}>すべて</button>
             {emotionCounts.map(e => (
               <button key={e.key} onClick={() => setFilterEmotion(filterEmotion === e.key ? null : e.key)} style={{
-                padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                 border: `1.5px solid ${filterEmotion === e.key ? e.color : '#ddd'}`,
                 background: filterEmotion === e.key ? e.color : '#fff',
                 color: filterEmotion === e.key ? '#fff' : '#666',
@@ -367,10 +454,10 @@ export default function App() {
         )}
       </header>
 
-      {/* メインコンテンツ */}
+      {/* ── メインコンテンツ ── */}
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
 
-        {/* ⑧ 通信エラー表示 */}
+        {/* エラーバナー */}
         {fetchError && (
           <div style={{
             position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
@@ -380,19 +467,20 @@ export default function App() {
           }}>
             ⚠ {fetchError}
             <button onClick={fetchTraces} style={{
-              background: 'rgba(255,255,255,0.3)', border: 'none',
+              background: 'rgba(255,255,255,0.25)', border: 'none',
               color: '#fff', borderRadius: 12, padding: '3px 9px', fontSize: 12, cursor: 'pointer',
             }}>再試行</button>
           </div>
         )}
 
-        {/* マップタブ */}
+        {/* ─── マップ ─── */}
         {tab === 'map' && (
           <div style={{ height: '100%', position: 'relative' }}>
             <TraceMap
-              traces={filtered}
+              traces={filteredForMap}
               mode={mapMode}
               center={userPos ?? undefined}
+              flyTo={mapFlyTo ?? undefined}
               onLocate={pos => setUserPos(pos)}
               onTraceClick={setSelectedTrace}
             />
@@ -412,17 +500,16 @@ export default function App() {
                 現在地から{NEARBY_RADIUS}m以内：{filtered.length}件
               </div>
             )}
-            {/* ⑤ ヒートマップ凡例 */}
+            {/* ヒートマップ凡例 */}
             {mapMode === 'heat' && filtered.length > 0 && (
               <div style={{
                 position: 'absolute', bottom: 30, left: 10, zIndex: 500,
                 background: 'rgba(255,255,255,0.93)', borderRadius: 10,
                 padding: '8px 12px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                backdropFilter: 'blur(6px)',
               }}>
                 {EMOTIONS.filter(e => filtered.some(t => t.emotion_key === e.key)).map(e => (
                   <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, lineHeight: 1.9 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, display: 'inline-block' }} />
                     <span style={{ color: '#444' }}>{e.label}</span>
                   </div>
                 ))}
@@ -434,281 +521,399 @@ export default function App() {
           </div>
         )}
 
-        {/* 投稿タブ */}
+        {/* ─── 投稿フォーム ─── */}
         {tab === 'post' && (
-          <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 130px' }}>
+          <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 140px', background: '#f8f8f8' }}>
+
+            {/* 送信完了 */}
             {submitDone && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', fontSize: 20, fontWeight: 700, color: '#38ADA9' }}>
+              <div style={{
+                textAlign: 'center', padding: '60px 20px',
+                fontSize: 22, fontWeight: 800, color: '#38ADA9',
+              }}>
                 ✓ 記録しました<br />
-                <span style={{ fontSize: 13, fontWeight: 400, color: '#aaa', marginTop: 8, display: 'block' }}>地図に戻ります…</span>
+                <span style={{ fontSize: 13, fontWeight: 400, color: '#aaa', marginTop: 10, display: 'block' }}>
+                  地図に戻ります…
+                </span>
               </div>
             )}
+
             {!submitDone && (
               <form id="trace-form" onSubmit={handleSubmit}>
 
-                {/* ① 実験回コード（冒頭に常時表示） */}
-                <section style={{ ...secStyle, padding: '12px', background: '#F8F9FA', borderRadius: 10 }}>
-                  <label style={{ ...labelStyle, fontSize: 12, color: '#888', marginBottom: 4 }}>🔖 実験回コード（任意・グループで同じコードを入力）</label>
-                  <input
-                    type="text"
-                    value={sessionCode}
-                    onChange={e => saveSessionCode(e.target.value)}
-                    placeholder="例: yanaka-20260701"
-                    style={{ ...inputStyle, fontSize: 13, background: '#fff' }}
-                  />
-                </section>
+                {/* STEP 0: 何を記録する？（痕跡 or アーカイブ） */}
+                <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
+                    何を記録する？
+                  </label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => setArchiveTypeKey(null)} style={{
+                      padding: '8px 12px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
+                      border: `2px solid ${!archiveTypeKey ? '#FF6B9D' : '#ddd'}`,
+                      background: !archiveTypeKey ? '#FFF0F5' : '#fff',
+                      color: !archiveTypeKey ? '#FF6B9D' : '#666',
+                      fontWeight: !archiveTypeKey ? 700 : 400,
+                    }}>📍 痕跡</button>
+                    {ARCHIVE_TYPES.map(a => (
+                      <button key={a.key} type="button"
+                        onClick={() => setArchiveTypeKey(archiveTypeKey === a.key ? null : a.key)} style={{
+                          padding: '8px 12px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
+                          border: `2px solid ${archiveTypeKey === a.key ? a.color : '#ddd'}`,
+                          background: archiveTypeKey === a.key ? a.color + '18' : '#fff',
+                          color: archiveTypeKey === a.key ? a.color : '#666',
+                          fontWeight: archiveTypeKey === a.key ? 700 : 400,
+                        }}>{a.emoji} {a.label}</button>
+                    ))}
+                  </div>
+                  {selectedArchiveType && (
+                    <p style={{ fontSize: 11, color: '#aaa', margin: '8px 0 0' }}>
+                      この土地の記憶を後世に残す記録です。知っていることをそのまま書いてください。
+                    </p>
+                  )}
+                </div>
 
-                {/* 写真 */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>📷 写真</label>
+                {/* STEP 1: 写真 */}
+                <div style={{ background: '#fff', borderRadius: 14, marginBottom: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                   <input ref={fileRef} type="file" accept="image/*" capture="environment"
                     style={{ display: 'none' }} onChange={handlePhoto} />
                   {photoPreview ? (
                     <div style={{ position: 'relative' }}>
                       <img src={photoPreview} alt="preview"
-                        style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10 }} />
+                        style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }} />
                       <button type="button" onClick={() => fileRef.current?.click()} style={{
-                        position: 'absolute', bottom: 8, right: 8,
-                        background: 'rgba(0,0,0,0.55)', color: '#fff',
-                        border: 'none', borderRadius: 7, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                        position: 'absolute', bottom: 10, right: 10,
+                        background: 'rgba(0,0,0,0.6)', color: '#fff',
+                        border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
                       }}>撮り直す</button>
                     </div>
                   ) : (
                     <button type="button" onClick={() => fileRef.current?.click()} style={{
-                      width: '100%', height: 120, borderRadius: 10,
-                      border: '2px dashed #ccc', background: '#fafafa',
+                      width: '100%', height: 130, border: 'none', background: '#fafafa',
                       cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center', gap: 6,
+                      alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}>
-                      <span style={{ fontSize: 28 }}>📷</span>
-                      <span style={{ fontSize: 13, color: '#aaa' }}>タップして写真を撮る</span>
+                      <span style={{ fontSize: 36 }}>📷</span>
+                      <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る</span>
                     </button>
                   )}
-                </section>
+                </div>
 
-                {/* 位置情報 */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>📍 場所 <span style={{ color: '#E55039' }}>*</span></label>
+                {/* STEP 2: タイトル（必須） */}
+                <div style={{ background: '#fff', borderRadius: 14, padding: '14px 14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 6 }}>
+                    {selectedArchiveType ? selectedArchiveType.titleLabel : '何を見つけた？'} <span style={{ color: '#FF6B9D' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder={selectedArchiveType ? selectedArchiveType.titlePlaceholder : '例：修理された木の椅子、古い看板…'}
+                    style={{ ...inputStyle, fontSize: 16, fontWeight: 600, border: '2px solid ' + (title.trim() ? '#38ADA9' : '#eee') }}
+                    required
+                  />
+                </div>
 
-                  {/* 住所検索 */}
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <input
-                      type="text"
-                      value={addressQuery}
-                      onChange={e => setAddressQuery(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchAddress(); } }}
-                      placeholder="住所・地名で検索（例: 谷中銀座、東京都台東区谷中3丁目）"
-                      style={{ ...inputStyle, flex: 1, fontSize: 13 }}
-                    />
-                    <button type="button" onClick={searchAddress} disabled={addressSearching} style={{
-                      padding: '0 14px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-                      border: '1.5px solid #4A90E2', background: '#EEF4FF', color: '#4A90E2',
-                      fontWeight: 700, whiteSpace: 'nowrap',
-                    }}>{addressSearching ? '🔍…' : '🔍 検索'}</button>
-                  </div>
+                {/* STEP 3a: アーカイブの詳細（タイプ別） */}
+                {selectedArchiveType && (
+                  <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {archiveTypeKey === 'chimei' && (
+                      <>
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>よみ（ひらがな）</label>
+                          <input type="text" value={yomi} onChange={e => setYomi(e.target.value)}
+                            placeholder="例：どんどやきば" style={inputStyle} />
+                        </div>
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>別名・旧称（カンマ区切り）</label>
+                          <input type="text" value={altNames} onChange={e => setAltNames(e.target.value)}
+                            placeholder="例：才の神焼き場、どんどん場" style={inputStyle} />
+                        </div>
+                      </>
+                    )}
 
-                  {/* 候補リスト */}
-                  {addressCandidates.length > 1 && (
-                    <div style={{
-                      border: '1.5px solid #e0e0e0', borderRadius: 10, overflow: 'hidden', marginBottom: 8,
-                    }}>
-                      {addressCandidates.map((c, i) => (
-                        <button key={i} type="button" onClick={() => {
-                          setLat(parseFloat(c.lat));
-                          setLng(parseFloat(c.lon));
-                          setAddressQuery(c.display_name.split(',')[0]);
-                          setAddressCandidates([]);
-                        }} style={{
-                          width: '100%', padding: '9px 12px', background: '#fff',
-                          border: 'none', borderBottom: i < addressCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
-                          cursor: 'pointer', textAlign: 'left' as const, fontSize: 12, color: '#333',
-                          display: 'block',
-                        }}>
-                          📍 {c.display_name.split(',').slice(0, 3).join(', ')}
-                        </button>
-                      ))}
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>
+                        {selectedArchiveType.bodyLabel}
+                      </label>
+                      <textarea value={why} onChange={e => setWhy(e.target.value)}
+                        placeholder={selectedArchiveType.bodyPlaceholder}
+                        rows={archiveTypeKey === 'denshou' || archiveTypeKey === 'koe' ? 4 : 2} style={inputStyle} />
                     </div>
-                  )}
 
-                  {addressError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px' }}>{addressError}</p>}
-
-                  {/* GPSボタン */}
-                  <button type="button" onClick={detectGPS} disabled={gpsLoading} style={{
-                    width: '100%', padding: '10px', borderRadius: 10, marginBottom: 8,
-                    border: '1.5px solid #ddd', background: '#fafafa',
-                    color: '#666', fontSize: 13, cursor: gpsLoading ? 'wait' : 'pointer',
-                  }}>{gpsLoading ? '取得中…' : '📡 現在地を自動取得'}</button>
-
-                  {/* 座標・地図 */}
-                  {lat && (
-                    <>
-                      <p style={{ fontSize: 12, color: '#888', margin: '0 0 6px' }}>
-                        {lat.toFixed(5)}, {lng!.toFixed(5)}
-                        <button type="button" onClick={() => { setLat(null); setLng(null); setAddressQuery(''); }} style={{
-                          background: 'none', border: 'none', color: '#E55039',
-                          cursor: 'pointer', fontSize: 12, marginLeft: 8,
-                        }}>リセット</button>
-                      </p>
-                      <div style={{ height: 180, borderRadius: 10, overflow: 'hidden' }}>
-                        <LocationPickerMap lat={lat} lng={lng!} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
+                    {(archiveTypeKey === 'denshou' || archiveTypeKey === 'koe') && (
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>🎙️ 音声で残す（任意）</label>
+                        <AudioRecorder value={audioBlob} onChange={setAudioBlob} />
+                        <p style={{ fontSize: 11, color: '#bbb', margin: '6px 0 0' }}>
+                          話し言葉のまま残すと、文字にならないニュアンスも伝わります
+                        </p>
                       </div>
-                      <p style={{ fontSize: 11, color: '#aaa', margin: '4px 0 0' }}>地図をタップしてピンを微調整</p>
-                    </>
-                  )}
-                  {gpsError && <p style={{ color: '#E55039', fontSize: 12, margin: '6px 0 0' }}>{gpsError}</p>}
-                </section>
+                    )}
 
-                {/* 感情 */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>✨ なにを感じた？</label>
-                  <EmotionPicker value={emotionKey} onChange={setEmotionKey} />
-                </section>
+                    {archiveTypeKey === 'bunken' && (
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>出典・URL</label>
+                        <input type="text" value={sourceRef} onChange={e => setSourceRef(e.target.value)}
+                          placeholder="例：〇〇村誌 p.123 / https://…" style={inputStyle} />
+                      </div>
+                    )}
 
-                {/* 強度 */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>💫 どのくらい強く？</label>
-                  <IntensityPicker value={intensity} onChange={setIntensity} />
-                </section>
+                    {archiveTypeKey === 'koe' && (
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>この土地との関係</label>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {VOICE_RELATIONS.map(r => (
+                            <button key={r.key} type="button"
+                              onClick={() => setVoiceRelation(voiceRelation === r.key ? null : r.key)} style={{
+                                padding: '6px 11px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                                border: `1.5px solid ${voiceRelation === r.key ? selectedArchiveType.color : '#ddd'}`,
+                                background: voiceRelation === r.key ? selectedArchiveType.color : '#fff',
+                                color: voiceRelation === r.key ? '#fff' : '#666',
+                              }}>{r.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                {/* 人・もの・こと */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>👤 人・もの・こと？</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {TRACE_TYPES.map(t => (
-                      <button key={t.key} type="button"
-                        onClick={() => setTraceTypeKey(traceTypeKey === t.key ? null : t.key)}
-                        style={{
-                          flex: 1, padding: '10px 6px', borderRadius: 10, fontSize: 14, cursor: 'pointer',
-                          border: `2px solid ${traceTypeKey === t.key ? t.color : '#ddd'}`,
-                          background: traceTypeKey === t.key ? t.color + '18' : '#fff',
-                          color: traceTypeKey === t.key ? t.color : '#666',
-                          fontWeight: traceTypeKey === t.key ? 700 : 400,
-                        }}>
-                        {t.emoji} {t.label}
-                      </button>
-                    ))}
+                    {archiveTypeKey !== 'koe' && (
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>時代・年代（わかれば）</label>
+                        <input type="text" value={eraLabel} onChange={e => setEraLabel(e.target.value)}
+                          placeholder="例：昭和40年代まで、明治期、江戸末期…" style={inputStyle} />
+                      </div>
+                    )}
+                    {archiveTypeKey === 'koe' && (
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>いつ頃の話？（わかれば）</label>
+                        <input type="text" value={eraLabel} onChange={e => setEraLabel(e.target.value)}
+                          placeholder="例：1960年代、戦後すぐ…" style={inputStyle} />
+                      </div>
+                    )}
                   </div>
-                </section>
-
-                {/* 過去の記憶トグル */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>🕰 過去の思い出？</label>
-                  <button type="button" onClick={() => setIsPastMemory(v => !v)} style={{
-                    width: '100%', padding: '12px', borderRadius: 10, fontSize: 14, cursor: 'pointer',
-                    border: `2px solid ${isPastMemory ? '#F6B93B' : '#ddd'}`,
-                    background: isPastMemory ? '#FFFBF0' : '#fff',
-                    color: isPastMemory ? '#856404' : '#aaa',
-                    fontWeight: isPastMemory ? 700 : 400,
-                  }}>
-                    {isPastMemory ? '🕰 過去の記憶として登録する' : '📍 今の記録として登録する'}
-                  </button>
-                  {isPastMemory && (
-                    <div style={{ marginTop: 8 }}>
-                      <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>いつの記憶か（任意）</label>
-                      <input
-                        type="date"
-                        value={memoryDate}
-                        onChange={e => setMemoryDate(e.target.value)}
-                        style={{ ...inputStyle, fontSize: 14 }}
-                      />
-                    </div>
-                  )}
-                </section>
-
-                {/* カスタムタグ */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>🏷️ タグ（自由入力・ Enterで追加）</label>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {customTags.map(tag => (
-                      <span key={tag} style={{
-                        padding: '4px 10px', borderRadius: 20, fontSize: 12,
-                        background: '#f0f0f0', color: '#444',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}>
-                        #{tag}
-                        <button type="button" onClick={() => setCustomTags(tags => tags.filter(t => t !== tag))}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, color: '#aaa', padding: 0 }}>
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={e => setTagInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const t = tagInput.trim();
-                          if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]);
-                          setTagInput('');
-                        }
-                      }}
-                      placeholder="例: 木造り、昔の山手線…"
-                      style={{ ...inputStyle, flex: 1 }}
-                    />
-                    <button type="button" onClick={() => {
-                      const t = tagInput.trim();
-                      if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]);
-                      setTagInput('');
-                    }} style={{
-                      padding: '0 14px', borderRadius: 10, border: '1.5px solid #ddd',
-                      background: '#fff', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
-                    }}>追加</button>
-                  </div>
-                </section>
-
-                {/* カテゴリ */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>🏷 何を見つけた？（種類）</label>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {CATEGORIES.map(c => (
-                      <button key={c.key} type="button"
-                        onClick={() => setCategoryKey(categoryKey === c.key ? null : c.key)} style={{
-                          padding: '6px 11px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-                          border: `1.5px solid ${categoryKey === c.key ? '#555' : '#ddd'}`,
-                          background: categoryKey === c.key ? '#555' : '#fff',
-                          color: categoryKey === c.key ? '#fff' : '#666',
-                        }}>{c.emoji} {c.label}</button>
-                    ))}
-                  </div>
-                </section>
-
-                {/* タイトル */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>📝 何を見つけた？ <span style={{ color: '#E55039' }}>*</span></label>
-                  <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-                    placeholder="例：修理された木の椅子" style={inputStyle} required />
-                </section>
-
-                {/* かんたんモード */}
-                {quickMode && (
-                  <section style={secStyle}>
-                    <label style={labelStyle}>💬 なぜ気になった？（任意）</label>
-                    <textarea value={why} onChange={e => setWhy(e.target.value)}
-                      placeholder="直感でOK。うまく書かなくていい。" rows={2} style={inputStyle} />
-                  </section>
                 )}
 
-                {/* くわしくモード */}
-                {!quickMode && (
-                  <>
-                    <section style={secStyle}>
-                      <label style={labelStyle}>💬 言葉にしてみる（任意）</label>
+                {/* STEP 3: 感情（痕跡のみ） */}
+                {!selectedArchiveType && (
+                  <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
+                      なにを感じた？
+                    </label>
+                    <EmotionPicker value={emotionKey} onChange={setEmotionKey} />
+                  </div>
+                )}
+
+                {/* STEP 4: 位置（必須） */}
+                <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
+                    {selectedArchiveType ? 'その場所はどこ？' : 'いまいる場所'} <span style={{ color: '#FF6B9D' }}>*</span>
+                  </label>
+
+                  {/* 地図をタップして記録（メインの記録方法） */}
+                  <div style={{ height: 200, borderRadius: 10, overflow: 'hidden', marginBottom: 6 }}>
+                    <LocationPickerMap
+                      lat={lat ?? userPos?.[0] ?? DEFAULT_CENTER[0]}
+                      lng={lng ?? userPos?.[1] ?? DEFAULT_CENTER[1]}
+                      onChange={(la, ln) => { setLat(la); setLng(ln); }}
+                    />
+                  </div>
+                  <p style={{ fontSize: 11, color: '#999', margin: '0 0 8px' }}>
+                    {lat ? 'タップしてピンの位置を調整できます' : '☝️ 地図をタップして場所を選んでください'}
+                  </p>
+
+                  {lat && (
+                    <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 8px', display: 'flex', justifyContent: 'space-between' } as React.CSSProperties}>
+                      <span>✓ {lat.toFixed(5)}, {lng!.toFixed(5)}</span>
+                      <button type="button" onClick={() => { setLat(null); setLng(null); }}
+                        style={{ background: 'none', border: 'none', color: '#E55039', cursor: 'pointer', fontSize: 11 }}>
+                        リセット
+                      </button>
+                    </p>
+                  )}
+
+                  <button type="button" onClick={detectGPS} disabled={gpsLoading} style={{
+                    width: '100%', padding: '11px', borderRadius: 10, marginBottom: 8,
+                    border: `2px solid ${lat ? '#38ADA9' : '#4A90E2'}`,
+                    background: lat ? '#E8F8F7' : '#EEF4FF',
+                    color: lat ? '#38ADA9' : '#4A90E2', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}>
+                    {gpsLoading ? '取得中…' : lat ? '✓ 現在地を再取得' : '📡 現在地を自動取得'}
+                  </button>
+                  {gpsError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 8px' }}>{gpsError}</p>}
+
+                  {/* 住所検索（任意・折りたたみ） */}
+                  <button type="button" onClick={() => setShowAddressSearch(v => !v)} style={{
+                    background: 'none', border: 'none', color: '#aaa', fontSize: 12, cursor: 'pointer', padding: 0,
+                  }}>
+                    {showAddressSearch ? '▲ 住所検索を閉じる' : '🔍 住所で検索したい場合はこちら（任意）'}
+                  </button>
+
+                  {showAddressSearch && (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                        <input
+                          type="text" value={addressQuery}
+                          onChange={e => setAddressQuery(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchAddress(); } }}
+                          placeholder="地名・住所で検索"
+                          style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+                        />
+                        <button type="button" onClick={searchAddress} disabled={addressSearching} style={{
+                          padding: '0 12px', borderRadius: 10, border: '1.5px solid #e0e0e0',
+                          background: '#fff', color: '#555', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
+                        }}>{addressSearching ? '…' : '🔍'}</button>
+                      </div>
+
+                      {addressCandidates.length > 0 && (
+                        <div style={{ border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+                          {addressCandidates.map((c, i) => (
+                            <button key={i} type="button" onClick={() => {
+                              setLat(parseFloat(c.lat)); setLng(parseFloat(c.lon));
+                              setAddressQuery(c.display_name.split(',')[0]); setAddressCandidates([]);
+                            }} style={{
+                              width: '100%', padding: '9px 12px', background: '#fff',
+                              border: 'none', borderBottom: i < addressCandidates.length - 1 ? '1px solid #f5f5f5' : 'none',
+                              cursor: 'pointer', textAlign: 'left' as const, fontSize: 12, color: '#333',
+                            }}>
+                              📍 {c.display_name.split(',').slice(0, 3).join(', ')}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {addressError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px' }}>{addressError}</p>}
+                    </div>
+                  )}
+                </div>
+
+                {/* くわしく記録する トグル */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: 12, marginBottom: 12,
+                    border: `1.5px dashed ${showAdvanced ? '#FF6B9D' : '#ddd'}`,
+                    background: showAdvanced ? '#FFF0F5' : '#fafafa',
+                    color: showAdvanced ? '#FF6B9D' : '#999',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {showAdvanced ? '▲ くわしい記録を閉じる' : '＋ くわしく記録する（任意）'}
+                </button>
+
+                {/* 詳細フィールド */}
+                {showAdvanced && (
+                  <div style={{ background: '#fff', borderRadius: 14, padding: '16px 14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+                    {/* なぜ気になった（アーカイブ投稿では本文欄が上にあるため非表示） */}
+                    {!archiveTypeKey && (
+                      <section>
+                        <label style={labelStyle}>💬 なぜ気になった？</label>
+                        <textarea value={why} onChange={e => setWhy(e.target.value)}
+                          placeholder="直感でOK。うまく書かなくていい。" rows={2} style={inputStyle} />
+                      </section>
+                    )}
+
+                    {/* 見えた暮らし・自分との接点 */}
+                    <section>
+                      <label style={labelStyle}>🔍 もっと深く</label>
                       {[
-                        { label: 'なぜ気になった？', val: why, set: setWhy, ph: '直感でOK。うまく書かなくていい。' },
                         { label: '誰のどんな暮らし・想いが見えた？', val: interpretation, set: setInterpretation, ph: 'このものを使っていた人を想像してみる' },
                         { label: '自分のどんな記憶・感情とつながった？', val: selfReflection, set: setSelfReflection, ph: 'なぜ自分はこれに反応したのか' },
                       ].map(({ label, val, set, ph }) => (
-                        <div key={label} style={{ marginBottom: 12 }}>
-                          <p style={{ fontSize: 12, color: '#666', margin: '0 0 5px' }}>{label}</p>
-                          <textarea value={val} onChange={e => set(e.target.value)} placeholder={ph} rows={3} style={inputStyle} />
+                        <div key={label} style={{ marginBottom: 10 }}>
+                          <p style={{ fontSize: 12, color: '#888', margin: '0 0 4px' }}>{label}</p>
+                          <textarea value={val} onChange={e => set(e.target.value)} placeholder={ph} rows={2} style={inputStyle} />
                         </div>
                       ))}
                     </section>
-                    <section style={secStyle}>
+
+                    {/* 強度 */}
+                    <section>
+                      <label style={labelStyle}>💫 どのくらい強く感じた？</label>
+                      <IntensityPicker value={intensity} onChange={setIntensity} />
+                    </section>
+
+                    {/* カテゴリ */}
+                    <section>
+                      <label style={labelStyle}>🏷 何の種類？</label>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {CATEGORIES.map(c => (
+                          <button key={c.key} type="button"
+                            onClick={() => setCategoryKey(categoryKey === c.key ? null : c.key)} style={{
+                              padding: '6px 11px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                              border: `1.5px solid ${categoryKey === c.key ? '#555' : '#ddd'}`,
+                              background: categoryKey === c.key ? '#555' : '#fff',
+                              color: categoryKey === c.key ? '#fff' : '#666',
+                            }}>{c.emoji} {c.label}</button>
+                        ))}
+                      </div>
+                    </section>
+
+                    {/* 人・もの・こと */}
+                    <section>
+                      <label style={labelStyle}>👤 人・もの・こと？</label>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {TRACE_TYPES.map(t => (
+                          <button key={t.key} type="button"
+                            onClick={() => setTraceTypeKey(traceTypeKey === t.key ? null : t.key)} style={{
+                              flex: 1, padding: '10px 6px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
+                              border: `2px solid ${traceTypeKey === t.key ? t.color : '#ddd'}`,
+                              background: traceTypeKey === t.key ? t.color + '18' : '#fff',
+                              color: traceTypeKey === t.key ? t.color : '#666',
+                              fontWeight: traceTypeKey === t.key ? 700 : 400,
+                            }}>
+                            {t.emoji} {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+
+                    {/* 過去の記憶 */}
+                    <section>
+                      <button type="button" onClick={() => setIsPastMemory(v => !v)} style={{
+                        width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
+                        border: `2px solid ${isPastMemory ? '#F6B93B' : '#ddd'}`,
+                        background: isPastMemory ? '#FFFBF0' : '#fff',
+                        color: isPastMemory ? '#856404' : '#aaa', fontWeight: isPastMemory ? 700 : 400, fontSize: 14,
+                      }}>
+                        {isPastMemory ? '🕰 過去の記憶として登録する' : '📍 今の記録として登録する'}
+                      </button>
+                      {isPastMemory && (
+                        <input type="date" value={memoryDate} onChange={e => setMemoryDate(e.target.value)}
+                          style={{ ...inputStyle, marginTop: 8, fontSize: 14 }} />
+                      )}
+                    </section>
+
+                    {/* タグ */}
+                    <section>
+                      <label style={labelStyle}>🏷️ タグ（自由入力）</label>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+                        {customTags.map(tag => (
+                          <span key={tag} style={{
+                            padding: '4px 10px', borderRadius: 20, fontSize: 12,
+                            background: '#f0f0f0', color: '#444',
+                            display: 'flex', alignItems: 'center', gap: 4,
+                          }}>
+                            #{tag}
+                            <button type="button" onClick={() => setCustomTags(tags => tags.filter(t => t !== tag))}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#aaa', padding: 0 }}>×</button>
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); const t = tagInput.trim(); if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]); setTagInput(''); }
+                          }}
+                          placeholder="例: 木造り、昭和…" style={{ ...inputStyle, flex: 1, fontSize: 13 }} />
+                        <button type="button" onClick={() => { const t = tagInput.trim(); if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]); setTagInput(''); }} style={{
+                          padding: '0 12px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
+                        }}>追加</button>
+                      </div>
+                    </section>
+
+                    {/* また来たい・話したい */}
+                    <section>
                       <div style={{ display: 'flex', gap: 10 }}>
                         {([
                           { label: '🔁 また来たい', val: wantRevisit, toggle: () => setWantRevisit(!wantRevisit) },
@@ -717,30 +922,38 @@ export default function App() {
                           <button key={label} type="button" onClick={toggle} style={{
                             flex: 1, padding: '11px 6px', borderRadius: 10, fontSize: 13,
                             border: `2px solid ${val ? '#38ADA9' : '#ddd'}`,
-                            background: val ? '#E8F8F7' : '#fff',
-                            color: val ? '#38ADA9' : '#aaa',
+                            background: val ? '#E8F8F7' : '#fff', color: val ? '#38ADA9' : '#aaa',
                             fontWeight: val ? 700 : 400, cursor: 'pointer',
                           }}>{label}</button>
                         ))}
                       </div>
                     </section>
-                  </>
-                )}
 
-                {/* ニックネーム */}
-                <section style={secStyle}>
-                  <label style={labelStyle}>👤 ニックネーム（任意）</label>
-                  <input type="text" value={nickname} onChange={e => setNickname(e.target.value)}
-                    placeholder="匿名でもOK" style={inputStyle} />
-                </section>
+                    {/* ニックネーム + 実験回コード */}
+                    <section>
+                      <label style={labelStyle}>👤 ニックネーム（任意）</label>
+                      <input type="text" value={nickname} onChange={e => setNickname(e.target.value)}
+                        placeholder="匿名でもOK" style={inputStyle} />
+                    </section>
+
+                    <section style={{ padding: '10px', background: '#F8F9FA', borderRadius: 10, marginBottom: 0 }}>
+                      <label style={{ ...labelStyle, fontSize: 12, color: '#888', marginBottom: 4 }}>🔖 実験回コード（グループ共通）</label>
+                      <input type="text" value={sessionCode} onChange={e => saveSessionCode(e.target.value)}
+                        placeholder="例: yanaka-20260701" style={{ ...inputStyle, fontSize: 13, background: '#fff' }} />
+                    </section>
+                  </div>
+                )}
               </form>
             )}
           </div>
         )}
 
-        {/* 一覧タブ */}
+        {/* ─── 一覧 ─── */}
         {tab === 'list' && (
-          <div style={{ height: '100%', overflowY: 'auto', padding: '12px 12px 80px' }}>
+          <div style={{ height: '100%', overflowY: 'auto', padding: '12px 12px 80px', background: '#f8f8f8' }}>
+
+            {/* 統計パネル */}
+            <StatsPanel traces={filtered} sessionCode={sessionCode || undefined} />
 
             {/* マイ感情プロフィール */}
             {myProfile.length > 0 && (
@@ -748,68 +961,65 @@ export default function App() {
                 background: '#FFF8FC', border: '1.5px solid #FFD6E7',
                 borderRadius: 12, padding: '12px 14px', marginBottom: 14,
               }}>
-                <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#FF6B9D' }}>✨ あなたの感情プロフィール</p>
+                <p style={{ margin: '0 0 7px', fontSize: 12, fontWeight: 700, color: '#FF6B9D' }}>✨ あなたの感情プロフィール</p>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {myProfile.map((e, i) => (
                     <span key={e.key} style={{
                       padding: '4px 10px', borderRadius: 20, fontSize: 12,
                       background: i === 0 ? e.color : e.color + '33',
-                      color: i === 0 ? '#fff' : e.color,
-                      fontWeight: i === 0 ? 700 : 400,
+                      color: i === 0 ? '#fff' : e.color, fontWeight: i === 0 ? 700 : 400,
                     }}>{e.emoji} {e.label} {e.count}回</span>
                   ))}
                 </div>
-                <p style={{ margin: '7px 0 0', fontSize: 11, color: '#aaa' }}>
-                  「{myProfile[0].label}」に最もよく動かされています
-                </p>
               </div>
             )}
 
             {/* カテゴリフィルター */}
             {traces.some(t => t.category) && (
-              <div style={{ display: 'flex', gap: 5, overflowX: 'auto', marginBottom: 10, paddingBottom: 2 }}>
+              <div style={{ display: 'flex', gap: 5, overflowX: 'auto', marginBottom: 10, paddingBottom: 2, scrollbarWidth: 'none' }}>
                 <button onClick={() => setFilterCategory(null)} style={{
-                  padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                  padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   border: `1.5px solid ${!filterCategory ? '#444' : '#ddd'}`,
-                  background: !filterCategory ? '#444' : '#fff',
-                  color: !filterCategory ? '#fff' : '#666',
+                  background: !filterCategory ? '#444' : '#fff', color: !filterCategory ? '#fff' : '#666',
                 }}>すべて</button>
                 {CATEGORIES.filter(c => traces.some(t => t.category === c.key)).map(c => (
                   <button key={c.key} onClick={() => setFilterCategory(filterCategory === c.key ? null : c.key)} style={{
-                    padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                    padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                     border: `1.5px solid ${filterCategory === c.key ? '#555' : '#ddd'}`,
-                    background: filterCategory === c.key ? '#555' : '#fff',
-                    color: filterCategory === c.key ? '#fff' : '#666',
+                    background: filterCategory === c.key ? '#555' : '#fff', color: filterCategory === c.key ? '#fff' : '#666',
                   }}>{c.emoji} {c.label}</button>
                 ))}
               </div>
             )}
 
-            {/* ① 実験回コード絞り込み */}
-            <div style={{ marginBottom: 12 }}>
-              <input
-                placeholder="実験回コードで絞り込み（例: yanaka-20260701）"
-                value={sessionCode}
-                onChange={e => saveSessionCode(e.target.value)}
-                style={{ ...inputStyle, fontSize: 13 }}
-              />
-            </div>
+            {/* 実験回コード絞り込み */}
+            <input
+              placeholder="🔖 実験回コードで絞り込み（例: yanaka-20260701）"
+              value={sessionCode}
+              onChange={e => saveSessionCode(e.target.value)}
+              style={{ ...inputStyle, fontSize: 13, marginBottom: 12 }}
+            />
 
+            {/* カード一覧 */}
             {loading ? (
               <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>読み込み中…</p>
-            ) : filtered.length === 0 ? (
-              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>
-                {sessionCode ? `「${sessionCode}」の記録はまだありません。` : 'まだ記録がありません。'}<br />
-                まちを歩いて最初の痕跡を記録しましょう。
-              </p>
+            ) : sorted.length === 0 ? (
+              <div style={{ textAlign: 'center', marginTop: 50, color: '#bbb' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🗺</div>
+                <p style={{ fontSize: 14, margin: 0 }}>
+                  {sessionCode ? `「${sessionCode}」の記録はまだありません` : 'まだ記録がありません'}
+                </p>
+                <p style={{ fontSize: 12, marginTop: 6 }}>まちを歩いて最初の痕跡を記録しましょう</p>
+              </div>
             ) : (
-              /* ④ カードタップで詳細モーダル */
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-                {filtered.map(t => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                {sorted.map(t => (
                   <TraceCard
                     key={t.id}
                     trace={t}
+                    userPos={userPos}
                     onClick={() => setSelectedTrace(t)}
+                    onShowOnMap={handleShowOnMap}
                   />
                 ))}
               </div>
@@ -818,56 +1028,58 @@ export default function App() {
         )}
       </main>
 
-      {/* 投稿ボタン */}
+      {/* 記録するボタン */}
       {tab === 'post' && !submitDone && (
         <div style={{
           position: 'fixed', bottom: 60, left: 0, right: 0, padding: '8px 14px',
-          background: 'rgba(250,250,250,0.95)', backdropFilter: 'blur(8px)',
+          background: 'rgba(250,250,250,0.96)', backdropFilter: 'blur(10px)',
           borderTop: '1px solid #eee', zIndex: 200,
         }}>
           {submitError && (
             <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px', textAlign: 'center' }}>{submitError}</p>
           )}
           <button type="submit" form="trace-form" disabled={!canSubmit} style={{
-            width: '100%', padding: '14px',
-            background: canSubmit ? '#FF6B9D' : '#ddd',
-            color: '#fff', border: 'none', borderRadius: 11,
-            fontSize: 16, fontWeight: 700,
+            width: '100%', padding: '15px',
+            background: canSubmit
+              ? `linear-gradient(135deg, #FF6B9D, #FF8C42)`
+              : '#e0e0e0',
+            color: '#fff', border: 'none', borderRadius: 12,
+            fontSize: 16, fontWeight: 800,
             cursor: canSubmit ? 'pointer' : 'not-allowed',
+            boxShadow: canSubmit ? '0 4px 15px rgba(255,107,157,0.35)' : 'none',
+            transition: 'all 0.2s',
           }}>
             {uploadProgress || (submitting ? '記録中…' : '記録する →')}
           </button>
         </div>
       )}
 
-      {/* ボトムナビ */}
+      {/* ── ボトムナビ ── */}
       <nav style={{
         display: 'flex', borderTop: '1px solid #eee',
         background: '#fff', flexShrink: 0, zIndex: 300,
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}>
         {([
-          { id: 'map',  icon: '🗺',  label: 'マップ' },
-          { id: 'post', icon: '✏️', label: '記録する' },
+          { id: 'map', icon: '🗺', label: 'マップ' },
+          { id: 'post', icon: '✚', label: '記録する' },
           { id: 'list', icon: '📋', label: '一覧' },
         ] as { id: Tab; icon: string; label: string }[]).map(({ id, icon, label }) => (
           <button key={id} onClick={() => setTab(id)} style={{
             flex: 1, padding: '10px 4px 8px',
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-            color: tab === id ? '#FF6B9D' : '#999',
-            fontWeight: tab === id ? 700 : 400,
-            borderTop: `2px solid ${tab === id ? '#FF6B9D' : 'transparent'}`,
+            color: tab === id ? '#FF6B9D' : '#999', fontWeight: tab === id ? 700 : 400,
+            borderTop: `2.5px solid ${tab === id ? '#FF6B9D' : 'transparent'}`,
+            transition: 'color 0.15s',
           }}>
-            <span style={{ fontSize: 20 }}>{icon}</span>
+            <span style={{ fontSize: id === 'post' ? 22 : 20 }}>{icon}</span>
             <span style={{ fontSize: 11 }}>{label}</span>
           </button>
         ))}
       </nav>
 
-      {/* ④ 詳細モーダル */}
-      {showQR && <QRModal onClose={() => setShowQR(false)} />}
-
+      {/* ── モーダル ── */}
       {selectedTrace && (
         <TraceDetail
           trace={selectedTrace}

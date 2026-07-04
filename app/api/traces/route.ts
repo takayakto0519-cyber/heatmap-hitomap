@@ -61,6 +61,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         is_past_memory: body.is_past_memory ?? false,
         memory_date: body.memory_date ?? null,
         custom_tags: body.custom_tags ?? null,
+        archive_type: body.archive_type ?? null,
+        yomi: body.yomi ?? null,
+        alt_names: body.alt_names ?? null,
+        era_label: body.era_label ?? null,
+        source_ref: body.source_ref ?? null,
+        voice_relation: body.voice_relation ?? null,
+        audio_url: body.audio_url ?? null,
         session_code: body.session_code ?? null,
         nickname: body.nickname ?? null,
       })

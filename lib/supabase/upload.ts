@@ -20,3 +20,20 @@ export async function uploadTracePhoto(file: File): Promise<string> {
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
+
+// 言い伝え・人の声の録音を写真と同じ公開バケットにアップロード（新規バケット不要）
+export async function uploadTraceAudio(blob: Blob): Promise<string> {
+  const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+  const path = `audio/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: blob.type || 'audio/webm',
+  });
+
+  if (error) throw new Error(`録音のアップロードに失敗: ${error.message}`);
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}

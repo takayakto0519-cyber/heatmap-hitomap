@@ -19,7 +19,10 @@ export async function PATCH(
   try {
     const { id } = context.params;
     const body = await req.json();
-    const allowed = ['title', 'why', 'interpretation', 'self_reflection', 'want_revisit', 'want_to_share'];
+    const allowed = [
+      'title', 'why', 'interpretation', 'self_reflection', 'want_revisit', 'want_to_share',
+      'archive_type', 'yomi', 'alt_names', 'era_label', 'source_ref', 'voice_relation', 'audio_url',
+    ];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) updates[key] = body[key] ?? null;

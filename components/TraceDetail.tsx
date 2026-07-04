@@ -5,6 +5,7 @@ import type { Trace } from '@/lib/types';
 import { getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getTraceType } from '@/lib/traceTypes';
+import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 
 interface Props {
   trace: Trace;
@@ -36,9 +37,12 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [editRevisit, setEditRevisit] = useState(trace.want_revisit);
   const [editShare, setEditShare] = useState(trace.want_to_share);
 
-  const emotion = getEmotion(trace.emotion_key);
-  const category = getCategory(trace.category);
-  const traceType = getTraceType(trace.trace_type);
+  const archiveType = getArchiveType(trace.archive_type);
+  const emotion = archiveType ? null : getEmotion(trace.emotion_key);
+  const category = archiveType ? null : getCategory(trace.category);
+  const traceType = archiveType ? null : getTraceType(trace.trace_type);
+  const voiceRelation = getVoiceRelation(trace.voice_relation);
+  const sourceIsUrl = !!trace.source_ref && /^https?:\/\//.test(trace.source_ref);
 
   async function handleSave() {
     if (!editTitle.trim()) return;
@@ -161,6 +165,13 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
             {/* タグ行 */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {archiveType && (
+                <span style={{
+                  padding: '4px 10px', borderRadius: 20,
+                  background: archiveType.color + '22', color: archiveType.color,
+                  fontSize: 13, fontWeight: 700,
+                }}>{archiveType.emoji} {archiveType.label}</span>
+              )}
               {traceType && (
                 <span style={{
                   padding: '4px 10px', borderRadius: 20,
@@ -208,7 +219,53 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 <input value={editTitle} onChange={e => setEditTitle(e.target.value)} style={inputStyle} />
               </div>
             ) : (
-              <h2 style={{ margin: '0 0 14px', fontSize: 20, lineHeight: 1.4, fontWeight: 800 }}>{trace.title}</h2>
+              <h2 style={{ margin: '0 0 14px', fontSize: 20, lineHeight: 1.4, fontWeight: 800 }}>
+                {trace.title}
+                {trace.yomi && <span style={{ fontWeight: 400, color: '#aaa', fontSize: 14 }}>（{trace.yomi}）</span>}
+              </h2>
+            )}
+
+            {/* 録音（表示モードのみ） */}
+            {!editing && trace.audio_url && (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎙️ 録音</p>
+                <audio controls src={trace.audio_url} style={{ width: '100%' }} />
+              </div>
+            )}
+
+            {/* アーカイブ情報（表示モードのみ） */}
+            {!editing && archiveType && (trace.alt_names || trace.era_label || voiceRelation || trace.source_ref) && (
+              <div style={{
+                background: archiveType.color + '0D', border: `1px solid ${archiveType.color}33`,
+                borderRadius: 10, padding: '10px 12px', marginBottom: 14,
+                display: 'flex', flexDirection: 'column', gap: 6,
+              }}>
+                {trace.alt_names && (
+                  <p style={{ margin: 0, fontSize: 13, color: '#444' }}>
+                    <span style={{ color: '#999', fontSize: 11, fontWeight: 700 }}>別名・旧称　</span>{trace.alt_names}
+                  </p>
+                )}
+                {trace.era_label && (
+                  <p style={{ margin: 0, fontSize: 13, color: '#444' }}>
+                    <span style={{ color: '#999', fontSize: 11, fontWeight: 700 }}>時代・年代　</span>{trace.era_label}
+                  </p>
+                )}
+                {voiceRelation && (
+                  <p style={{ margin: 0, fontSize: 13, color: '#444' }}>
+                    <span style={{ color: '#999', fontSize: 11, fontWeight: 700 }}>語り手　</span>{voiceRelation.label}
+                  </p>
+                )}
+                {trace.source_ref && (
+                  <p style={{ margin: 0, fontSize: 13, color: '#444', wordBreak: 'break-all' }}>
+                    <span style={{ color: '#999', fontSize: 11, fontWeight: 700 }}>出典　</span>
+                    {sourceIsUrl ? (
+                      <a href={trace.source_ref} target="_blank" rel="noopener noreferrer" style={{ color: '#2E86C1' }}>
+                        {trace.source_ref}
+                      </a>
+                    ) : trace.source_ref}
+                  </p>
+                )}
+              </div>
             )}
 
             {/* なぜ */}
@@ -219,7 +276,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
               </div>
             ) : trace.why ? (
               <div style={{ marginBottom: 14 }}>
-                <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>なぜ気になった</p>
+                <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{archiveType ? archiveType.bodyLabel : 'なぜ気になった'}</p>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: '#333' }}>{trace.why}</p>
               </div>
             ) : null}
