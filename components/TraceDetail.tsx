@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Trace } from '@/lib/types';
 import { getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
@@ -36,6 +36,17 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [editSelf, setEditSelf] = useState(trace.self_reflection ?? '');
   const [editRevisit, setEditRevisit] = useState(trace.want_revisit);
   const [editShare, setEditShare] = useState(trace.want_to_share);
+  const [authorUsername, setAuthorUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!trace.user_id) { setAuthorUsername(null); return; }
+    (async () => {
+      const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
+      const supabase = createAuthBrowserClient();
+      const { data } = await supabase.from('profiles').select('username').eq('id', trace.user_id!).maybeSingle();
+      setAuthorUsername(data?.username ?? null);
+    })();
+  }, [trace.user_id]);
 
   const archiveType = getArchiveType(trace.archive_type);
   const emotion = archiveType ? null : getEmotion(trace.emotion_key);
@@ -345,7 +356,9 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             {!editing && (
               <p style={{ fontSize: 11, color: '#ccc', margin: '0 0 4px' }}>
                 {new Date(trace.created_at).toLocaleString('ja-JP')}
-                {trace.nickname ? ` · ${trace.nickname}` : ''}
+                {authorUsername ? (
+                  <> · <a href={`/profile/${authorUsername}`} style={{ color: '#38ADA9' }}>@{authorUsername}</a></>
+                ) : trace.nickname ? ` · ${trace.nickname}` : ''}
               </p>
             )}
           </div>

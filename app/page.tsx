@@ -117,6 +117,12 @@ export default function App() {
   const [uploadProgress, setUploadProgress] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitDone, setSubmitDone] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
+  const [postVisibility, setPostVisibility] = useState<'private' | 'followers' | 'pending_review'>('private');
+
+  useEffect(() => {
+    fetch('/api/profile').then(r => r.json()).then(d => setCurrentUser(d.user ?? null)).catch(() => {});
+  }, []);
 
   // ── 初期化 ──────────────────────────────
   useEffect(() => {
@@ -284,6 +290,7 @@ export default function App() {
           custom_tags: customTags.length > 0 ? customTags : null,
           session_code: sessionCode.trim() || null,
           nickname: nickname.trim() || null,
+          visibility: currentUser ? postVisibility : undefined,
         }),
       });
       const data: CreateTraceResponse = await res.json();
@@ -354,7 +361,18 @@ export default function App() {
 
       {/* ── ヘッダー ── */}
       <header style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          {currentUser ? (
+            <button onClick={async () => {
+              const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
+              await createAuthBrowserClient().auth.signOut();
+              setCurrentUser(null);
+            }} style={{
+              background: 'none', border: 'none', color: '#999', fontSize: 11, cursor: 'pointer', padding: 0,
+            }}>👤 {currentUser.email} ・ ログアウト</button>
+          ) : (
+            <a href="/login" style={{ color: '#38ADA9', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>ログイン / 新規登録</a>
+          )}
 
           {/* タブ別コントロール */}
           {tab === 'map' && (
@@ -1035,6 +1053,23 @@ export default function App() {
           background: 'rgba(250,250,250,0.96)', backdropFilter: 'blur(10px)',
           borderTop: '1px solid #eee', zIndex: 200,
         }}>
+          {currentUser && (
+            <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+              {([
+                { key: 'private', label: '🔒 非公開' },
+                { key: 'followers', label: '👥 フォロワー限定' },
+                { key: 'pending_review', label: '🌏 全国公開を申請' },
+              ] as const).map(v => (
+                <button key={v.key} type="button" onClick={() => setPostVisibility(v.key)} style={{
+                  flex: 1, padding: '6px 4px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                  border: `1.5px solid ${postVisibility === v.key ? '#38ADA9' : '#ddd'}`,
+                  background: postVisibility === v.key ? '#E8F8F7' : '#fff',
+                  color: postVisibility === v.key ? '#38ADA9' : '#888',
+                  fontWeight: postVisibility === v.key ? 700 : 400,
+                }}>{v.label}</button>
+              ))}
+            </div>
+          )}
           {submitError && (
             <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px', textAlign: 'center' }}>{submitError}</p>
           )}

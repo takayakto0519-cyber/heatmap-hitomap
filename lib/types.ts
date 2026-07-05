@@ -43,6 +43,13 @@ export interface Trace {
 
   session_code: string | null;    // 実験回の識別
   nickname: string | null;        // 任意ニックネーム（匿名可）
+
+  // アカウント・公開範囲・削除
+  user_id: string | null;         // ログイン投稿の場合の auth.users.id（匿名投稿は null）
+  visibility: string;             // private | followers | pending_review | public
+  is_deleted: boolean;            // ソフトデリートフラグ
+  deleted_at: string | null;
+  deleted_by: string | null;      // 'admin' または削除者の識別子
 }
 
 /**
@@ -84,6 +91,8 @@ export interface TraceInput {
 
   session_code?: string;
   nickname?: string;
+
+  visibility?: string;             // private | followers | pending_review | public（未指定・未ログインは public 固定）
 }
 
 // ------------------------------------------------------------

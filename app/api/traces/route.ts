@@ -11,6 +11,7 @@ import type {
   Trace,
 } from '@/lib/types';
 import { SAMPLE_TRACES } from '@/lib/sampleTraces';
+import { getCurrentUserId } from '@/lib/supabase/requestClient';
 
 // Supabaseが設定済みかどうか。未設定ならローカル確認用のサンプルにフォールバック。
 const SUPABASE_READY = Boolean(
@@ -41,6 +42,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
       );
     }
 
+    const userId = await getCurrentUserId();
+    // 匿名投稿は従来どおり即時 public。ログイン投稿のみ公開範囲を選べる（private/followers/pending_review）。
+    const allowedVisibility = ['private', 'followers', 'pending_review'];
+    const visibility = userId && body.visibility && allowedVisibility.includes(body.visibility)
+      ? body.visibility
+      : userId ? 'private' : 'public';
+
     const supabaseServer = await getServerClient();
     const { data, error } = await supabaseServer
       .from('traces')
@@ -70,6 +78,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         audio_url: body.audio_url ?? null,
         session_code: body.session_code ?? null,
         nickname: body.nickname ?? null,
+        user_id: userId,
+        visibility,
       })
       .select()
       .single();
@@ -100,11 +110,29 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
   }
 
   const supabaseServer = await getServerClient();
+  const userId = await getCurrentUserId();
+
   let query = supabaseServer
     .from('traces')
     .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .eq('is_deleted', false);
+
+  if (!userId) {
+    // 未ログイン閲覧者には public のみ
+    query = query.eq('visibility', 'public');
+  } else {
+    const { data: followRows } = await supabaseServer
+      .from('follows').select('followee_id').eq('follower_id', userId);
+    const followingIds = (followRows ?? []).map((r) => r.followee_id);
+
+    const orParts = ['visibility.eq.public', `user_id.eq.${userId}`];
+    if (followingIds.length > 0) {
+      orParts.push(`and(visibility.eq.followers,user_id.in.(${followingIds.join(',')}))`);
+    }
+    query = query.or(orParts.join(','));
+  }
+
+  query = query.order('created_at', { ascending: false }).limit(limit);
 
   if (sessionCode) query = query.eq('session_code', sessionCode);
 
