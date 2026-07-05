@@ -73,7 +73,7 @@ export default function ProfilePage() {
 
   return (
     <div style={{ padding: 20, maxWidth: 480, margin: '0 auto' }}>
-      <a href="/" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← マップへ戻る</a>
+      <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← マップへ戻る</a>
       <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginTop: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>{profile.display_name ?? profile.username}</h1>
         <p style={{ fontSize: 13, color: '#999', marginBottom: 10 }}>@{profile.username}</p>

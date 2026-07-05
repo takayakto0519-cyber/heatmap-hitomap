@@ -142,6 +142,8 @@ export interface Route {
   is_deleted: boolean;
   deleted_at: string | null;
   deleted_by: string | null;
+  sponsor_name: string | null;  // 協賛企業名（手動設定、決済は伴わない）
+  sponsor_url: string | null;
 }
 
 export interface CreateRouteRequest {
@@ -169,6 +171,31 @@ export interface RouteDetailResponse {
 export interface ListRoutesResponse {
   ok: boolean;
   routes: Route[];
+  error?: string;
+}
+
+export interface RouteCompletionsResponse {
+  ok: boolean;
+  count: number;
+  error?: string;
+}
+
+export interface Sponsor {
+  id: string;
+  placement: 'region' | 'detour';
+  region: string | null;
+  name: string;
+  message: string | null;
+  url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ListSponsorsResponse {
+  ok: boolean;
+  sponsors: Sponsor[];
   error?: string;
 }
 

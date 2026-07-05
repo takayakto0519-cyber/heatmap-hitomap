@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import type { Trace, ListTracesResponse } from '@/lib/types';
+import type { Trace, ListTracesResponse, Sponsor, ListSponsorsResponse } from '@/lib/types';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 
@@ -19,6 +19,7 @@ export default function RegionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+  const [sponsor, setSponsor] = useState<Sponsor | null>(null);
 
   useEffect(() => {
     fetch(`/api/traces?region=${encodeURIComponent(regionName)}`)
@@ -26,15 +27,29 @@ export default function RegionPage() {
       .then(d => { if (d.ok) setTraces(d.traces); else setError(d.error ?? '取得に失敗しました'); })
       .catch(e => setError(e instanceof Error ? e.message : '通信エラー'))
       .finally(() => setLoading(false));
+    fetch(`/api/sponsors?placement=region&region=${encodeURIComponent(regionName)}`)
+      .then(r => r.json() as Promise<ListSponsorsResponse>)
+      .then(d => { if (d.ok && d.sponsors.length > 0) setSponsor(d.sponsors[0]); })
+      .catch(() => {});
   }, [regionName]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
       <header style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
-        <a href="/" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
+        <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
         <h1 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 800 }}>🏘 {regionName}</h1>
         <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>{loading ? '読み込み中…' : `${traces.length}件の記録`}</p>
       </header>
+
+      {sponsor && (
+        <a href={sponsor.url ?? undefined} target={sponsor.url ? '_blank' : undefined} rel="noopener noreferrer" style={{
+          display: 'block', padding: '8px 16px', background: '#FFF8E8', borderBottom: '1px solid #F0E4C0',
+          textDecoration: 'none', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 10, color: '#B7791F', fontWeight: 700, marginRight: 6 }}>PR</span>
+          <span style={{ fontSize: 12, color: '#8A6D3B' }}>{sponsor.name}{sponsor.message ? ` ・ ${sponsor.message}` : ''}</span>
+        </a>
+      )}
 
       <div style={{ height: '55%', flexShrink: 0 }}>
         {traces.length > 0 && (

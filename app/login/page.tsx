@@ -40,7 +40,7 @@ export default function LoginPage() {
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
-        router.push('/');
+        router.push('/map');
         router.refresh();
       }
     } catch (err) {
@@ -111,7 +111,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <button onClick={() => router.push('/')} style={{
+        <button onClick={() => router.push('/map')} style={{
           marginTop: 14, background: 'none', border: 'none', color: '#999', fontSize: 12, cursor: 'pointer',
         }}>
           ← ログインせずにマップへ戻る

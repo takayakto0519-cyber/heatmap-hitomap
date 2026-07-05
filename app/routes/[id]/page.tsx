@@ -41,6 +41,8 @@ export default function RoutePage() {
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
   const [visitedIds, setVisitedIds] = useState<string[]>([]);
   const [gpsError, setGpsError] = useState('');
+  const [completionCount, setCompletionCount] = useState<number | null>(null);
+  const [justCompleted, setJustCompleted] = useState(false);
 
   useEffect(() => {
     fetch(`/api/routes/${id}`)
@@ -51,6 +53,10 @@ export default function RoutePage() {
       })
       .catch(e => setError(e instanceof Error ? e.message : '通信エラー'))
       .finally(() => setLoading(false));
+    fetch(`/api/routes/${id}/complete`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setCompletionCount(d.count); })
+      .catch(() => {});
   }, [id]);
 
   const nextTrace = traces.find(t => !visitedIds.includes(t.id));
@@ -62,6 +68,18 @@ export default function RoutePage() {
       setVisitedIds(prev => prev.includes(nextTrace.id) ? prev : [...prev, nextTrace.id]);
     }
   }, [nextTrace]);
+
+  // 全地点を歩き終えたら一度だけ踏破を記録する（🏅 無料版スタンプラリー）
+  useEffect(() => {
+    if (walking && traces.length > 0 && !nextTrace && !justCompleted) {
+      setJustCompleted(true);
+      fetch(`/api/routes/${id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: route?.nickname ?? undefined }),
+      }).then(() => setCompletionCount(c => (c ?? 0) + 1)).catch(() => {});
+    }
+  }, [walking, traces.length, nextTrace, justCompleted, id, route]);
 
   useEffect(() => {
     if (!walking || !navigator.geolocation) return;
@@ -86,10 +104,18 @@ export default function RoutePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
       <header style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
-        <a href="/" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
+        <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
         <h1 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 800 }}>🥾 {route.title}</h1>
         {route.description && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>{route.description}</p>}
-        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>{traces.length}地点 {route.nickname ? `・ ${route.nickname}` : ''}</p>
+        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>
+          {traces.length}地点 {route.nickname ? `・ ${route.nickname}` : ''}
+          {completionCount !== null && completionCount > 0 ? ` ・ 🏅${completionCount}人が踏破` : ''}
+        </p>
+        {route.sponsor_name && (
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#B7791F', background: '#FFF8E8', display: 'inline-block', padding: '3px 9px', borderRadius: 8 }}>
+            PR ・ 協賛：{route.sponsor_url ? <a href={route.sponsor_url} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F' }}>{route.sponsor_name}</a> : route.sponsor_name}
+          </p>
+        )}
       </header>
 
       <div style={{ height: '45%', flexShrink: 0 }}>
@@ -123,7 +149,11 @@ export default function RoutePage() {
                 <p style={{ fontSize: 11, color: '#ccc', margin: '8px 0 0' }}>近づくと自動的に到着扱いになります（半径{ARRIVAL_RADIUS}m）</p>
               </>
             ) : (
-              <p style={{ fontSize: 15, fontWeight: 800, color: '#8E44AD', margin: 0 }}>🎉 すべての地点を歩き終えました</p>
+              <>
+                <p style={{ fontSize: 15, fontWeight: 800, color: '#8E44AD', margin: 0 }}>🎉 すべての地点を歩き終えました</p>
+                <p style={{ fontSize: 26, margin: '10px 0 0' }}>🏅</p>
+                <p style={{ fontSize: 12, color: '#999', margin: '2px 0 0' }}>踏破バッジを獲得しました{completionCount !== null ? `（あなたで${completionCount}人目）` : ''}</p>
+              </>
             )}
           </div>
         )}
