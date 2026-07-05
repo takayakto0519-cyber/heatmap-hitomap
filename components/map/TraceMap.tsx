@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -125,11 +125,13 @@ interface Props {
   flyTo?: [number, number];
   flyToZoom?: number;
   fitBounds?: [[number, number], [number, number]];
+  routeLine?: [number, number][];
+  highlightIds?: string[];
   onLocate?: (pos: [number, number]) => void;
   onTraceClick?: (trace: Trace) => void;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, onLocate, onTraceClick }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -155,6 +157,14 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       <LocateControl onLocate={onLocate} />
       <FlyToHandler pos={flyTo} zoom={flyToZoom} bounds={fitBounds} />
       <ZoomTracker onZoom={setCurrentZoom} />
+
+      {routeLine && routeLine.length >= 2 && (
+        <Polyline positions={routeLine} pathOptions={{ color: '#38ADA9', weight: 3, dashArray: '2 10' }} />
+      )}
+      {highlightIds && traces.filter(t => highlightIds.includes(t.id)).map(t => (
+        <Circle key={`hl-${t.id}`} center={[t.latitude, t.longitude]} radius={35}
+          pathOptions={{ color: '#38ADA9', fillColor: '#38ADA9', fillOpacity: 0.15, weight: 2 }} />
+      ))}
 
       {mode === 'heat'
         ? traces.filter(t => !t.archive_type).map((t) => {

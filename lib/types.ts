@@ -126,6 +126,52 @@ export interface ListTracesQuery {
   limit?: number;
 }
 
+// ------------------------------------------------------------
+// 痕跡ルート：複数の痕跡を順番につなげ「この人が歩いた道」として公開する
+// ------------------------------------------------------------
+
+export interface Route {
+  id: string;
+  created_at: string;
+  title: string;
+  description: string | null;
+  trace_ids: string[];   // 順序付き。歩く順番＝配列の順番
+  nickname: string | null;
+  user_id: string | null;
+  session_code: string | null;
+  is_deleted: boolean;
+  deleted_at: string | null;
+  deleted_by: string | null;
+}
+
+export interface CreateRouteRequest {
+  title: string;
+  description?: string | null;
+  trace_ids: string[];
+  nickname?: string;
+  session_code?: string;
+}
+
+export interface CreateRouteResponse {
+  ok: boolean;
+  route?: Route;
+  error?: string;
+}
+
+/** GET /api/routes/[id] のレスポンス。traces は trace_ids の順番どおりに解決済み */
+export interface RouteDetailResponse {
+  ok: boolean;
+  route?: Route;
+  traces?: Trace[];
+  error?: string;
+}
+
+export interface ListRoutesResponse {
+  ok: boolean;
+  routes: Route[];
+  error?: string;
+}
+
 /**
  * Googleフォームの回答行 → TraceInput への正規化マップ。
  * （Apps Script や中継サーバーで列名→キーを対応させる際の指針）

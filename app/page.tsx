@@ -73,6 +73,77 @@ export default function App() {
   const [regionCandidates, setRegionCandidates] = useState<{ display_name: string; lat: string; lon: string; boundingbox: string[] }[]>([]);
   const [showRegionSearch, setShowRegionSearch] = useState(false);
 
+  // ルート作成モード（一覧タブ）
+  const [routeMode, setRouteMode] = useState(false);
+  const [routeSelection, setRouteSelection] = useState<string[]>([]);
+  const [routeTitle, setRouteTitle] = useState('');
+  const [routeNickname, setRouteNickname] = useState('');
+  const [routeSaving, setRouteSaving] = useState(false);
+  const [routeSaveError, setRouteSaveError] = useState('');
+
+  function toggleRouteSelection(id: string) {
+    setRouteSelection(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
+  async function saveRoute() {
+    if (!routeTitle.trim() || routeSelection.length < 2) return;
+    setRouteSaving(true);
+    setRouteSaveError('');
+    try {
+      const res = await fetch('/api/routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: routeTitle.trim(),
+          trace_ids: routeSelection,
+          nickname: routeNickname.trim() || undefined,
+          session_code: sessionCode.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.route?.id) {
+        window.location.href = `/routes/${data.route.id}`;
+      } else {
+        setRouteSaveError(data.error ?? '保存に失敗しました');
+      }
+    } catch (err) {
+      setRouteSaveError(err instanceof Error ? err.message : '保存に失敗しました');
+    } finally {
+      setRouteSaving(false);
+    }
+  }
+
+  // 寄り道モード（地図タブ：目的地までの経路沿いにある痕跡を提案する）
+  const [detourMode, setDetourMode] = useState(false);
+  const [detourQuery, setDetourQuery] = useState('');
+  const [detourSearching, setDetourSearching] = useState(false);
+  const [detourError, setDetourError] = useState('');
+  const [detourCandidates, setDetourCandidates] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
+  const [detourDestination, setDetourDestination] = useState<{ name: string; pos: [number, number] } | null>(null);
+
+  async function searchDetourDestination() {
+    if (!detourQuery.trim()) return;
+    setDetourSearching(true);
+    setDetourError('');
+    setDetourCandidates([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(detourQuery)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
+      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { display_name: string; lat: string; lon: string }[];
+      if (results.length === 0) setDetourError('見つかりませんでした');
+      setDetourCandidates(results);
+    } catch {
+      setDetourError('検索に失敗しました');
+    } finally {
+      setDetourSearching(false);
+    }
+  }
+
+  function pickDetourDestination(c: { display_name: string; lat: string; lon: string }) {
+    setDetourDestination({ name: c.display_name, pos: [Number(c.lat), Number(c.lon)] });
+    setDetourCandidates([]);
+    setDetourQuery('');
+  }
+
   // ── データ ──────────────────────────────
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -227,6 +298,35 @@ export default function App() {
     if (sessionCode && t.session_code !== sessionCode) return false;
     return true;
   });
+
+  // 寄り道モード：現在地→目的地の直線付近にある痕跡を、通過順に並べて提案する
+  const DETOUR_BUFFER_METERS = 400;
+  const detourWaypoints = (() => {
+    if (!detourMode || !userPos || !detourDestination) return [];
+    const [oLat, oLng] = userPos;
+    const [dLat, dLng] = detourDestination.pos;
+    // 局所的な平面近似（数km範囲なら十分な精度）
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.cos(oLat * Math.PI / 180);
+    const toXY = (lat: number, lng: number): [number, number] => [(lng - oLng) * mPerDegLng, (lat - oLat) * mPerDegLat];
+    const [ox, oy] = toXY(oLat, oLng);
+    const [dx, dy] = toXY(dLat, dLng);
+    const segX = dx - ox, segY = dy - oy;
+    const segLenSq = segX * segX + segY * segY || 1;
+
+    return traces
+      .map(t => {
+        const [px, py] = toXY(t.latitude, t.longitude);
+        const relX = px - ox, relY = py - oy;
+        const proj = (relX * segX + relY * segY) / segLenSq;
+        const clampedProj = Math.max(0, Math.min(1, proj));
+        const closestX = ox + segX * clampedProj, closestY = oy + segY * clampedProj;
+        const perpDist = Math.hypot(px - closestX, py - closestY);
+        return { trace: t, proj, perpDist };
+      })
+      .filter(w => w.proj >= -0.05 && w.proj <= 1.05 && w.perpDist <= DETOUR_BUFFER_METERS)
+      .sort((a, b) => a.proj - b.proj);
+  })();
 
   const sorted = [...filtered].sort((a, b) => {
     const ta = new Date(a.created_at).getTime();
@@ -441,6 +541,15 @@ export default function App() {
                 background: showRegionSearch ? '#E8F8F7' : '#fff',
                 color: showRegionSearch ? '#38ADA9' : '#666', fontWeight: showRegionSearch ? 700 : 400,
               }}>🔍 地域</button>
+              <button onClick={() => {
+                setDetourMode(v => !v);
+                if (detourMode) { setDetourDestination(null); setDetourQuery(''); setDetourCandidates([]); }
+              }} style={{
+                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                border: `1.5px solid ${detourMode ? '#38ADA9' : '#ddd'}`,
+                background: detourMode ? '#E8F8F7' : '#fff',
+                color: detourMode ? '#38ADA9' : '#666', fontWeight: detourMode ? 700 : 400,
+              }}>🚶 寄り道</button>
               {(['pin', 'heat'] as MapMode[]).map(m => (
                 <button key={m} onClick={() => {
                   setMapMode(m);
@@ -465,6 +574,12 @@ export default function App() {
               }}>
                 {sortOrder === 'new' ? '🕐 新しい順' : '🕰 古い順'}
               </button>
+              <button onClick={() => { setRouteMode(v => !v); setRouteSelection([]); }} style={{
+                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                border: `1.5px solid ${routeMode ? '#8E44AD' : '#ddd'}`,
+                background: routeMode ? '#F3EAFB' : '#fff',
+                color: routeMode ? '#8E44AD' : '#666', fontWeight: routeMode ? 700 : 400,
+              }}>🥾 {routeMode ? 'ルート作成中' : 'ルートを作る'}</button>
             </div>
           )}
 
@@ -544,6 +659,65 @@ export default function App() {
           </div>
         )}
 
+        {/* 寄り道モード（マップ） */}
+        {tab === 'map' && detourMode && (
+          <div style={{ marginBottom: 6 }}>
+            {!userPos ? (
+              <p style={{ fontSize: 12, color: '#aaa', margin: 0 }}>現在地を取得しています…（位置情報を許可してください）</p>
+            ) : !detourDestination ? (
+              <>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={detourQuery}
+                    onChange={e => setDetourQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') searchDetourDestination(); }}
+                    placeholder="目的地は？（例：〇〇駅）"
+                    style={{ flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 13, border: '1.5px solid #ddd', outline: 'none' }}
+                  />
+                  <button onClick={searchDetourDestination} disabled={detourSearching} style={{
+                    padding: '7px 14px', borderRadius: 8, border: 'none',
+                    background: '#38ADA9', color: '#fff', fontSize: 13, fontWeight: 700,
+                    cursor: detourSearching ? 'wait' : 'pointer',
+                  }}>{detourSearching ? '検索中…' : '検索'}</button>
+                </div>
+                {detourError && <p style={{ color: '#E55039', fontSize: 12, margin: '4px 0 0' }}>{detourError}</p>}
+                {detourCandidates.length > 0 && (
+                  <div style={{ marginTop: 6, background: '#fff', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
+                    {detourCandidates.map((c, i) => (
+                      <button key={i} onClick={() => pickDetourDestination(c)} style={{
+                        display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
+                        border: 'none', borderBottom: i < detourCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        background: '#fff', fontSize: 12, color: '#444', cursor: 'pointer',
+                      }}>{c.display_name}</button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ background: '#E8F8F7', border: '1.5px solid #38ADA933', borderRadius: 10, padding: '8px 12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#38ADA9', fontWeight: 700 }}>
+                    🚶 {detourDestination.name.split('、')[0]} まで・寄り道スポット {detourWaypoints.length}件
+                  </p>
+                  <button onClick={() => setDetourDestination(null)} style={{
+                    background: 'none', border: 'none', color: '#999', fontSize: 11, cursor: 'pointer',
+                  }}>やり直す</button>
+                </div>
+                {detourWaypoints.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginTop: 6, paddingBottom: 2 }}>
+                    {detourWaypoints.map(w => (
+                      <button key={w.trace.id} onClick={() => { setMapFlyToZoom(17); setMapFlyTo([w.trace.latitude, w.trace.longitude]); }} style={{
+                        flexShrink: 0, padding: '5px 10px', borderRadius: 14, fontSize: 11,
+                        border: '1.5px solid #38ADA9', background: '#fff', color: '#38ADA9', cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>{w.trace.title}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 感情フィルター（マップ・一覧） */}
         {(tab === 'map' || tab === 'list') && emotionCounts.length > 0 && (
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
@@ -593,7 +767,16 @@ export default function App() {
               center={userPos ?? undefined}
               flyTo={mapFlyTo ?? undefined}
               flyToZoom={mapFlyToZoom}
-              fitBounds={mapFitBounds ?? undefined}
+              fitBounds={
+                (detourDestination && userPos)
+                  ? [
+                      [Math.min(userPos[0], detourDestination.pos[0]), Math.min(userPos[1], detourDestination.pos[1])],
+                      [Math.max(userPos[0], detourDestination.pos[0]), Math.max(userPos[1], detourDestination.pos[1])],
+                    ]
+                  : mapFitBounds ?? undefined
+              }
+              routeLine={(detourDestination && userPos) ? [userPos, detourDestination.pos] : undefined}
+              highlightIds={detourDestination ? detourWaypoints.map(w => w.trace.id) : undefined}
               onLocate={pos => setUserPos(pos)}
               onTraceClick={setSelectedTrace}
             />
@@ -1113,6 +1296,16 @@ export default function App() {
               style={{ ...inputStyle, fontSize: 13, marginBottom: 12 }}
             />
 
+            {/* ルート作成モードの案内 */}
+            {routeMode && (
+              <div style={{
+                background: '#F3EAFB', border: '1.5px solid #8E44AD33', borderRadius: 12,
+                padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#8E44AD',
+              }}>
+                🥾 歩いた順にカードをタップして選んでください（{routeSelection.length}件選択中、2件以上必要）
+              </div>
+            )}
+
             {/* カード一覧 */}
             {loading ? (
               <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>読み込み中…</p>
@@ -1126,20 +1319,67 @@ export default function App() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-                {sorted.map(t => (
-                  <TraceCard
-                    key={t.id}
-                    trace={t}
-                    userPos={userPos}
-                    onClick={() => setSelectedTrace(t)}
-                    onShowOnMap={handleShowOnMap}
-                  />
-                ))}
+                {sorted.map(t => {
+                  const selectedIndex = routeSelection.indexOf(t.id);
+                  return (
+                    <div key={t.id} style={{ position: 'relative' }}>
+                      <TraceCard
+                        trace={t}
+                        userPos={userPos}
+                        onClick={() => routeMode ? toggleRouteSelection(t.id) : setSelectedTrace(t)}
+                        onShowOnMap={routeMode ? undefined : handleShowOnMap}
+                      />
+                      {routeMode && (
+                        <div style={{
+                          position: 'absolute', top: 8, left: 8, width: 26, height: 26, borderRadius: 13,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: selectedIndex >= 0 ? '#8E44AD' : 'rgba(255,255,255,0.85)',
+                          color: selectedIndex >= 0 ? '#fff' : '#bbb',
+                          border: selectedIndex >= 0 ? 'none' : '1.5px solid #ddd',
+                          fontSize: 12, fontWeight: 800, pointerEvents: 'none',
+                        }}>{selectedIndex >= 0 ? selectedIndex + 1 : ''}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </main>
+
+      {/* ルート保存バー */}
+      {tab === 'list' && routeMode && (
+        <div style={{
+          position: 'fixed', bottom: 60, left: 0, right: 0, padding: '10px 14px',
+          background: 'rgba(250,250,250,0.97)', backdropFilter: 'blur(10px)',
+          borderTop: '1px solid #eee', zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <input
+            value={routeTitle}
+            onChange={e => setRouteTitle(e.target.value)}
+            placeholder="ルート名（例：谷中の路地を歩く道）"
+            style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }}
+          />
+          <input
+            value={routeNickname}
+            onChange={e => setRouteNickname(e.target.value)}
+            placeholder="ニックネーム（削除・編集時の確認用、任意）"
+            style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }}
+          />
+          {routeSaveError && <p style={{ color: '#E55039', fontSize: 12, margin: 0 }}>{routeSaveError}</p>}
+          <button
+            onClick={saveRoute}
+            disabled={!routeTitle.trim() || routeSelection.length < 2 || routeSaving}
+            style={{
+              padding: '12px', borderRadius: 10, border: 'none',
+              background: (!routeTitle.trim() || routeSelection.length < 2 || routeSaving) ? '#e0e0e0' : '#8E44AD',
+              color: '#fff', fontWeight: 800, fontSize: 14,
+              cursor: (!routeTitle.trim() || routeSelection.length < 2 || routeSaving) ? 'not-allowed' : 'pointer',
+            }}
+          >{routeSaving ? '保存中…' : `このルートを保存する（${routeSelection.length}件）`}</button>
+        </div>
+      )}
 
       {/* 記録するボタン */}
       {tab === 'post' && !submitDone && (
