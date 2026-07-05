@@ -1,16 +1,26 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { useState, useEffect } from 'react';
 import type { Trace } from '@/lib/types';
 
-function FlyToHandler({ pos }: { pos: [number, number] | undefined }) {
+function FlyToHandler({ pos, zoom = 17, bounds }: {
+  pos: [number, number] | undefined;
+  zoom?: number;
+  bounds?: [[number, number], [number, number]];
+}) {
   const map = useMap();
   useEffect(() => {
-    if (pos) map.flyTo(pos, 17, { duration: 1.2 });
-  }, [pos, map]);
+    if (bounds) map.fitBounds(bounds, { padding: [20, 20] });
+  }, [bounds, map]);
+  useEffect(() => {
+    if (pos) map.flyTo(pos, zoom, { duration: 1.2 });
+  }, [pos, zoom, map]);
   return null;
 }
 import { getEmotionColor, getEmotion } from '@/lib/emotions';
@@ -113,11 +123,13 @@ interface Props {
   center?: [number, number];
   zoom?: number;
   flyTo?: [number, number];
+  flyToZoom?: number;
+  fitBounds?: [[number, number], [number, number]];
   onLocate?: (pos: [number, number]) => void;
   onTraceClick?: (trace: Trace) => void;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, onLocate, onTraceClick }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, onLocate, onTraceClick }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -141,7 +153,7 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <LocateControl onLocate={onLocate} />
-      <FlyToHandler pos={flyTo} />
+      <FlyToHandler pos={flyTo} zoom={flyToZoom} bounds={fitBounds} />
       <ZoomTracker onZoom={setCurrentZoom} />
 
       {mode === 'heat'
@@ -153,7 +165,9 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
                 pathOptions={{ color, fillColor: color, fillOpacity: 0.28, weight: 0 }} />
             );
           })
-        : traces.map((t) => {
+        : (
+        <MarkerClusterGroup chunkedLoading maxClusterRadius={60} spiderfyOnMaxZoom>
+        {traces.map((t) => {
             const archiveType = getArchiveType(t.archive_type);
             const emotion = archiveType ? null : getEmotion(t.emotion_key);
             const category = archiveType ? null : getCategory(t.category);
@@ -237,6 +251,8 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
               </Marker>
             );
           })}
+        </MarkerClusterGroup>
+        )}
     </MapContainer>
   );
 }

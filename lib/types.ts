@@ -50,6 +50,8 @@ export interface Trace {
   is_deleted: boolean;            // ソフトデリートフラグ
   deleted_at: string | null;
   deleted_by: string | null;      // 'admin' または削除者の識別子
+
+  region: string | null;          // 逆ジオコーディングで自動保存される自治体名（例：「大阪府浪速区」）
 }
 
 /**

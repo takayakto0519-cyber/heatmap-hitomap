@@ -62,6 +62,16 @@ export default function App() {
   const [filterArchive, setFilterArchive] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('new');
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
+  const [mapFlyToZoom, setMapFlyToZoom] = useState<number>(17);
+  const [mapFitBounds, setMapFitBounds] = useState<[[number, number], [number, number]] | null>(null);
+  const hasAutoLocatedRef = useRef(false);
+
+  // 地図タブの地域ジャンプ検索
+  const [regionQuery, setRegionQuery] = useState('');
+  const [regionSearching, setRegionSearching] = useState(false);
+  const [regionError, setRegionError] = useState('');
+  const [regionCandidates, setRegionCandidates] = useState<{ display_name: string; lat: string; lon: string; boundingbox: string[] }[]>([]);
+  const [showRegionSearch, setShowRegionSearch] = useState(false);
 
   // ── データ ──────────────────────────────
   const [traces, setTraces] = useState<Trace[]>([]);
@@ -136,16 +146,50 @@ export default function App() {
     fetch('/api/migrate').catch(() => {});
   }, []);
 
-  // 地図タブを開いたとき、まだ位置不明なら自動取得試みる
+  // 地図タブを開いたとき、まだ位置不明なら自動取得試みる。
+  // 初回の1回だけ、取得できた現在地の町スケール（zoom15）へ地図を飛ばす。
   useEffect(() => {
     if (tab === 'map' && !userPos && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        p => setUserPos([p.coords.latitude, p.coords.longitude]),
+        p => {
+          const pos: [number, number] = [p.coords.latitude, p.coords.longitude];
+          setUserPos(pos);
+          if (!hasAutoLocatedRef.current) {
+            hasAutoLocatedRef.current = true;
+            setMapFlyToZoom(15);
+            setMapFlyTo(pos);
+          }
+        },
         () => { /* サイレント失敗 */ },
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
       );
     }
   }, [tab, userPos]);
+
+  async function searchRegion() {
+    if (!regionQuery.trim()) return;
+    setRegionSearching(true);
+    setRegionError('');
+    setRegionCandidates([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(regionQuery)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
+      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { display_name: string; lat: string; lon: string; boundingbox: string[] }[];
+      if (results.length === 0) setRegionError('見つかりませんでした');
+      setRegionCandidates(results);
+    } catch {
+      setRegionError('検索に失敗しました');
+    } finally {
+      setRegionSearching(false);
+    }
+  }
+
+  function jumpToRegion(c: { display_name: string; lat: string; lon: string; boundingbox: string[] }) {
+    const [south, north, west, east] = c.boundingbox.map(Number);
+    setMapFitBounds([[south, west], [north, east]]);
+    setRegionQuery('');
+    setRegionCandidates([]);
+    setShowRegionSearch(false);
+  }
 
   function saveSessionCode(code: string) {
     setSessionCode(code);
@@ -320,7 +364,7 @@ export default function App() {
           setAddressQuery(''); setAddressCandidates([]); setAddressError(''); setShowAddressSearch(false);
           setShowAdvanced(false); setSubmitDone(false);
           fetchTraces();
-          if (postedLat && postedLng) setMapFlyTo([postedLat, postedLng]);
+          if (postedLat && postedLng) { setMapFlyToZoom(17); setMapFlyTo([postedLat, postedLng]); }
           setTab('map');
         }, 1500);
       } else {
@@ -343,6 +387,7 @@ export default function App() {
   // カードから地図へジャンプ
   function handleShowOnMap(trace: Trace) {
     setTab('map');
+    setMapFlyToZoom(17);
     setMapFlyTo([trace.latitude, trace.longitude]);
     setTimeout(() => setMapFlyTo(null), 2000);
   }
@@ -390,6 +435,12 @@ export default function App() {
                 background: nearbyOnly ? '#E8F8F7' : '#fff',
                 color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
               }}>📍 近く</button>
+              <button onClick={() => setShowRegionSearch(v => !v)} style={{
+                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                border: `1.5px solid ${showRegionSearch ? '#38ADA9' : '#ddd'}`,
+                background: showRegionSearch ? '#E8F8F7' : '#fff',
+                color: showRegionSearch ? '#38ADA9' : '#666', fontWeight: showRegionSearch ? 700 : 400,
+              }}>🔍 地域</button>
               {(['pin', 'heat'] as MapMode[]).map(m => (
                 <button key={m} onClick={() => {
                   setMapMode(m);
@@ -458,6 +509,41 @@ export default function App() {
           <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px' }}>🌡 ヒートは感情を記録した「痕跡」投稿のみが対象です</p>
         )}
 
+        {/* 地域ジャンプ検索（マップ） */}
+        {tab === 'map' && showRegionSearch && (
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                value={regionQuery}
+                onChange={e => setRegionQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') searchRegion(); }}
+                placeholder="例：渋谷区、別府市…"
+                style={{
+                  flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 13,
+                  border: '1.5px solid #ddd', outline: 'none',
+                }}
+              />
+              <button onClick={searchRegion} disabled={regionSearching} style={{
+                padding: '7px 14px', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontSize: 13, fontWeight: 700,
+                cursor: regionSearching ? 'wait' : 'pointer',
+              }}>{regionSearching ? '検索中…' : '移動'}</button>
+            </div>
+            {regionError && <p style={{ color: '#E55039', fontSize: 12, margin: '4px 0 0' }}>{regionError}</p>}
+            {regionCandidates.length > 0 && (
+              <div style={{ marginTop: 6, background: '#fff', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
+                {regionCandidates.map((c, i) => (
+                  <button key={i} onClick={() => jumpToRegion(c)} style={{
+                    display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
+                    border: 'none', borderBottom: i < regionCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    background: '#fff', fontSize: 12, color: '#444', cursor: 'pointer',
+                  }}>{c.display_name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 感情フィルター（マップ・一覧） */}
         {(tab === 'map' || tab === 'list') && emotionCounts.length > 0 && (
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
@@ -506,6 +592,8 @@ export default function App() {
               mode={mapMode}
               center={userPos ?? undefined}
               flyTo={mapFlyTo ?? undefined}
+              flyToZoom={mapFlyToZoom}
+              fitBounds={mapFitBounds ?? undefined}
               onLocate={pos => setUserPos(pos)}
               onTraceClick={setSelectedTrace}
             />

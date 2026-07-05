@@ -361,6 +361,14 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 ) : trace.nickname ? ` · ${trace.nickname}` : ''}
               </p>
             )}
+
+            {/* 地域ページへのリンク */}
+            {!editing && trace.region && (
+              <a href={`/region/${encodeURIComponent(trace.region)}`} style={{
+                display: 'inline-block', marginBottom: 8, fontSize: 12, color: '#38ADA9',
+                textDecoration: 'none', fontWeight: 700,
+              }}>🏘 {trace.region}の投稿を見る</a>
+            )}
           </div>
         </div>
 

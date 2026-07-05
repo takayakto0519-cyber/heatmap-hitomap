@@ -23,6 +23,22 @@ async function getServerClient() {
   return supabaseServer;
 }
 
+// 座標→自治体名（例：「大阪府浪速区」）。Nominatim利用規約に従いUser-Agentを付与。失敗時はnullを返し投稿自体は継続する。
+async function reverseGeocodeRegion(lat: number, lon: number): Promise<string | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja&zoom=14`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Hitomap/1.0 (hitomap.info@gmail.com)' } });
+    if (!res.ok) return null;
+    const data = await res.json() as { address?: Record<string, string> };
+    const a = data.address ?? {};
+    const city = a.city || a.town || a.village || a.county;
+    if (!city) return null;
+    return a.state ? `${a.state}${city}` : city;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceResponse>> {
   try {
     const body = (await req.json()) as CreateTraceRequest;
@@ -49,11 +65,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
       ? body.visibility
       : userId ? 'private' : 'public';
 
+    const region = await reverseGeocodeRegion(body.latitude, body.longitude);
+
     const supabaseServer = await getServerClient();
     const { data, error } = await supabaseServer
       .from('traces')
       .insert({
         photo_url: body.photo_url ?? null,
+        region,
         latitude: body.latitude,
         longitude: body.longitude,
         title: body.title,
@@ -99,6 +118,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 
 export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResponse>> {
   const sessionCode = req.nextUrl.searchParams.get('session_code');
+  const region = req.nextUrl.searchParams.get('region');
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
 
   // Supabase未設定時はサンプルを返す（ブラウザでの動作確認用）
@@ -135,6 +155,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
   query = query.order('created_at', { ascending: false }).limit(limit);
 
   if (sessionCode) query = query.eq('session_code', sessionCode);
+  if (region) query = query.eq('region', region);
 
   const { data, error } = await query;
 
