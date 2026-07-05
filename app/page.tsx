@@ -391,7 +391,11 @@ export default function App() {
                 color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
               }}>📍 近く</button>
               {(['pin', 'heat'] as MapMode[]).map(m => (
-                <button key={m} onClick={() => setMapMode(m)} style={{
+                <button key={m} onClick={() => {
+                  setMapMode(m);
+                  // ヒートは感情データを持つ痕跡のみが対象。アーカイブ種別で絞られたままだと0件になるためリセットする。
+                  if (m === 'heat' && filterArchive && filterArchive !== 'trace') setFilterArchive(null);
+                }} style={{
                   padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
                   border: '1.5px solid #ddd',
                   background: mapMode === m ? '#222' : '#fff',
@@ -425,8 +429,8 @@ export default function App() {
           )}
         </div>
 
-        {/* アーカイブタイプフィルター（マップ・一覧） */}
-        {(tab === 'map' || tab === 'list') && hasArchive && (
+        {/* アーカイブタイプフィルター（マップ・一覧）。ヒートは感情データを持つ痕跡専用のため、ヒート表示中は出さない */}
+        {(tab === 'map' || tab === 'list') && hasArchive && !(tab === 'map' && mapMode === 'heat') && (
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
             <button onClick={() => setFilterArchive(null)} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
@@ -449,6 +453,9 @@ export default function App() {
               }}>{a.emoji} {a.label} {a.count}</button>
             ))}
           </div>
+        )}
+        {tab === 'map' && mapMode === 'heat' && (
+          <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px' }}>🌡 ヒートは感情を記録した「痕跡」投稿のみが対象です</p>
         )}
 
         {/* 感情フィルター（マップ・一覧） */}
