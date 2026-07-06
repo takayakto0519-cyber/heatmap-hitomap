@@ -4,6 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createAuthBrowserClient } from '@/lib/supabase/authClient';
 
+// SupabaseのAuthErrorはmessageが空のことがあり、その場合 String(err) が "{}" になって
+// そのままユーザーに見せてしまうバグがあった。空・非文字列のケースをフォールバックする。
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'object' && err !== null) {
+    const withMessage = err as { message?: unknown; error_description?: unknown };
+    if (typeof withMessage.message === 'string' && withMessage.message) return withMessage.message;
+    if (typeof withMessage.error_description === 'string' && withMessage.error_description) return withMessage.error_description;
+  }
+  return 'メール送信に失敗しました。時間をおいて再度お試しください。';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -44,7 +56,7 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
+      setError(extractErrorMessage(err));
     } finally {
       setBusy(false);
     }
