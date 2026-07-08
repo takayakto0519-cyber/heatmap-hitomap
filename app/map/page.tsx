@@ -8,6 +8,7 @@ import { EMOTIONS, getEmotion } from '@/lib/emotions';
 import { CATEGORIES } from '@/lib/categories';
 import { TRACE_TYPES } from '@/lib/traceTypes';
 import { ARCHIVE_TYPES, getArchiveType, VOICE_RELATIONS } from '@/lib/archiveTypes';
+import { haversine } from '@/lib/geo';
 import EmotionPicker from '@/components/form/EmotionPicker';
 import IntensityPicker from '@/components/form/IntensityPicker';
 import AudioRecorder from '@/components/form/AudioRecorder';
@@ -30,15 +31,6 @@ type MapMode = 'pin' | 'heat';
 type SortOrder = 'new' | 'old';
 const NEARBY_RADIUS = 500;
 const DEFAULT_CENTER: [number, number] = [35.681236, 139.767125];
-
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 const mapLoadingStyle: React.CSSProperties = {
   height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1630,11 +1622,13 @@ function MapApp() {
       {/* ── モーダル ── */}
       {selectedTrace && (
         <TraceDetail
+          key={selectedTrace.id}
           trace={selectedTrace}
           isOwn={selectedTrace.user_id ? selectedTrace.user_id === currentUser?.id : myTraceIds.includes(selectedTrace.id)}
           onClose={() => setSelectedTrace(null)}
           onUpdate={handleTraceUpdate}
           onDelete={handleTraceDelete}
+          onNavigateTo={setSelectedTrace}
         />
       )}
     </div>

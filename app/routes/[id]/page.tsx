@@ -4,20 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { Route, Trace, RouteDetailResponse } from '@/lib/types';
+import { haversine } from '@/lib/geo';
 
 const RouteMap = dynamic(() => import('@/components/map/RouteMap'), {
   ssr: false,
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa' }}>地図を読み込み中…</div>,
 });
-
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function bearing(lat1: number, lng1: number, lat2: number, lng2: number) {
   const y = Math.sin((lng2 - lng1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);

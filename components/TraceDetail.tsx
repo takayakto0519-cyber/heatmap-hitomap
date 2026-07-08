@@ -14,6 +14,7 @@ interface Props {
   onClose: () => void;
   onUpdate: (updated: Trace) => void;
   onDelete: (id: string) => void;
+  onNavigateTo?: (trace: Trace) => void;
 }
 
 const REACTIONS = [
@@ -28,7 +29,7 @@ const inputStyle: React.CSSProperties = {
   resize: 'vertical' as const, outline: 'none', background: '#fafafa',
 };
 
-export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, onDelete }: Props) {
+export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, onDelete, onNavigateTo }: Props) {
   const [trace, setTrace] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,6 +52,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [bookmarked, setBookmarked] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [nearbyTraces, setNearbyTraces] = useState<Trace[]>([]);
 
   useEffect(() => {
     if (!trace.user_id) { setAuthorUsername(null); return; }
@@ -73,6 +75,10 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
     (async () => {
       const res = await fetch(`/api/bookmarks?trace_id=${trace.id}`).then((r) => r.json()).catch(() => null);
       if (res?.ok) setBookmarked(Boolean(res.bookmarked));
+    })();
+    (async () => {
+      const res = await fetch(`/api/traces/${trace.id}/nearby`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) setNearbyTraces(res.traces ?? []);
     })();
   }, [trace.id]);
 
@@ -476,6 +482,43 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 display: 'inline-block', marginBottom: 8, fontSize: 12, color: '#38ADA9',
                 textDecoration: 'none', fontWeight: 700,
               }}>🏘 {trace.region}の投稿を見る</a>
+            )}
+
+            {/* 重ね書き：同じ場所に残された他の痕跡 */}
+            {!editing && nearbyTraces.length > 0 && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+                <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#444' }}>
+                  📍 あなたは今、{nearbyTraces.length}人が心を動かされた場所にいる
+                </p>
+                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                  {nearbyTraces.map((nt) => {
+                    const ntEmotion = getEmotion(nt.emotion_key);
+                    return (
+                      <button
+                        key={nt.id}
+                        onClick={() => onNavigateTo?.(nt)}
+                        style={{
+                          flexShrink: 0, width: 130, textAlign: 'left', cursor: onNavigateTo ? 'pointer' : 'default',
+                          border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', background: '#fff', padding: 0,
+                        }}
+                      >
+                        {nt.photo_url ? (
+                          <img src={nt.photo_url} alt={nt.title} style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                        ) : (
+                          <div style={{
+                            width: '100%', height: 80, background: (ntEmotion?.color ?? '#ddd') + '22',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+                          }}>{ntEmotion?.emoji ?? '📍'}</div>
+                        )}
+                        <div style={{ padding: '6px 8px' }}>
+                          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nt.title}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: 10, color: '#aaa' }}>{new Date(nt.created_at).toLocaleDateString('ja-JP')}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>
