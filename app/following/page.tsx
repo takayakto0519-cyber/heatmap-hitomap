@@ -12,6 +12,13 @@ interface FeedProfile {
   display_name: string | null;
 }
 
+interface Suggestion {
+  id: string;
+  username: string;
+  display_name: string | null;
+  followersCount: number;
+}
+
 export default function FollowingFeedPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -20,6 +27,8 @@ export default function FollowingFeedPage() {
   const [profiles, setProfiles] = useState<Record<string, FeedProfile>>({});
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -32,6 +41,9 @@ export default function FollowingFeedPage() {
         const map: Record<string, FeedProfile> = {};
         for (const p of (data.profiles ?? []) as FeedProfile[]) map[p.id] = p;
         setProfiles(map);
+
+        const sugRes = await fetch('/api/follows/suggestions').then((r) => r.json()).catch(() => null);
+        if (sugRes?.ok) setSuggestions(sugRes.suggestions ?? []);
       } catch (e) {
         setError(e instanceof Error ? e.message : '読み込みに失敗しました');
       } finally {
@@ -39,6 +51,15 @@ export default function FollowingFeedPage() {
       }
     })();
   }, []);
+
+  async function followSuggested(id: string) {
+    const res = await fetch('/api/follows', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ followee_id: id }),
+    });
+    const data = await res.json();
+    if (data.ok) setFollowedIds((prev) => new Set(prev).add(id));
+  }
 
   return (
     <div style={{ minHeight: '100dvh', background: '#fafafa' }}>
@@ -66,6 +87,35 @@ export default function FollowingFeedPage() {
         )}
 
         {error && <p style={{ color: '#E55039', fontSize: 13, textAlign: 'center' }}>{error}</p>}
+
+        {!loading && !needsLogin && suggestions.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 10px', color: '#444' }}>✨ おすすめの人</h2>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              {suggestions.map((s) => {
+                const followed = followedIds.has(s.id);
+                return (
+                  <div key={s.id} style={{
+                    flexShrink: 0, width: 140, background: '#fff', borderRadius: 12,
+                    padding: '12px 10px', border: '1px solid #eee', textAlign: 'center',
+                  }}>
+                    <a href={`/profile/${s.username}`} style={{ textDecoration: 'none', color: '#333' }}>
+                      <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.display_name ?? s.username}
+                      </p>
+                      <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>@{s.username} ・ {s.followersCount}人</p>
+                    </a>
+                    <button onClick={() => followSuggested(s.id)} disabled={followed} style={{
+                      width: '100%', padding: '6px 0', borderRadius: 8, border: 'none', fontSize: 12,
+                      background: followed ? '#eee' : '#38ADA9', color: followed ? '#999' : '#fff',
+                      fontWeight: 700, cursor: followed ? 'default' : 'pointer',
+                    }}>{followed ? 'フォロー中 ✓' : 'フォローする'}</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {!loading && !needsLogin && !error && traces.length === 0 && (
           <div style={{ textAlign: 'center', padding: '50px 20px' }}>
