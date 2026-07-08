@@ -1596,7 +1596,7 @@ function MapApp() {
       {selectedTrace && (
         <TraceDetail
           trace={selectedTrace}
-          isOwn={myTraceIds.includes(selectedTrace.id)}
+          isOwn={selectedTrace.user_id ? selectedTrace.user_id === currentUser?.id : myTraceIds.includes(selectedTrace.id)}
           onClose={() => setSelectedTrace(null)}
           onUpdate={handleTraceUpdate}
           onDelete={handleTraceDelete}

@@ -120,6 +120,13 @@ export default function LoginPage() {
           {error && <p style={{ fontSize: 12, color: '#E74C3C', margin: 0 }}>{error}</p>}
           {message && <p style={{ fontSize: 12, color: '#27AE60', margin: 0 }}>{message}</p>}
 
+          {mode === 'signup' && (
+            <p style={{ fontSize: 11, color: '#aaa', margin: 0, lineHeight: 1.6 }}>
+              登録すると<a href="/terms" target="_blank" style={{ color: '#38ADA9' }}>利用規約</a>・
+              <a href="/privacy" target="_blank" style={{ color: '#38ADA9' }}>プライバシーポリシー</a>に同意したものとみなされます。
+            </p>
+          )}
+
           <button type="submit" disabled={busy} style={{
             padding: '11px 0', borderRadius: 10, border: 'none', marginTop: 4,
             background: busy ? '#ccc' : 'linear-gradient(135deg, #FF6B9D, #FF9068)',

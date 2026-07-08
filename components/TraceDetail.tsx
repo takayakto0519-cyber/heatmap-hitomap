@@ -6,6 +6,7 @@ import { getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getTraceType } from '@/lib/traceTypes';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
+import ReportModal from './ReportModal';
 
 interface Props {
   trace: Trace;
@@ -48,6 +49,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [myReactions, setMyReactions] = useState<string[]>([]);
   const [reactionLoading, setReactionLoading] = useState<string | null>(null);
   const [bookmarked, setBookmarked] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
   useEffect(() => {
@@ -216,6 +218,13 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>×</button>
               <div style={{ flex: 1 }} />
+              {!isOwn && (
+                <button onClick={() => setShowReportModal(true)} title="通報する" style={{
+                  width: 32, height: 32, borderRadius: 16,
+                  background: '#f0f0f0', border: 'none', cursor: 'pointer', fontSize: 15,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>⚠</button>
+              )}
               <button onClick={handleShare} style={{
                 width: 32, height: 32, borderRadius: 16,
                 background: '#f0f0f0', border: 'none', cursor: 'pointer', fontSize: 16,
@@ -224,6 +233,10 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             </>
           )}
         </div>
+
+        {showReportModal && (
+          <ReportModal traceId={trace.id} onClose={() => setShowReportModal(false)} />
+        )}
 
         {/* スクロール領域 */}
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: isOwn ? 80 : 24 }}>
@@ -477,10 +490,16 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
           }}>
             {confirmDelete ? (
               <>
-                <p style={{ margin: 0, fontSize: 13, color: '#E55039', fontWeight: 700 }}>
-                  🔐 削除するにはニックネームを入力してください
-                </p>
-                {trace.nickname && (
+                {trace.user_id ? (
+                  <p style={{ margin: 0, fontSize: 13, color: '#E55039', fontWeight: 700 }}>
+                    🔐 あなたのアカウントの投稿です。本当に削除しますか？（あとで管理者に復元を依頼できます）
+                  </p>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 13, color: '#E55039', fontWeight: 700 }}>
+                    🔐 削除するにはニックネームを入力してください
+                  </p>
+                )}
+                {!trace.user_id && trace.nickname && (
                   <input
                     placeholder={`ニックネームを入力（例: ${trace.nickname}）`}
                     value={deleteNickname}
@@ -500,9 +519,9 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                     flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd',
                     background: '#fff', cursor: 'pointer', fontSize: 13,
                   }}>キャンセル</button>
-                  <button onClick={handleDelete} disabled={deleting || (!!trace.nickname && !deleteNickname)} style={{
+                  <button onClick={handleDelete} disabled={deleting || (!trace.user_id && !!trace.nickname && !deleteNickname)} style={{
                     flex: 2, padding: '10px 14px', borderRadius: 10, border: 'none',
-                    background: (deleting || (!!trace.nickname && !deleteNickname)) ? '#ddd' : '#E55039',
+                    background: (deleting || (!trace.user_id && !!trace.nickname && !deleteNickname)) ? '#ddd' : '#E55039',
                     color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700,
                   }}>{deleting ? '削除中…' : '削除する'}</button>
                 </div>

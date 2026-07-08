@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
     { count: profileCount },
     { count: routeCount },
     { count: activeSponsors },
+    { count: pendingReports },
   ] = await Promise.all([
     supabaseServer.from('traces').select('id', { count: 'exact', head: true }).eq('is_deleted', false),
     supabaseServer.from('traces').select('id', { count: 'exact', head: true }).eq('visibility', 'pending_review').eq('is_deleted', false),
@@ -34,6 +35,7 @@ export async function GET(req: NextRequest) {
     supabaseServer.from('profiles').select('id', { count: 'exact', head: true }),
     supabaseServer.from('routes').select('id', { count: 'exact', head: true }).eq('is_deleted', false),
     supabaseServer.from('sponsors').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    supabaseServer.from('trace_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ]);
 
   return NextResponse.json({
@@ -45,6 +47,7 @@ export async function GET(req: NextRequest) {
       profileCount: profileCount ?? 0,
       routeCount: routeCount ?? 0,
       activeSponsors: activeSponsors ?? 0,
+      pendingReports: pendingReports ?? 0,
     },
   });
 }

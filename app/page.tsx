@@ -123,6 +123,11 @@ export default function TopPage() {
           borderRadius: 10, border: '1.5px solid #ddd', color: '#666', fontSize: 13, fontWeight: 700,
           textDecoration: 'none',
         }}>🗾 全国の地図を見る</a>
+
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 24 }}>
+          <a href="/terms" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>利用規約</a>
+          <a href="/privacy" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>プライバシーポリシー</a>
+        </div>
       </div>
     </div>
   );

@@ -4,13 +4,7 @@
 //   DELETE ... ある種別の反応を取り消す（trace_id, reaction_type）
 import { NextRequest, NextResponse } from 'next/server';
 import { createRequestClient, getCurrentUserId } from '@/lib/supabase/requestClient';
-
-export const REACTION_TYPES = ['empathy', 'want_to_visit', 'nostalgic'] as const;
-export type ReactionType = typeof REACTION_TYPES[number];
-
-function isReactionType(v: unknown): v is ReactionType {
-  return typeof v === 'string' && (REACTION_TYPES as readonly string[]).includes(v);
-}
+import { isReactionType } from '@/lib/reactionTypes';
 
 export async function GET(req: NextRequest) {
   const idsParam = req.nextUrl.searchParams.get('trace_ids');
