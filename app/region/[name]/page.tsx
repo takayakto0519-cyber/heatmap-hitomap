@@ -22,6 +22,7 @@ export default function RegionPage() {
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`/api/traces?region=${encodeURIComponent(regionName)}`)
@@ -35,6 +36,23 @@ export default function RegionPage() {
       .catch(() => {});
     fetch('/api/profile').then(r => r.json()).then(d => setCurrentUserId(d.user?.id ?? null)).catch(() => {});
   }, [regionName]);
+
+  // 共感ヒート：表示中の痕跡の反応数をまとめて取得し、ピンの色濃度・サイズに反映する
+  useEffect(() => {
+    if (traces.length === 0) return;
+    const ids = traces.map(t => t.id).join(',');
+    fetch(`/api/reactions?trace_ids=${ids}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return;
+        const totals: Record<string, number> = {};
+        for (const [traceId, byType] of Object.entries(d.counts ?? {}) as [string, Record<string, number>][]) {
+          totals[traceId] = Object.values(byType).reduce((sum, n) => sum + n, 0);
+        }
+        setReactionCounts(totals);
+      })
+      .catch(() => {});
+  }, [traces]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
@@ -60,6 +78,7 @@ export default function RegionPage() {
             traces={traces}
             mode="pin"
             currentUserId={currentUserId}
+            reactionCounts={reactionCounts}
             center={[traces[0].latitude, traces[0].longitude]}
             onTraceClick={setSelectedTrace}
           />
@@ -86,11 +105,12 @@ export default function RegionPage() {
 
       {selectedTrace && (
         <TraceDetail
+          key={selectedTrace.id}
           trace={selectedTrace}
-          isOwn={false}
+          isOwn={Boolean(currentUserId) && selectedTrace.user_id === currentUserId}
           onClose={() => setSelectedTrace(null)}
-          onUpdate={() => {}}
-          onDelete={() => setSelectedTrace(null)}
+          onUpdate={updated => setTraces(prev => prev.map(t => (t.id === updated.id ? updated : t)))}
+          onDelete={id => setTraces(prev => prev.filter(t => t.id !== id))}
         />
       )}
     </div>

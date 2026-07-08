@@ -15,6 +15,7 @@ import AudioRecorder from '@/components/form/AudioRecorder';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import StatsPanel from '@/components/list/StatsPanel';
+import Onboarding from '@/components/Onboarding';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -74,6 +75,10 @@ function MapApp() {
 
   // 全体マップから直接ピンを立てて投稿する導線
   const [pinDropMode, setPinDropMode] = useState(false);
+
+  // クイック記録モード：現地では位置＋1タップだけ記録し、写真・言葉は後から追記する
+  const [quickRecording, setQuickRecording] = useState(false);
+  const [quickRecordError, setQuickRecordError] = useState('');
 
   // 地図タブの地域ジャンプ検索
   const [regionQuery, setRegionQuery] = useState('');
@@ -574,6 +579,50 @@ function MapApp() {
     } finally { setSubmitting(false); }
   }
 
+  // クイック記録：位置＋1タップだけで即記録する。タイトル・写真・言葉は後からTraceDetailの編集で追記できる
+  async function handleQuickRecord() {
+    setQuickRecordError('');
+    setQuickRecording(true);
+    try {
+      const pos = userPos ?? await new Promise<[number, number]>((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('位置情報が使えません')); return; }
+        navigator.geolocation.getCurrentPosition(
+          p => resolve([p.coords.latitude, p.coords.longitude]),
+          () => reject(new Error('位置情報を取得できませんでした')),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      });
+      const now = new Date();
+      const quickTitle = `クイック記録・${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const res = await fetch('/api/traces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: pos[0], longitude: pos[1],
+          title: quickTitle,
+          session_code: sessionCode.trim() || undefined,
+          nickname: nickname.trim() || undefined,
+          visibility: currentUser ? postVisibility : undefined,
+        }),
+      });
+      const data: CreateTraceResponse = await res.json();
+      if (!data.ok || !data.trace) {
+        setQuickRecordError(data.error ?? '記録に失敗しました');
+        return;
+      }
+      setUserPos(pos);
+      setTraces(prev => [data.trace as Trace, ...prev]);
+      const updatedIds = [...myTraceIds, data.trace.id];
+      setMyTraceIds(updatedIds);
+      localStorage.setItem('hitomap_my_traces', JSON.stringify(updatedIds));
+      setSelectedTrace(data.trace);
+    } catch (err) {
+      setQuickRecordError(err instanceof Error ? err.message : '記録に失敗しました');
+    } finally {
+      setQuickRecording(false);
+    }
+  }
+
   function handleTraceUpdate(updated: Trace) {
     setTraces(prev => prev.map(t => t.id === updated.id ? updated : t));
     setSelectedTrace(updated);
@@ -602,6 +651,7 @@ function MapApp() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
+      <Onboarding />
 
       {/* ── ヘッダー ── */}
       <header style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
@@ -920,21 +970,44 @@ function MapApp() {
                 setTab('post');
               } : undefined}
             />
-            {/* 全体マップから直接ピンを立てて記録する */}
-            <button
-              type="button"
-              onClick={() => setPinDropMode(v => !v)}
-              style={{
-                position: 'absolute', bottom: 16, right: 16, zIndex: 500,
-                padding: '12px 16px', borderRadius: 24, border: 'none',
-                background: pinDropMode ? '#FF6B9D' : '#fff',
-                color: pinDropMode ? '#fff' : '#333',
-                fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-              }}
-            >
-              {pinDropMode ? '✕ 取消（地図をタップ）' : '📍 ここに記録する'}
-            </button>
+            {/* クイック記録：現地では位置＋1タップだけ。写真・言葉は後から追記できる */}
+            <div style={{
+              position: 'absolute', bottom: 16, right: 16, zIndex: 500,
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+            }}>
+              {quickRecordError && (
+                <p style={{
+                  margin: 0, fontSize: 11, color: '#fff', background: '#E55039',
+                  padding: '5px 10px', borderRadius: 8, maxWidth: 220, textAlign: 'right',
+                }}>{quickRecordError}</p>
+              )}
+              <button
+                type="button"
+                onClick={handleQuickRecord}
+                disabled={quickRecording}
+                style={{
+                  padding: '12px 16px', borderRadius: 24, border: 'none',
+                  background: '#F6B93B', color: '#fff',
+                  fontWeight: 700, fontSize: 13, cursor: quickRecording ? 'wait' : 'pointer',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.2)', opacity: quickRecording ? 0.7 : 1,
+                }}
+              >
+                {quickRecording ? '記録中…' : '⚡ クイック記録（位置だけ）'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPinDropMode(v => !v)}
+                style={{
+                  padding: '12px 16px', borderRadius: 24, border: 'none',
+                  background: pinDropMode ? '#FF6B9D' : '#fff',
+                  color: pinDropMode ? '#fff' : '#333',
+                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                }}
+              >
+                {pinDropMode ? '✕ 取消（地図をタップ）' : '📍 ここに記録する'}
+              </button>
+            </div>
             {loading && !fetchError && (
               <div style={{
                 position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
