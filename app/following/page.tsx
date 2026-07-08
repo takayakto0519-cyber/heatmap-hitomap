@@ -117,13 +117,24 @@ export default function FollowingFeedPage() {
           </div>
         )}
 
-        {!loading && !needsLogin && !error && traces.length === 0 && (
+        {!loading && !needsLogin && !error && traces.length === 0 && Object.keys(profiles).length === 0 && (
           <div style={{ textAlign: 'center', padding: '50px 20px' }}>
             <p style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>
               まだ誰もフォローしていません
             </p>
             <p style={{ fontSize: 12, color: '#bbb' }}>
               気になる人をフォローすると、ここに歩みが流れてきます
+            </p>
+          </div>
+        )}
+
+        {!loading && !needsLogin && !error && traces.length === 0 && Object.keys(profiles).length > 0 && (
+          <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+            <p style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>
+              フォロー中の人の記録はまだありません
+            </p>
+            <p style={{ fontSize: 12, color: '#bbb' }}>
+              相手が記録を投稿すると、ここに歩みが流れてきます
             </p>
           </div>
         )}
