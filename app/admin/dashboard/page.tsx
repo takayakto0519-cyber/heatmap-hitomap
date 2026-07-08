@@ -44,10 +44,20 @@ export default function AdminDashboardPage() {
   const [unlockError, setUnlockError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
+  const [badgeCounts, setBadgeCounts] = useState<{ pendingReview: number; pendingReports: number } | null>(null);
 
   const authHeaders = useCallback((): HeadersInit => {
     return { 'Content-Type': 'application/json', 'x-admin-password': password };
   }, [password]);
+
+  // ナビのタブに未処理件数バッジを出すため、タブ切替のたびに軽量に取り直す（対応後すぐ数字が減るように）
+  useEffect(() => {
+    if (!unlocked) return;
+    fetch('/api/admin/stats', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setBadgeCounts({ pendingReview: d.stats.pendingReview, pendingReports: d.stats.pendingReports }); })
+      .catch(() => {});
+  }, [unlocked, tab, authHeaders]);
 
   async function tryUnlock(pw: string) {
     setUnlocking(true);
@@ -93,21 +103,32 @@ export default function AdminDashboardPage() {
 
         <nav style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
           {([
-            ['overview', '概要'],
-            ['review', '承認待ち'],
-            ['traces', '投稿管理'],
-            ['reports', '通報'],
-            ['sponsors', 'スポンサー'],
-            ['routes', 'ルート'],
-          ] as [Tab, string][]).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              padding: '9px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
-              background: tab === id ? '#38ADA9' : '#fff',
-              color: tab === id ? '#fff' : '#666',
-              fontWeight: 700, fontSize: 13,
-              boxShadow: tab === id ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-            }}>{label}</button>
-          ))}
+            ['overview', '概要', 0],
+            ['review', '承認待ち', badgeCounts?.pendingReview ?? 0],
+            ['traces', '投稿管理', 0],
+            ['reports', '通報', badgeCounts?.pendingReports ?? 0],
+            ['sponsors', 'スポンサー', 0],
+            ['routes', 'ルート', 0],
+          ] as [Tab, string, number][]).map(([id, label, count]) => {
+            const urgent = count > 0 && tab !== id;
+            return (
+              <button key={id} onClick={() => setTab(id)} style={{
+                padding: '9px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                background: tab === id ? '#38ADA9' : urgent ? '#FFF0EE' : '#fff',
+                color: tab === id ? '#fff' : urgent ? '#E55039' : '#666',
+                fontWeight: 700, fontSize: 13,
+                boxShadow: tab === id ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+              }}>
+                {label}
+                {count > 0 && (
+                  <span style={{
+                    marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11,
+                    background: tab === id ? 'rgba(255,255,255,0.3)' : '#E55039', color: '#fff',
+                  }}>{count}</span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         {tab === 'overview' && <OverviewTab authHeaders={authHeaders} />}
@@ -122,9 +143,9 @@ export default function AdminDashboardPage() {
 }
 
 // ────────────────────────────────────────────
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', ...style }}>
       {children}
     </div>
   );
@@ -145,23 +166,24 @@ function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   if (error) return <p style={{ color: '#E74C3C' }}>{error}</p>;
   if (!stats) return <p style={{ color: '#999' }}>読み込み中…</p>;
 
-  const items: [string, number, string][] = [
-    ['総投稿数', stats.totalTraces, '📍'],
-    ['承認待ち', stats.pendingReview, '⏳'],
-    ['直近7日の投稿', stats.last7Days, '📈'],
-    ['登録ユーザー', stats.profileCount, '👤'],
-    ['公開ルート', stats.routeCount, '🧭'],
-    ['稼働中スポンサー', stats.activeSponsors, '🏷'],
-    ['未処理の通報', stats.pendingReports, '⚠'],
+  // 承認待ち・未処理の通報は「対応が必要な状態」なので、0件でなければ視覚的に目立たせる
+  const items: [string, number, string, boolean][] = [
+    ['総投稿数', stats.totalTraces, '📍', false],
+    ['承認待ち', stats.pendingReview, '⏳', stats.pendingReview > 0],
+    ['直近7日の投稿', stats.last7Days, '📈', false],
+    ['登録ユーザー', stats.profileCount, '👤', false],
+    ['公開ルート', stats.routeCount, '🧭', false],
+    ['稼働中スポンサー', stats.activeSponsors, '🏷', false],
+    ['未処理の通報', stats.pendingReports, '⚠', stats.pendingReports > 0],
   ];
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-      {items.map(([label, value, emoji]) => (
-        <Card key={label}>
+      {items.map(([label, value, emoji, urgent]) => (
+        <Card key={label} style={urgent ? { background: '#FFF5F3', boxShadow: '0 1px 4px rgba(229,80,57,0.15)', border: '1px solid #FFD9D0' } : undefined}>
           <div style={{ fontSize: 22 }}>{emoji}</div>
-          <div style={{ fontSize: 26, fontWeight: 800, marginTop: 6 }}>{value}</div>
-          <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{label}</div>
+          <div style={{ fontSize: 26, fontWeight: 800, marginTop: 6, color: urgent ? '#E55039' : '#222' }}>{value}</div>
+          <div style={{ fontSize: 12, color: urgent ? '#E55039' : '#888', marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
         </Card>
       ))}
     </div>
@@ -521,6 +543,31 @@ function SponsorsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
 }
 
 // ── ルート管理 ────────────────────────────
+// datetime-local入力用：ISO文字列 ⇄ "YYYY-MM-DDTHH:mm" の相互変換
+function isoToInputValue(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function inputValueToIso(v: string): string | null {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+interface EventFieldsForm {
+  event_slug: string;
+  event_cover_url: string;
+  event_starts_at: string;
+  event_ends_at: string;
+  event_area: string;
+}
+
+const emptyEventFields: EventFieldsForm = {
+  event_slug: '', event_cover_url: '', event_starts_at: '', event_ends_at: '', event_area: '',
+};
+
 function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
@@ -528,6 +575,9 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sponsorName, setSponsorName] = useState('');
   const [sponsorUrl, setSponsorUrl] = useState('');
+  const [eventEditingId, setEventEditingId] = useState<string | null>(null);
+  const [eventFields, setEventFields] = useState<EventFieldsForm>(emptyEventFields);
+  const [eventSaving, setEventSaving] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -555,6 +605,37 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     if (data.ok) { setEditingId(null); load(); } else setError(data.error ?? '更新に失敗しました');
   }
 
+  function startEventEdit(r: Route) {
+    setEventEditingId(r.id);
+    setEventFields({
+      event_slug: r.event_slug ?? '',
+      event_cover_url: r.event_cover_url ?? '',
+      event_starts_at: isoToInputValue(r.event_starts_at),
+      event_ends_at: isoToInputValue(r.event_ends_at),
+      event_area: r.event_area ?? '',
+    });
+  }
+
+  async function saveEventFields(id: string) {
+    setEventSaving(true);
+    try {
+      const res = await fetch(`/api/admin/routes/${id}`, {
+        method: 'PATCH', headers: authHeaders(),
+        body: JSON.stringify({
+          event_slug: eventFields.event_slug.trim() || null,
+          event_cover_url: eventFields.event_cover_url.trim() || null,
+          event_starts_at: inputValueToIso(eventFields.event_starts_at),
+          event_ends_at: inputValueToIso(eventFields.event_ends_at),
+          event_area: eventFields.event_area.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) { setEventEditingId(null); load(); } else setError(data.error ?? '更新に失敗しました');
+    } finally {
+      setEventSaving(false);
+    }
+  }
+
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
 
   return (
@@ -565,12 +646,20 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         {routes.map(r => (
           <Card key={r.id}>
             <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>{r.title}</p>
-            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#999' }}>
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#888' }}>
               {r.trace_ids.length}地点 ・ {new Date(r.created_at).toLocaleDateString('ja-JP')}
               {r.sponsor_name && ` ・ 協賛：${r.sponsor_name}`}
             </p>
+            {r.event_slug && (
+              <p style={{ margin: '0 0 8px', fontSize: 12 }}>
+                <a href={`/events/${r.event_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: '#8E44AD', fontWeight: 700 }}>
+                  🎪 /events/{r.event_slug} を公開中 ↗
+                </a>
+              </p>
+            )}
+
             {editingId === r.id ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                 <input placeholder="協賛企業名" value={sponsorName} onChange={e => setSponsorName(e.target.value)} style={inputStyle} />
                 <input placeholder="協賛企業URL" value={sponsorUrl} onChange={e => setSponsorUrl(e.target.value)} style={inputStyle} />
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -586,9 +675,50 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
               </div>
             ) : (
               <button onClick={() => startEdit(r)} style={{
-                padding: '6px 12px', borderRadius: 8, border: '1px solid #eee',
+                padding: '6px 12px', borderRadius: 8, border: '1px solid #eee', marginRight: 8, marginBottom: 8,
                 background: '#fff', color: '#38ADA9', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>協賛を設定</button>
+            )}
+
+            {eventEditingId === r.id ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, padding: 10, background: '#FBF6FF', borderRadius: 8 }}>
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>URL（英数字とハイフン、例: shibuya-2026）</label>
+                <input placeholder="event_slug" value={eventFields.event_slug}
+                  onChange={e => setEventFields(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>ヒーロー画像URL</label>
+                <input placeholder="event_cover_url" value={eventFields.event_cover_url}
+                  onChange={e => setEventFields(f => ({ ...f, event_cover_url: e.target.value }))} style={inputStyle} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>エリア名（例：渋谷、山手線）</label>
+                <input placeholder="event_area" value={eventFields.event_area}
+                  onChange={e => setEventFields(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700, display: 'block' }}>開始</label>
+                    <input type="datetime-local" value={eventFields.event_starts_at}
+                      onChange={e => setEventFields(f => ({ ...f, event_starts_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700, display: 'block' }}>終了</label>
+                    <input type="datetime-local" value={eventFields.event_ends_at}
+                      onChange={e => setEventFields(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button onClick={() => saveEventFields(r.id)} disabled={eventSaving} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+                    background: '#8E44AD', color: '#fff', fontWeight: 700, cursor: eventSaving ? 'wait' : 'pointer', fontSize: 12,
+                  }}>{eventSaving ? '保存中…' : '保存してイベント公開'}</button>
+                  <button onClick={() => setEventEditingId(null)} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid #ddd',
+                    background: '#fff', color: '#888', cursor: 'pointer', fontSize: 12,
+                  }}>キャンセル</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => startEventEdit(r)} style={{
+                padding: '6px 12px', borderRadius: 8, border: '1px solid #eee',
+                background: '#fff', color: '#8E44AD', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>{r.event_slug ? 'イベント情報を編集' : '🎪 イベントとして公開'}</button>
             )}
           </Card>
         ))}

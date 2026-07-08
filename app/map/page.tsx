@@ -65,6 +65,7 @@ function MapApp() {
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   // 'trace' = 痕跡のみ / それ以外は archive_type のキー / null = すべて
   const [filterArchive, setFilterArchive] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<SortOrder>('new');
   const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
   const [mapFlyToZoom, setMapFlyToZoom] = useState<number>(17);
@@ -696,8 +697,21 @@ function MapApp() {
           )}
         </div>
 
+        {/* 絞り込みの開閉トグル：フィルター行が最大2段になり画面を圧迫するため、必要な時だけ開く */}
+        {(tab === 'map' || tab === 'list') && (hasArchive || emotionCounts.length > 0) && !(tab === 'map' && mapMode === 'heat') && (
+          <button onClick={() => setFiltersOpen(v => !v)} style={{
+            display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+            padding: '4px 10px', borderRadius: 14, fontSize: 12, cursor: 'pointer', marginBottom: 4,
+            border: `1.5px solid ${(filterArchive || filterEmotion) ? '#FF6B9D' : '#ddd'}`,
+            background: (filterArchive || filterEmotion) ? '#FFF0F5' : '#fff',
+            color: (filterArchive || filterEmotion) ? '#FF6B9D' : '#666', fontWeight: (filterArchive || filterEmotion) ? 700 : 400,
+          }}>
+            絞り込み{(filterArchive || filterEmotion) ? '中' : ''} {filtersOpen ? '▴' : '▾'}
+          </button>
+        )}
+
         {/* アーカイブタイプフィルター（マップ・一覧）。ヒートは感情データを持つ痕跡専用のため、ヒート表示中は出さない */}
-        {(tab === 'map' || tab === 'list') && hasArchive && !(tab === 'map' && mapMode === 'heat') && (
+        {filtersOpen && (tab === 'map' || tab === 'list') && hasArchive && !(tab === 'map' && mapMode === 'heat') && (
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
             <button onClick={() => setFilterArchive(null)} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
@@ -832,7 +846,7 @@ function MapApp() {
         )}
 
         {/* 感情フィルター（マップ・一覧） */}
-        {(tab === 'map' || tab === 'list') && emotionCounts.length > 0 && (
+        {filtersOpen && (tab === 'map' || tab === 'list') && emotionCounts.length > 0 && (
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
             <button onClick={() => setFilterEmotion(null)} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,

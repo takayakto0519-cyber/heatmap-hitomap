@@ -8,7 +8,22 @@ function checkAdmin(req: NextRequest): boolean {
   return Boolean(expected) && provided === expected;
 }
 
-// PATCH /api/admin/routes/[id] — 協賛の設定（手動、決済は伴わない。合言葉必須）
+interface RouteAdminUpdateBody {
+  sponsor_name?: string | null;
+  sponsor_url?: string | null;
+  event_slug?: string | null;
+  event_cover_url?: string | null;
+  event_starts_at?: string | null;
+  event_ends_at?: string | null;
+  event_area?: string | null;
+}
+
+const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
+  'sponsor_name', 'sponsor_url',
+  'event_slug', 'event_cover_url', 'event_starts_at', 'event_ends_at', 'event_area',
+];
+
+// PATCH /api/admin/routes/[id] — 協賛・イベント公開情報の設定（手動、決済は伴わない。合言葉必須）
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -17,13 +32,19 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
     return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
   }
   const { id } = context.params;
-  const body = await req.json().catch(() => ({})) as { sponsor_name?: string | null; sponsor_url?: string | null };
+  const body = await req.json().catch(() => ({})) as RouteAdminUpdateBody;
   const updates: Record<string, unknown> = {};
-  if ('sponsor_name' in body) updates.sponsor_name = body.sponsor_name;
-  if ('sponsor_url' in body) updates.sponsor_url = body.sponsor_url;
+  for (const key of ALLOWED_FIELDS) {
+    if (key in body) updates[key] = body[key];
+  }
 
   const { supabaseServer } = await import('@/lib/supabase/server');
   const { data, error } = await supabaseServer.from('routes').update(updates).eq('id', id).select().single();
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    const message = error.message.includes('routes_event_slug_key')
+      ? 'このURL（スラッグ）は既に使われています'
+      : error.message;
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, route: data });
 }
