@@ -52,6 +52,8 @@ export interface Trace {
   deleted_by: string | null;      // 'admin' または削除者の識別子
 
   region: string | null;          // 逆ジオコーディングで自動保存される自治体名（例：「大阪府浪速区」）
+
+  team: string | null;            // リレー型イベント参加時のチーム名（自由記述）
 }
 
 /**
@@ -93,6 +95,7 @@ export interface TraceInput {
 
   session_code?: string;
   nickname?: string;
+  team?: string;                   // リレー型イベント参加時のチーム名（指定するとvisibilityは強制的にpublic）
 
   visibility?: string;             // private | followers | pending_review | public（未指定・未ログインは public 固定）
 }
@@ -151,6 +154,8 @@ export interface Route {
   event_starts_at: string | null;
   event_ends_at: string | null;
   event_area: string | null;
+  event_mode: string;              // 'route'（事前ルート型） | 'relay'（発見連鎖型）
+  event_session_code: string | null; // relay型イベントの参加者投稿を束ねるsession_code
 }
 
 export interface CreateRouteRequest {
@@ -159,6 +164,8 @@ export interface CreateRouteRequest {
   trace_ids: string[];
   nickname?: string;
   session_code?: string;
+  event_mode?: 'route' | 'relay';
+  event_session_code?: string;
 }
 
 export interface CreateRouteResponse {

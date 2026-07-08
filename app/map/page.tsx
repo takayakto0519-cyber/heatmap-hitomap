@@ -207,6 +207,7 @@ function MapApp() {
   const [wantRevisit, setWantRevisit] = useState(false);
   const [wantToShare, setWantToShare] = useState(false);
   const [nickname, setNickname] = useState('');
+  const [team, setTeam] = useState('');
   const [traceTypeKey, setTraceTypeKey] = useState<string | null>(null);
   const [isPastMemory, setIsPastMemory] = useState(false);
   const [memoryDate, setMemoryDate] = useState('');
@@ -538,6 +539,7 @@ function MapApp() {
           custom_tags: customTags.length > 0 ? customTags : null,
           session_code: sessionCode.trim() || null,
           nickname: nickname.trim() || null,
+          team: team.trim() || null,
           visibility: currentUser ? postVisibility : undefined,
         }),
       });
@@ -1412,6 +1414,17 @@ function MapApp() {
                       <input type="text" value={sessionCode} onChange={e => saveSessionCode(e.target.value)}
                         placeholder="例: yanaka-20260701" style={{ ...inputStyle, fontSize: 13, background: '#fff' }} />
                     </section>
+
+                    {sessionCode && (
+                      <section style={{ padding: '10px', background: '#FBF6FF', borderRadius: 10, marginBottom: 0, marginTop: 8 }}>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8E44AD', marginBottom: 4 }}>🏳 チーム名（イベント参加時）</label>
+                        <input type="text" value={team} onChange={e => setTeam(e.target.value)}
+                          placeholder="例: 新宿チーム" style={{ ...inputStyle, fontSize: 13, background: '#fff' }} />
+                        <p style={{ fontSize: 11, color: '#aaa', margin: '4px 0 0' }}>
+                          チーム名を入れると、この投稿はチームメンバー全員に見える公開投稿になります
+                        </p>
+                      </section>
+                    )}
                   </div>
                 )}
               </form>

@@ -59,11 +59,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
     }
 
     const userId = await getCurrentUserId();
+    const team = body.team?.trim() || null;
     // 匿名投稿は従来どおり即時 public。ログイン投稿のみ公開範囲を選べる（private/followers/pending_review）。
+    // ただしリレー型イベント参加（team指定あり）の投稿は、ログイン有無にかかわらず必ずpublicにする。
+    // ログイン投稿はデフォルトprivateになるため、そのままだとチームメンバー同士に投稿が見えなくなってしまう。
     const allowedVisibility = ['private', 'followers', 'pending_review'];
-    const visibility = userId && body.visibility && allowedVisibility.includes(body.visibility)
-      ? body.visibility
-      : userId ? 'private' : 'public';
+    const visibility = team
+      ? 'public'
+      : userId && body.visibility && allowedVisibility.includes(body.visibility)
+        ? body.visibility
+        : userId ? 'private' : 'public';
 
     const region = await reverseGeocodeRegion(body.latitude, body.longitude);
 
@@ -97,6 +102,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         audio_url: body.audio_url ?? null,
         session_code: body.session_code ?? null,
         nickname: body.nickname ?? null,
+        team,
         user_id: userId,
         visibility,
       })

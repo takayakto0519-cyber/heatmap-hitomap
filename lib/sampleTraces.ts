@@ -36,6 +36,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
   {
     id: 'sample-2',
@@ -71,6 +72,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
   {
     id: 'sample-3',
@@ -106,6 +108,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
   {
     id: 'sample-4',
@@ -141,6 +144,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
   {
     id: 'sample-5',
@@ -176,6 +180,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
   {
     id: 'sample-6',
@@ -211,6 +216,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
   {
     id: 'sample-7',
@@ -246,5 +252,6 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_at: null,
     deleted_by: null,
     region: null,
+    team: null,
   },
 ];

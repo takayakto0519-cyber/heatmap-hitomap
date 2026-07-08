@@ -468,11 +468,19 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
             {/* 日時・ニックネーム */}
             {!editing && (
-              <p style={{ fontSize: 11, color: '#ccc', margin: '0 0 4px' }}>
-                {new Date(trace.created_at).toLocaleString('ja-JP')}
-                {authorUsername ? (
-                  <> · <a href={`/profile/${authorUsername}`} style={{ color: '#38ADA9' }}>@{authorUsername}</a></>
-                ) : trace.nickname ? ` · ${trace.nickname}` : ''}
+              <p style={{ fontSize: 11, color: '#ccc', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span>
+                  {new Date(trace.created_at).toLocaleString('ja-JP')}
+                  {authorUsername ? (
+                    <> · <a href={`/profile/${authorUsername}`} style={{ color: '#38ADA9' }}>@{authorUsername}</a></>
+                  ) : trace.nickname ? ` · ${trace.nickname}` : ''}
+                </span>
+                {trace.team && (
+                  <span style={{
+                    display: 'inline-block', padding: '2px 9px', borderRadius: 20,
+                    background: '#8E44AD22', color: '#8E44AD', fontSize: 11, fontWeight: 700,
+                  }}>🏳 {trace.team}</span>
+                )}
               </p>
             )}
 

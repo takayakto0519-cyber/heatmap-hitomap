@@ -22,7 +22,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateRouteRe
   }
   try {
     const body = (await req.json()) as CreateRouteRequest;
-    if (!body.title || !Array.isArray(body.trace_ids) || body.trace_ids.length < 2) {
+    const isRelay = body.event_mode === 'relay';
+    // relay型イベントは事前に地点が決まっていないため、trace_ids 2件以上の必須チェックを免除する
+    if (!body.title || (!isRelay && (!Array.isArray(body.trace_ids) || body.trace_ids.length < 2))) {
       return NextResponse.json(
         { ok: false, error: 'タイトルと2件以上の痕跡が必要です' },
         { status: 400 }
@@ -36,10 +38,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateRouteRe
       .insert({
         title: body.title,
         description: body.description ?? null,
-        trace_ids: body.trace_ids,
+        trace_ids: body.trace_ids ?? [],
         nickname: body.nickname ?? null,
         session_code: body.session_code ?? null,
         user_id: userId,
+        event_mode: isRelay ? 'relay' : 'route',
+        event_session_code: isRelay ? (body.event_session_code ?? null) : null,
       })
       .select()
       .single();

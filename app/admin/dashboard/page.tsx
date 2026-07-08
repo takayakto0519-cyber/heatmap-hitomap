@@ -562,10 +562,29 @@ interface EventFieldsForm {
   event_starts_at: string;
   event_ends_at: string;
   event_area: string;
+  event_mode: 'route' | 'relay';
+  event_session_code: string;
 }
 
 const emptyEventFields: EventFieldsForm = {
   event_slug: '', event_cover_url: '', event_starts_at: '', event_ends_at: '', event_area: '',
+  event_mode: 'route', event_session_code: '',
+};
+
+interface RelayCreateForm {
+  title: string;
+  description: string;
+  event_session_code: string;
+  event_slug: string;
+  event_cover_url: string;
+  event_area: string;
+  event_starts_at: string;
+  event_ends_at: string;
+}
+
+const emptyRelayForm: RelayCreateForm = {
+  title: '', description: '', event_session_code: '', event_slug: '', event_cover_url: '',
+  event_area: '', event_starts_at: '', event_ends_at: '',
 };
 
 function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
@@ -578,6 +597,9 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [eventEditingId, setEventEditingId] = useState<string | null>(null);
   const [eventFields, setEventFields] = useState<EventFieldsForm>(emptyEventFields);
   const [eventSaving, setEventSaving] = useState(false);
+  const [showRelayCreate, setShowRelayCreate] = useState(false);
+  const [relayForm, setRelayForm] = useState<RelayCreateForm>(emptyRelayForm);
+  const [relaySaving, setRelaySaving] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -613,6 +635,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       event_starts_at: isoToInputValue(r.event_starts_at),
       event_ends_at: isoToInputValue(r.event_ends_at),
       event_area: r.event_area ?? '',
+      event_mode: r.event_mode === 'relay' ? 'relay' : 'route',
+      event_session_code: r.event_session_code ?? '',
     });
   }
 
@@ -627,6 +651,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_starts_at: inputValueToIso(eventFields.event_starts_at),
           event_ends_at: inputValueToIso(eventFields.event_ends_at),
           event_area: eventFields.event_area.trim() || null,
+          event_mode: eventFields.event_mode,
+          event_session_code: eventFields.event_mode === 'relay' ? (eventFields.event_session_code.trim() || null) : null,
         }),
       });
       const data = await res.json();
@@ -636,11 +662,104 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     }
   }
 
+  async function createRelayEvent() {
+    if (!relayForm.title.trim()) { setError('タイトルは必須です'); return; }
+    setRelaySaving(true);
+    try {
+      const res = await fetch('/api/routes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: relayForm.title.trim(),
+          description: relayForm.description.trim() || null,
+          trace_ids: [],
+          event_mode: 'relay',
+          event_session_code: relayForm.event_session_code.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setError(data.error ?? '作成に失敗しました'); return; }
+
+      // 続けて event_slug 等の公開情報を設定
+      const patchRes = await fetch(`/api/admin/routes/${data.route.id}`, {
+        method: 'PATCH', headers: authHeaders(),
+        body: JSON.stringify({
+          event_slug: relayForm.event_slug.trim() || null,
+          event_cover_url: relayForm.event_cover_url.trim() || null,
+          event_area: relayForm.event_area.trim() || null,
+          event_starts_at: inputValueToIso(relayForm.event_starts_at),
+          event_ends_at: inputValueToIso(relayForm.event_ends_at),
+        }),
+      });
+      const patchData = await patchRes.json();
+      if (!patchData.ok) { setError(patchData.error ?? '公開情報の設定に失敗しました'); }
+
+      setShowRelayCreate(false);
+      setRelayForm(emptyRelayForm);
+      load();
+    } finally {
+      setRelaySaving(false);
+    }
+  }
+
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
 
   return (
     <div>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+
+      {showRelayCreate ? (
+        <Card>
+          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>🏃 新規relayイベントを作成</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>タイトル</label>
+            <input placeholder="例：ヒトマップ×山手線一周プロジェクト" value={relayForm.title}
+              onChange={e => setRelayForm(f => ({ ...f, title: e.target.value }))} style={inputStyle} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>説明文</label>
+            <textarea placeholder="イベントの説明" value={relayForm.description} rows={3}
+              onChange={e => setRelayForm(f => ({ ...f, description: e.target.value }))} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>参加者投稿を束ねるコード（実験回コードとして参加者に案内）</label>
+            <input placeholder="例：yamanote2026" value={relayForm.event_session_code}
+              onChange={e => setRelayForm(f => ({ ...f, event_session_code: e.target.value }))} style={inputStyle} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>URL（英数字とハイフン）</label>
+            <input placeholder="event_slug 例：yamanote-2026" value={relayForm.event_slug}
+              onChange={e => setRelayForm(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>ヒーロー画像URL</label>
+            <input placeholder="event_cover_url" value={relayForm.event_cover_url}
+              onChange={e => setRelayForm(f => ({ ...f, event_cover_url: e.target.value }))} style={inputStyle} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>エリア名</label>
+            <input placeholder="例：山手線" value={relayForm.event_area}
+              onChange={e => setRelayForm(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#666', fontWeight: 700, display: 'block' }}>開始</label>
+                <input type="datetime-local" value={relayForm.event_starts_at}
+                  onChange={e => setRelayForm(f => ({ ...f, event_starts_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#666', fontWeight: 700, display: 'block' }}>終了</label>
+                <input type="datetime-local" value={relayForm.event_ends_at}
+                  onChange={e => setRelayForm(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={createRelayEvent} disabled={relaySaving} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: relaySaving ? 'wait' : 'pointer', fontSize: 13,
+              }}>{relaySaving ? '作成中…' : '作成する'}</button>
+              <button onClick={() => { setShowRelayCreate(false); setRelayForm(emptyRelayForm); }} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #ddd',
+                background: '#fff', color: '#888', cursor: 'pointer', fontSize: 13,
+              }}>キャンセル</button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <button onClick={() => setShowRelayCreate(true)} style={{
+          display: 'block', width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px dashed #38ADA9',
+          background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 12,
+        }}>＋ 新規relayイベントを作成</button>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {routes.length === 0 && <p style={{ color: '#aaa' }}>公開中のルートはありません。</p>}
         {routes.map(r => (
@@ -652,9 +771,12 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             </p>
             {r.event_slug && (
               <p style={{ margin: '0 0 8px', fontSize: 12 }}>
-                <a href={`/events/${r.event_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: '#8E44AD', fontWeight: 700 }}>
-                  🎪 /events/{r.event_slug} を公開中 ↗
+                <a href={`/events/${r.event_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: r.event_mode === 'relay' ? '#38ADA9' : '#8E44AD', fontWeight: 700 }}>
+                  {r.event_mode === 'relay' ? '🏃 relay' : '🎪 route'} ・ /events/{r.event_slug} を公開中 ↗
                 </a>
+                {r.event_mode === 'relay' && r.event_session_code && (
+                  <span style={{ marginLeft: 8, color: '#999' }}>コード: {r.event_session_code}</span>
+                )}
               </p>
             )}
 
@@ -682,6 +804,28 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
 
             {eventEditingId === r.id ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, padding: 10, background: '#FBF6FF', borderRadius: 8 }}>
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>イベント形式</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setEventFields(f => ({ ...f, event_mode: 'route' }))} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    border: eventFields.event_mode === 'route' ? '1.5px solid #8E44AD' : '1.5px solid #ddd',
+                    background: eventFields.event_mode === 'route' ? '#8E44AD' : '#fff',
+                    color: eventFields.event_mode === 'route' ? '#fff' : '#888',
+                  }}>🚶 route（事前ルート型）</button>
+                  <button onClick={() => setEventFields(f => ({ ...f, event_mode: 'relay' }))} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    border: eventFields.event_mode === 'relay' ? '1.5px solid #38ADA9' : '1.5px solid #ddd',
+                    background: eventFields.event_mode === 'relay' ? '#38ADA9' : '#fff',
+                    color: eventFields.event_mode === 'relay' ? '#fff' : '#888',
+                  }}>🏃 relay（発見連鎖型）</button>
+                </div>
+                {eventFields.event_mode === 'relay' && (
+                  <>
+                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>参加者投稿を束ねるコード（実験回コードとして案内）</label>
+                    <input placeholder="例：yamanote2026" value={eventFields.event_session_code}
+                      onChange={e => setEventFields(f => ({ ...f, event_session_code: e.target.value }))} style={inputStyle} />
+                  </>
+                )}
                 <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>URL（英数字とハイフン、例: shibuya-2026）</label>
                 <input placeholder="event_slug" value={eventFields.event_slug}
                   onChange={e => setEventFields(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />

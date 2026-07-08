@@ -31,8 +31,9 @@ import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 const SELF_PIN_COLOR = '#4A90E2';
 
 // 共感ヒート：反応が重なるほどピンの色が濃く・大きくなる
-function createEmotionPin(emotionKey: string | null, reactionCount = 0, isMine = false) {
-  const color = getEmotionColor(emotionKey);
+// overrideColor が指定されている場合（relayイベントのチーム色分けなど）は感情色より優先する
+function createEmotionPin(emotionKey: string | null, reactionCount = 0, isMine = false, overrideColor?: string) {
+  const color = overrideColor ?? getEmotionColor(emotionKey);
   const size = 22 + Math.min(reactionCount, 8) * 2.5;
   const half = size / 2;
   const opacity = Math.min(0.55 + reactionCount * 0.08, 1);
@@ -171,9 +172,10 @@ interface Props {
   pinDropPos?: [number, number] | null;
   reactionCounts?: Record<string, number>;
   currentUserId?: string | null;
+  teamColors?: Record<string, string>;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -230,13 +232,14 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
             const voiceRelation = getVoiceRelation(t.voice_relation);
             const reactionCount = reactionCounts?.[t.id] ?? 0;
             const isMine = Boolean(currentUserId) && t.user_id === currentUserId;
+            const teamColor = teamColors && t.team ? teamColors[t.team] : undefined;
             const icon = archiveType
               ? (archiveType.key === 'chimei' && currentZoom >= CHIMEI_LABEL_ZOOM
                   ? createChimeiLabel(t.title, t.yomi, archiveType.color)
                   : createArchivePin(archiveType))
               : (t.photo_url && currentZoom >= PHOTO_THUMB_ZOOM
-                  ? createPhotoPin(t.photo_url, getEmotionColor(t.emotion_key), isMine)
-                  : createEmotionPin(t.emotion_key, reactionCount, isMine));
+                  ? createPhotoPin(t.photo_url, teamColor ?? getEmotionColor(t.emotion_key), isMine)
+                  : createEmotionPin(t.emotion_key, reactionCount, isMine, teamColor));
             const sourceIsUrl = !!t.source_ref && /^https?:\/\//.test(t.source_ref);
             return (
               <Marker key={t.id} position={[t.latitude, t.longitude]} icon={icon}>
@@ -247,6 +250,12 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
                         style={{ width: '100%', borderRadius: 8, objectFit: 'cover', maxHeight: 130 }} />
                     )}
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                      {t.team && (
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 20,
+                          background: (teamColor ?? '#8E44AD') + '22', color: teamColor ?? '#8E44AD', fontSize: 11, fontWeight: 700,
+                        }}>🏳 {t.team}</span>
+                      )}
                       {archiveType && (
                         <span style={{
                           padding: '2px 8px', borderRadius: 20,
