@@ -27,17 +27,22 @@ import { getEmotionColor, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 
+// ログイン時、自分の投稿と他人の投稿を枠線の色で見分けられるようにする
+const SELF_PIN_COLOR = '#4A90E2';
+
 // 共感ヒート：反応が重なるほどピンの色が濃く・大きくなる
-function createEmotionPin(emotionKey: string | null, reactionCount = 0) {
+function createEmotionPin(emotionKey: string | null, reactionCount = 0, isMine = false) {
   const color = getEmotionColor(emotionKey);
   const size = 22 + Math.min(reactionCount, 8) * 2.5;
   const half = size / 2;
   const opacity = Math.min(0.55 + reactionCount * 0.08, 1);
+  const borderColor = isMine ? SELF_PIN_COLOR : '#fff';
+  const borderWidth = isMine ? 4 : 3;
   const html = `<div style="
     width:${size}px;height:${size}px;
     background:${color};
     opacity:${opacity};
-    border:3px solid #fff;
+    border:${borderWidth}px solid ${borderColor};
     border-radius:50%;
     box-shadow:0 1px 5px rgba(0,0,0,0.4);
   "></div>`;
@@ -47,15 +52,16 @@ function createEmotionPin(emotionKey: string | null, reactionCount = 0) {
 // 拡大するとピンが写真サムネイルになる（ヒートが集まった場所がどんな場所か一目で分かるように）
 const PHOTO_THUMB_ZOOM = 16;
 
-function createPhotoPin(photoUrl: string, borderColor: string) {
+function createPhotoPin(photoUrl: string, borderColor: string, isMine = false) {
   const safeUrl = photoUrl.replace(/'/g, '%27');
   const size = 44;
   const half = size / 2;
+  const ring = isMine ? `box-shadow:0 0 0 3px ${SELF_PIN_COLOR}, 0 2px 6px rgba(0,0,0,0.35);` : 'box-shadow:0 2px 6px rgba(0,0,0,0.35);';
   const html = `<div style="
     width:${size}px;height:${size}px;
     border-radius:50%;
     border:3px solid ${borderColor};
-    box-shadow:0 2px 6px rgba(0,0,0,0.35);
+    ${ring}
     background-image:url('${safeUrl}');
     background-size:cover;background-position:center;
     background-color:#eee;
@@ -164,9 +170,10 @@ interface Props {
   onMapClick?: (lat: number, lng: number) => void;
   pinDropPos?: [number, number] | null;
   reactionCounts?: Record<string, number>;
+  currentUserId?: string | null;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -222,13 +229,14 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
             const category = archiveType ? null : getCategory(t.category);
             const voiceRelation = getVoiceRelation(t.voice_relation);
             const reactionCount = reactionCounts?.[t.id] ?? 0;
+            const isMine = Boolean(currentUserId) && t.user_id === currentUserId;
             const icon = archiveType
               ? (archiveType.key === 'chimei' && currentZoom >= CHIMEI_LABEL_ZOOM
                   ? createChimeiLabel(t.title, t.yomi, archiveType.color)
                   : createArchivePin(archiveType))
               : (t.photo_url && currentZoom >= PHOTO_THUMB_ZOOM
-                  ? createPhotoPin(t.photo_url, getEmotionColor(t.emotion_key))
-                  : createEmotionPin(t.emotion_key, reactionCount));
+                  ? createPhotoPin(t.photo_url, getEmotionColor(t.emotion_key), isMine)
+                  : createEmotionPin(t.emotion_key, reactionCount, isMine));
             const sourceIsUrl = !!t.source_ref && /^https?:\/\//.test(t.source_ref);
             return (
               <Marker key={t.id} position={[t.latitude, t.longitude]} icon={icon}>

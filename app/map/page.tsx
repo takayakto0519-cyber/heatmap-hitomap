@@ -891,6 +891,7 @@ function MapApp() {
             <TraceMap
               traces={filteredForMap}
               mode={mapMode}
+              currentUserId={currentUser?.id}
               center={userPos ?? undefined}
               flyTo={mapFlyTo ?? undefined}
               flyToZoom={mapFlyToZoom}

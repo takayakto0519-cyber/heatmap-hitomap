@@ -20,6 +20,7 @@ export default function RegionPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/traces?region=${encodeURIComponent(regionName)}`)
@@ -31,6 +32,7 @@ export default function RegionPage() {
       .then(r => r.json() as Promise<ListSponsorsResponse>)
       .then(d => { if (d.ok && d.sponsors.length > 0) setSponsor(d.sponsors[0]); })
       .catch(() => {});
+    fetch('/api/profile').then(r => r.json()).then(d => setCurrentUserId(d.user?.id ?? null)).catch(() => {});
   }, [regionName]);
 
   return (
@@ -56,6 +58,7 @@ export default function RegionPage() {
           <TraceMap
             traces={traces}
             mode="pin"
+            currentUserId={currentUserId}
             center={[traces[0].latitude, traces[0].longitude]}
             onTraceClick={setSelectedTrace}
           />
