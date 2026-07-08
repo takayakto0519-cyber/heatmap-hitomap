@@ -144,6 +144,13 @@ export interface Route {
   deleted_by: string | null;
   sponsor_name: string | null;  // 協賛企業名（手動設定、決済は伴わない）
   sponsor_url: string | null;
+
+  // イベント専用ページ（/events/[event_slug]）。event_slugが入っている行だけが公開イベントとして扱われる
+  event_slug: string | null;
+  event_cover_url: string | null;
+  event_starts_at: string | null;
+  event_ends_at: string | null;
+  event_area: string | null;
 }
 
 export interface CreateRouteRequest {
