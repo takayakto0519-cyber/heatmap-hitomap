@@ -18,12 +18,13 @@ interface RouteAdminUpdateBody {
   event_area?: string | null;
   event_mode?: string | null;
   event_session_code?: string | null;
+  review_status?: string | null;
 }
 
 const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
   'sponsor_name', 'sponsor_url',
   'event_slug', 'event_cover_url', 'event_starts_at', 'event_ends_at', 'event_area',
-  'event_mode', 'event_session_code',
+  'event_mode', 'event_session_code', 'review_status',
 ];
 
 // PATCH /api/admin/routes/[id] — 協賛・イベント公開情報の設定（手動、決済は伴わない。合言葉必須）

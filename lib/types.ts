@@ -156,6 +156,10 @@ export interface Route {
   event_area: string | null;
   event_mode: string;              // 'route'（事前ルート型） | 'relay'（発見連鎖型）
   event_session_code: string | null; // relay型イベントの参加者投稿を束ねるsession_code
+
+  is_public_recommendation: boolean; // ログインユーザーが「おすすめルート」として公開申請したか
+  review_status: string | null;      // null | 'pending' | 'approved' | 'rejected'（運営承認）
+  highlights: string | null;         // 見どころ・おすすめポイント（自由記述）
 }
 
 export interface CreateRouteRequest {
@@ -166,6 +170,8 @@ export interface CreateRouteRequest {
   session_code?: string;
   event_mode?: 'route' | 'relay';
   event_session_code?: string;
+  is_public_recommendation?: boolean;
+  highlights?: string;
 }
 
 export interface CreateRouteResponse {

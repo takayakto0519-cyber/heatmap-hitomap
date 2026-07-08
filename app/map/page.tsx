@@ -87,6 +87,8 @@ function MapApp() {
   const [routeSelection, setRouteSelection] = useState<string[]>([]);
   const [routeTitle, setRouteTitle] = useState('');
   const [routeNickname, setRouteNickname] = useState('');
+  const [routeHighlights, setRouteHighlights] = useState('');
+  const [routeRecommend, setRouteRecommend] = useState(false);
   const [routeSaving, setRouteSaving] = useState(false);
   const [routeSaveError, setRouteSaveError] = useState('');
 
@@ -107,6 +109,8 @@ function MapApp() {
           trace_ids: routeSelection,
           nickname: routeNickname.trim() || undefined,
           session_code: sessionCode.trim() || undefined,
+          highlights: routeHighlights.trim() || undefined,
+          is_public_recommendation: currentUser ? routeRecommend : undefined,
         }),
       });
       const data = await res.json();
@@ -1555,6 +1559,21 @@ function MapApp() {
             placeholder="ニックネーム（削除・編集時の確認用、任意）"
             style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }}
           />
+          {currentUser && (
+            <>
+              <textarea
+                value={routeHighlights}
+                onChange={e => setRouteHighlights(e.target.value)}
+                placeholder="見どころ・おすすめポイント（任意）"
+                rows={2}
+                style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8E44AD' }}>
+                <input type="checkbox" checked={routeRecommend} onChange={e => setRouteRecommend(e.target.checked)} />
+                ✨ おすすめルートとして公開申請する（運営の承認後、ルート一覧に掲載されます）
+              </label>
+            </>
+          )}
           {routeSaveError && <p style={{ color: '#E55039', fontSize: 12, margin: 0 }}>{routeSaveError}</p>}
           <button
             onClick={saveRoute}
@@ -1635,6 +1654,16 @@ function MapApp() {
             <span style={{ fontSize: 11 }}>{label}</span>
           </button>
         ))}
+        <button onClick={() => router.push('/routes')} style={{
+          flex: 1, padding: '10px 4px 8px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          color: '#999', fontWeight: 400,
+          borderTop: '2.5px solid transparent',
+        }}>
+          <span style={{ fontSize: 20 }}>🥾</span>
+          <span style={{ fontSize: 11 }}>ルート</span>
+        </button>
         <button onClick={() => router.push('/following')} style={{
           flex: 1, padding: '10px 4px 8px',
           background: 'none', border: 'none', cursor: 'pointer',

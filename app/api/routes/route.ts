@@ -32,6 +32,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateRouteRe
     }
 
     const userId = await getCurrentUserId();
+    // おすすめルート公開申請はログインユーザーのみ（本人確認・承認連絡のため）
+    const wantsRecommendation = Boolean(userId) && body.is_public_recommendation === true;
     const supabaseServer = await getServerClient();
     const { data, error } = await supabaseServer
       .from('routes')
@@ -44,6 +46,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateRouteRe
         user_id: userId,
         event_mode: isRelay ? 'relay' : 'route',
         event_session_code: isRelay ? (body.event_session_code ?? null) : null,
+        is_public_recommendation: wantsRecommendation,
+        review_status: wantsRecommendation ? 'pending' : null,
+        highlights: body.highlights?.trim() || null,
       })
       .select()
       .single();

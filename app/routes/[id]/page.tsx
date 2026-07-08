@@ -99,7 +99,18 @@ export default function RoutePage() {
         <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
         <h1 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 800 }}>🥾 {route.title}</h1>
         {route.description && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>{route.description}</p>}
-        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>
+        {route.is_public_recommendation && route.review_status === 'approved' && (
+          <span style={{
+            display: 'inline-block', marginTop: 6, padding: '3px 10px', borderRadius: 20,
+            background: '#FBF6FF', color: '#8E44AD', fontSize: 11, fontWeight: 700,
+          }}>✨ おすすめルート</span>
+        )}
+        {route.highlights && (
+          <p style={{ margin: '8px 0 0', fontSize: 13, color: '#8E44AD', background: '#FBF6FF', padding: '8px 10px', borderRadius: 8, whiteSpace: 'pre-wrap' }}>
+            👀 {route.highlights}
+          </p>
+        )}
+        <p style={{ margin: '6px 0 0', fontSize: 12, color: '#aaa' }}>
           {traces.length}地点 {route.nickname ? `・ ${route.nickname}` : ''}
           {completionCount !== null && completionCount > 0 ? ` ・ 🏅${completionCount}人が踏破` : ''}
         </p>

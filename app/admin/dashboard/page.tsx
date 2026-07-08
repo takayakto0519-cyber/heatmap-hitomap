@@ -701,11 +701,52 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     }
   }
 
+  async function reviewRoute(id: string, status: 'approved' | 'rejected') {
+    const res = await fetch(`/api/admin/routes/${id}`, {
+      method: 'PATCH', headers: authHeaders(),
+      body: JSON.stringify({ review_status: status }),
+    });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '更新に失敗しました');
+  }
+
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
+
+  const pendingRoutes = routes.filter(r => r.review_status === 'pending');
 
   return (
     <div>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+
+      {pendingRoutes.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14, color: '#B7791F' }}>✨ おすすめルート承認待ち（{pendingRoutes.length}件）</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pendingRoutes.map(r => (
+              <Card key={r.id} style={{ background: '#FFFAF0', border: '1px solid #F6E4B8' }}>
+                <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>{r.title}</p>
+                {r.description && <p style={{ margin: '0 0 6px', fontSize: 12, color: '#888' }}>{r.description}</p>}
+                {r.highlights && (
+                  <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8E44AD', background: '#FBF6FF', padding: '8px 10px', borderRadius: 8, whiteSpace: 'pre-wrap' }}>
+                    👀 {r.highlights}
+                  </p>
+                )}
+                <p style={{ margin: '0 0 8px', fontSize: 12, color: '#aaa' }}>{r.trace_ids.length}地点 ・ <a href={`/routes/${r.id}`} target="_blank" rel="noopener noreferrer" style={{ color: '#8E44AD' }}>プレビュー ↗</a></p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => reviewRoute(r.id, 'approved')} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+                    background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 12,
+                  }}>承認する</button>
+                  <button onClick={() => reviewRoute(r.id, 'rejected')} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid #ddd',
+                    background: '#fff', color: '#E74C3C', cursor: 'pointer', fontSize: 12,
+                  }}>却下する</button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showRelayCreate ? (
         <Card>
@@ -768,6 +809,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             <p style={{ margin: '0 0 8px', fontSize: 12, color: '#888' }}>
               {r.trace_ids.length}地点 ・ {new Date(r.created_at).toLocaleDateString('ja-JP')}
               {r.sponsor_name && ` ・ 協賛：${r.sponsor_name}`}
+              {r.review_status === 'approved' && <span style={{ color: '#38ADA9', fontWeight: 700 }}> ・ ✨承認済み</span>}
+              {r.review_status === 'rejected' && <span style={{ color: '#E74C3C', fontWeight: 700 }}> ・ 却下済み</span>}
             </p>
             {r.event_slug && (
               <p style={{ margin: '0 0 8px', fontSize: 12 }}>
