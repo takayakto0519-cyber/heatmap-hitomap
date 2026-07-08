@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import type { Trace, ListTracesResponse, Sponsor, ListSponsorsResponse } from '@/lib/types';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
+import RegionTimeline from '@/components/region/RegionTimeline';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -72,6 +73,10 @@ export default function RegionPage() {
             この地域にはまだ記録がありません。
           </p>
         )}
+        {!loading && traces.length > 0 && (
+          <RegionTimeline traces={traces} onTraceClick={setSelectedTrace} />
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
           {traces.map(t => (
             <TraceCard key={t.id} trace={t} onClick={() => setSelectedTrace(t)} />
