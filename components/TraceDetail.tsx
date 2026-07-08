@@ -168,10 +168,11 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
   async function handleShare() {
     const text = `${emotion ? emotion.emoji + ' ' + emotion.label + '：' : ''}${trace.title}`;
+    const shareUrl = `${window.location.origin}/t/${trace.id}`;
     if (navigator.share) {
-      await navigator.share({ title: 'ヒトマップの痕跡', text, url: window.location.href }).catch(() => {});
+      await navigator.share({ title: 'ヒトマップの痕跡', text, url: shareUrl }).catch(() => {});
     } else {
-      await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
+      await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
       alert('クリップボードにコピーしました');
     }
   }

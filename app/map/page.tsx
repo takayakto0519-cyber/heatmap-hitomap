@@ -224,6 +224,9 @@ function MapApp() {
   const [uploadProgress, setUploadProgress] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitDone, setSubmitDone] = useState(false);
+  const [lastPostedTrace, setLastPostedTrace] = useState<{ id: string; title: string; visibility: string } | null>(null);
+  const submitDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const postedPosRef = useRef<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
   const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
   const [postVisibility, setPostVisibility] = useState<'private' | 'followers' | 'pending_review'>('private');
 
@@ -470,6 +473,25 @@ function MapApp() {
     reader.readAsDataURL(file);
   }
 
+  // 投稿完了画面から地図に戻る（自動タイマー・手動「続ける」ボタンの両方から呼ばれる）
+  const finishSubmitPost = useCallback(() => {
+    if (submitDoneTimerRef.current) { clearTimeout(submitDoneTimerRef.current); submitDoneTimerRef.current = null; }
+    const { lat: postedLat, lng: postedLng } = postedPosRef.current;
+    setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
+    setPhotoPreview(null); setPhotoFile(null); setLat(null); setLng(null);
+    setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
+    setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
+    setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
+    setArchiveTypeKey(null); setYomi(''); setAltNames(''); setEraLabel(''); setSourceRef(''); setVoiceRelation(null);
+    setAudioBlob(null);
+    setAddressQuery(''); setAddressCandidates([]); setAddressError(''); setShowAddressSearch(false);
+    setShowAdvanced(false); setSubmitDone(false); setLastPostedTrace(null);
+    fetchTraces();
+    if (postedLat && postedLng) { setMapFlyToZoom(17); setMapFlyTo([postedLat, postedLng]); }
+    setTab('map');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchTraces]);
+
   // ── 投稿 ────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -539,23 +561,12 @@ function MapApp() {
           localStorage.setItem('hitomap_my_emotions', JSON.stringify(updated));
         }
         // 投稿位置を先に保存（setLatで消える前に）
-        const postedLat = lat;
-        const postedLng = lng;
+        postedPosRef.current = { lat, lng };
         setSubmitDone(true);
-        setTimeout(() => {
-          setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
-          setPhotoPreview(null); setPhotoFile(null); setLat(null); setLng(null);
-          setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
-          setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
-          setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
-          setArchiveTypeKey(null); setYomi(''); setAltNames(''); setEraLabel(''); setSourceRef(''); setVoiceRelation(null);
-          setAudioBlob(null);
-          setAddressQuery(''); setAddressCandidates([]); setAddressError(''); setShowAddressSearch(false);
-          setShowAdvanced(false); setSubmitDone(false);
-          fetchTraces();
-          if (postedLat && postedLng) { setMapFlyToZoom(17); setMapFlyTo([postedLat, postedLng]); }
-          setTab('map');
-        }, 1500);
+        if (data.trace) {
+          setLastPostedTrace({ id: data.trace.id, title: data.trace.title, visibility: data.trace.visibility });
+        }
+        submitDoneTimerRef.current = setTimeout(finishSubmitPost, 4000);
       } else {
         setSubmitError(data.error ?? '送信に失敗しました');
       }
@@ -954,14 +965,38 @@ function MapApp() {
 
             {/* 送信完了 */}
             {submitDone && (
-              <div style={{
-                textAlign: 'center', padding: '60px 20px',
-                fontSize: 22, fontWeight: 800, color: '#38ADA9',
-              }}>
-                ✓ 記録しました<br />
-                <span style={{ fontSize: 13, fontWeight: 400, color: '#aaa', marginTop: 10, display: 'block' }}>
-                  地図に戻ります…
-                </span>
+              <div style={{ textAlign: 'center', padding: '48px 20px 20px' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#38ADA9' }}>✓ 記録しました</div>
+
+                {lastPostedTrace?.visibility === 'public' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280, margin: '20px auto 0' }}>
+                    <button onClick={async () => {
+                      const shareUrl = `${window.location.origin}/t/${lastPostedTrace.id}`;
+                      if (navigator.share) {
+                        await navigator.share({ title: 'ヒトマップの痕跡', text: lastPostedTrace.title, url: shareUrl }).catch(() => {});
+                      } else {
+                        await navigator.clipboard.writeText(`${lastPostedTrace.title}\n${shareUrl}`);
+                        alert('クリップボードにコピーしました');
+                      }
+                    }} style={{
+                      padding: '12px 0', borderRadius: 10, border: 'none',
+                      background: 'linear-gradient(135deg, #FF6B9D, #FF9068)',
+                      color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                    }}>📤 シェアする</button>
+                    <a
+                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(lastPostedTrace.title)}&url=${encodeURIComponent(`${window.location.origin}/t/${lastPostedTrace.id}`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{
+                        display: 'block', padding: '12px 0', borderRadius: 10, border: '1.5px solid #ddd',
+                        color: '#444', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+                      }}
+                    >𝕏 でシェア</a>
+                  </div>
+                )}
+
+                <button onClick={finishSubmitPost} style={{
+                  marginTop: 16, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: 'pointer',
+                }}>続ける →</button>
               </div>
             )}
 

@@ -30,6 +30,39 @@ async function checkOwnership(
   return { ok: true };
 }
 
+// GET /api/traces/[id] — 単一トレース取得（恒久リンク・近隣取得用）。可視性ルールは一覧APIと揃える。
+export async function GET(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
+  if (!SUPABASE_READY) {
+    return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
+  }
+  const { id } = context.params;
+  const supabase = await getServerClient();
+  const { data: trace, error } = await supabase.from('traces').select('*').eq('id', id).single();
+  if (error || !trace || trace.is_deleted) {
+    return NextResponse.json({ ok: false, error: '見つかりません' }, { status: 404 });
+  }
+
+  if (trace.visibility && trace.visibility !== 'public') {
+    const myId = await getCurrentUserId();
+    const isOwner = myId && myId === trace.user_id;
+    let isFollower = false;
+    if (!isOwner && myId && trace.visibility === 'followers') {
+      const { data: followRow } = await supabase
+        .from('follows').select('follower_id')
+        .eq('follower_id', myId).eq('followee_id', trace.user_id).maybeSingle();
+      isFollower = Boolean(followRow);
+    }
+    if (!isOwner && !isFollower) {
+      return NextResponse.json({ ok: false, error: '見つかりません' }, { status: 404 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, trace: trace as Trace });
+}
+
 // PATCH /api/traces/[id] — タイトル・テキスト・トグルの更新、および復元(action:'restore')
 export async function PATCH(
   req: NextRequest,
