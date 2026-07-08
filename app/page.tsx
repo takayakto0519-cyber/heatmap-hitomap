@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Onboarding from '@/components/Onboarding';
 
 interface Candidate {
   display_name: string;
@@ -69,6 +70,7 @@ export default function TopPage() {
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', padding: 24, background: '#fafafa',
     }}>
+      <Onboarding />
       <div style={{ width: '100%', maxWidth: 400 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, margin: '0 0 4px', textAlign: 'center' }}>ヒトマップ</h1>
         <p style={{ fontSize: 13, color: '#999', textAlign: 'center', margin: '0 0 28px' }}>

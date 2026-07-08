@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { Trace, ListTracesResponse, CreateTraceResponse, Sponsor, ListSponsorsResponse } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
@@ -60,6 +60,7 @@ export default function MapPage() {
 }
 
 function MapApp() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const regionParam = searchParams.get('region');
 
@@ -77,6 +78,9 @@ function MapApp() {
   const [mapFlyToZoom, setMapFlyToZoom] = useState<number>(17);
   const [mapFitBounds, setMapFitBounds] = useState<[[number, number], [number, number]] | null>(null);
   const hasAutoLocatedRef = useRef(false);
+
+  // 全体マップから直接ピンを立てて投稿する導線
+  const [pinDropMode, setPinDropMode] = useState(false);
 
   // 地図タブの地域ジャンプ検索
   const [regionQuery, setRegionQuery] = useState('');
@@ -316,6 +320,24 @@ function MapApp() {
   }, []);
 
   useEffect(() => { fetchTraces(); }, [fetchTraces]);
+
+  // 共感ヒート：表示中の痕跡の反応数をまとめて取得し、ピンの色濃度・サイズに反映する
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (traces.length === 0) return;
+    const ids = traces.map(t => t.id).join(',');
+    fetch(`/api/reactions?trace_ids=${ids}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return;
+        const totals: Record<string, number> = {};
+        for (const [traceId, byType] of Object.entries(d.counts ?? {}) as [string, Record<string, number>][]) {
+          totals[traceId] = Object.values(byType).reduce((sum, n) => sum + n, 0);
+        }
+        setReactionCounts(totals);
+      })
+      .catch(() => {});
+  }, [traces]);
 
   // ── フィルタ・ソート ─────────────────────
   // マップ用：感情・カテゴリ・近くのみ（セッションコードでは絞らない→全件見える）
@@ -865,9 +887,30 @@ function MapApp() {
               }
               routeLine={(detourDestination && userPos) ? [userPos, detourDestination.pos] : undefined}
               highlightIds={detourDestination ? detourWaypoints.map(w => w.trace.id) : undefined}
+              reactionCounts={reactionCounts}
               onLocate={pos => setUserPos(pos)}
               onTraceClick={setSelectedTrace}
+              onMapClick={pinDropMode ? (la, ln) => {
+                setLat(la); setLng(ln);
+                setPinDropMode(false);
+                setTab('post');
+              } : undefined}
             />
+            {/* 全体マップから直接ピンを立てて記録する */}
+            <button
+              type="button"
+              onClick={() => setPinDropMode(v => !v)}
+              style={{
+                position: 'absolute', bottom: 16, right: 16, zIndex: 500,
+                padding: '12px 16px', borderRadius: 24, border: 'none',
+                background: pinDropMode ? '#FF6B9D' : '#fff',
+                color: pinDropMode ? '#fff' : '#333',
+                fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+              }}
+            >
+              {pinDropMode ? '✕ 取消（地図をタップ）' : '📍 ここに記録する'}
+            </button>
             {loading && !fetchError && (
               <div style={{
                 position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
@@ -1126,25 +1169,27 @@ function MapApp() {
 
                   {/* 住所検索（任意・折りたたみ） */}
                   <button type="button" onClick={() => setShowAddressSearch(v => !v)} style={{
-                    background: 'none', border: 'none', color: '#aaa', fontSize: 12, cursor: 'pointer', padding: 0,
+                    width: '100%', padding: '10px', borderRadius: 10, marginBottom: showAddressSearch ? 8 : 0,
+                    border: '1.5px solid #e0e0e0', background: '#fafafa',
+                    color: '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                   }}>
-                    {showAddressSearch ? '▲ 住所検索を閉じる' : '🔍 住所で検索したい場合はこちら（任意）'}
+                    {showAddressSearch ? '▲ 住所検索を閉じる' : '🔍 住所・地名で検索する'}
                   </button>
 
                   {showAddressSearch && (
                     <div style={{ marginTop: 8 }}>
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                         <input
                           type="text" value={addressQuery}
                           onChange={e => setAddressQuery(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchAddress(); } }}
                           placeholder="地名・住所で検索"
-                          style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+                          style={{ ...inputStyle, flex: 1, fontSize: 16, padding: '14px 16px' }}
                         />
                         <button type="button" onClick={searchAddress} disabled={addressSearching} style={{
-                          padding: '0 12px', borderRadius: 10, border: '1.5px solid #e0e0e0',
-                          background: '#fff', color: '#555', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
-                        }}>{addressSearching ? '…' : '🔍'}</button>
+                          padding: '0 18px', borderRadius: 10, border: 'none',
+                          background: '#4A90E2', color: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap',
+                        }}>{addressSearching ? '…' : '🔍 検索'}</button>
                       </div>
 
                       {addressCandidates.length > 0 && (
@@ -1154,9 +1199,9 @@ function MapApp() {
                               setLat(parseFloat(c.lat)); setLng(parseFloat(c.lon));
                               setAddressQuery(c.display_name.split(',')[0]); setAddressCandidates([]);
                             }} style={{
-                              width: '100%', padding: '9px 12px', background: '#fff',
+                              width: '100%', padding: '13px 14px', background: '#fff',
                               border: 'none', borderBottom: i < addressCandidates.length - 1 ? '1px solid #f5f5f5' : 'none',
-                              cursor: 'pointer', textAlign: 'left' as const, fontSize: 12, color: '#333',
+                              cursor: 'pointer', textAlign: 'left' as const, fontSize: 14, color: '#333',
                             }}>
                               📍 {c.display_name.split(',').slice(0, 3).join(', ')}
                             </button>
@@ -1535,6 +1580,16 @@ function MapApp() {
             <span style={{ fontSize: 11 }}>{label}</span>
           </button>
         ))}
+        <button onClick={() => router.push('/following')} style={{
+          flex: 1, padding: '10px 4px 8px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          color: '#999', fontWeight: 400,
+          borderTop: '2.5px solid transparent',
+        }}>
+          <span style={{ fontSize: 20 }}>👥</span>
+          <span style={{ fontSize: 11 }}>つながり</span>
+        </button>
       </nav>
 
       {/* ── モーダル ── */}

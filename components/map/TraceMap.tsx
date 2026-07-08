@@ -27,16 +27,40 @@ import { getEmotionColor, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 
-function createEmotionPin(emotionKey: string | null) {
+// 共感ヒート：反応が重なるほどピンの色が濃く・大きくなる
+function createEmotionPin(emotionKey: string | null, reactionCount = 0) {
   const color = getEmotionColor(emotionKey);
+  const size = 22 + Math.min(reactionCount, 8) * 2.5;
+  const half = size / 2;
+  const opacity = Math.min(0.55 + reactionCount * 0.08, 1);
   const html = `<div style="
-    width:22px;height:22px;
+    width:${size}px;height:${size}px;
     background:${color};
+    opacity:${opacity};
     border:3px solid #fff;
     border-radius:50%;
     box-shadow:0 1px 5px rgba(0,0,0,0.4);
   "></div>`;
-  return L.divIcon({ html, iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -14], className: '' });
+  return L.divIcon({ html, iconSize: [size, size], iconAnchor: [half, half], popupAnchor: [0, -half - 3], className: '' });
+}
+
+// 拡大するとピンが写真サムネイルになる（ヒートが集まった場所がどんな場所か一目で分かるように）
+const PHOTO_THUMB_ZOOM = 16;
+
+function createPhotoPin(photoUrl: string, borderColor: string) {
+  const safeUrl = photoUrl.replace(/'/g, '%27');
+  const size = 44;
+  const half = size / 2;
+  const html = `<div style="
+    width:${size}px;height:${size}px;
+    border-radius:50%;
+    border:3px solid ${borderColor};
+    box-shadow:0 2px 6px rgba(0,0,0,0.35);
+    background-image:url('${safeUrl}');
+    background-size:cover;background-position:center;
+    background-color:#eee;
+  "></div>`;
+  return L.divIcon({ html, iconSize: [size, size], iconAnchor: [half, half], popupAnchor: [0, -half - 4], className: '' });
 }
 
 function createArchivePin(archiveType: NonNullable<ReturnType<typeof getArchiveType>>) {
@@ -117,6 +141,14 @@ function LocateControl({ onLocate }: { onLocate?: (pos: [number, number]) => voi
   );
 }
 
+// 全体マップから直接ピンを立てるモード用：タップ位置を拾ってコールバックする
+function MapClickHandler({ onMapClick }: { onMapClick?: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) { onMapClick?.(e.latlng.lat, e.latlng.lng); },
+  });
+  return null;
+}
+
 interface Props {
   traces: Trace[];
   mode?: 'pin' | 'heat';
@@ -129,9 +161,12 @@ interface Props {
   highlightIds?: string[];
   onLocate?: (pos: [number, number]) => void;
   onTraceClick?: (trace: Trace) => void;
+  onMapClick?: (lat: number, lng: number) => void;
+  pinDropPos?: [number, number] | null;
+  reactionCounts?: Record<string, number>;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -157,6 +192,10 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       <LocateControl onLocate={onLocate} />
       <FlyToHandler pos={flyTo} zoom={flyToZoom} bounds={fitBounds} />
       <ZoomTracker onZoom={setCurrentZoom} />
+      {onMapClick && <MapClickHandler onMapClick={onMapClick} />}
+      {pinDropPos && (
+        <Marker position={pinDropPos} icon={createEmotionPin(null)} />
+      )}
 
       {routeLine && routeLine.length >= 2 && (
         <Polyline positions={routeLine} pathOptions={{ color: '#38ADA9', weight: 3, dashArray: '2 10' }} />
@@ -182,11 +221,14 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
             const emotion = archiveType ? null : getEmotion(t.emotion_key);
             const category = archiveType ? null : getCategory(t.category);
             const voiceRelation = getVoiceRelation(t.voice_relation);
+            const reactionCount = reactionCounts?.[t.id] ?? 0;
             const icon = archiveType
               ? (archiveType.key === 'chimei' && currentZoom >= CHIMEI_LABEL_ZOOM
                   ? createChimeiLabel(t.title, t.yomi, archiveType.color)
                   : createArchivePin(archiveType))
-              : createEmotionPin(t.emotion_key);
+              : (t.photo_url && currentZoom >= PHOTO_THUMB_ZOOM
+                  ? createPhotoPin(t.photo_url, getEmotionColor(t.emotion_key))
+                  : createEmotionPin(t.emotion_key, reactionCount));
             const sourceIsUrl = !!t.source_ref && /^https?:\/\//.test(t.source_ref);
             return (
               <Marker key={t.id} position={[t.latitude, t.longitude]} icon={icon}>
@@ -219,6 +261,11 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
                     {!archiveType && t.intensity && (
                       <span style={{ fontSize: 11, color: '#bbb' }}>
                         {'●'.repeat(t.intensity)}{'○'.repeat(5 - t.intensity)}
+                      </span>
+                    )}
+                    {reactionCount > 0 && (
+                      <span style={{ fontSize: 11, color: '#FF6B9D', fontWeight: 700 }}>
+                        🔥 共感 {reactionCount}
                       </span>
                     )}
                     <strong style={{ fontSize: 13 }}>

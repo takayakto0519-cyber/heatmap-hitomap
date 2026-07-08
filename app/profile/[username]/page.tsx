@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import TraceCard from '@/components/report/TraceCard';
+import TraceDetail from '@/components/TraceDetail';
+import type { Trace } from '@/lib/types';
 
 interface Profile {
   id: string;
@@ -19,6 +22,8 @@ export default function ProfilePage() {
   const [isMe, setIsMe] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bookmarks, setBookmarks] = useState<Trace[]>([]);
+  const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -37,7 +42,12 @@ export default function ProfilePage() {
         setProfile(rows as Profile);
 
         const { data: { user } } = await supabase.auth.getUser();
-        setIsMe(user?.id === rows.id);
+        const me = user?.id === rows.id;
+        setIsMe(me);
+        if (me) {
+          const bmRes = await fetch('/api/bookmarks').then(r => r.json()).catch(() => null);
+          if (bmRes?.ok) setBookmarks(bmRes.traces ?? []);
+        }
 
         const followRes = await fetch(`/api/follows?user_id=${rows.id}`).then(r => r.json());
         setFollowingCount(followRes.followingCount ?? 0);
@@ -90,6 +100,31 @@ export default function ProfilePage() {
           }}>{isFollowing ? 'フォロー中 ✓' : 'フォローする'}</button>
         )}
       </div>
+
+      {isMe && (
+        <div style={{ marginTop: 20 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🔖 保存した記録（{bookmarks.length}）</h2>
+          {bookmarks.length === 0 ? (
+            <p style={{ fontSize: 13, color: '#aaa' }}>まだ保存した記録はありません</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {bookmarks.map(t => (
+                <TraceCard key={t.id} trace={t} onClick={() => setSelectedTrace(t)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedTrace && (
+        <TraceDetail
+          trace={selectedTrace}
+          isOwn={false}
+          onClose={() => setSelectedTrace(null)}
+          onUpdate={(updated) => setBookmarks(prev => prev.map(t => t.id === updated.id ? updated : t))}
+          onDelete={(id) => setBookmarks(prev => prev.filter(t => t.id !== id))}
+        />
+      )}
     </div>
   );
 }

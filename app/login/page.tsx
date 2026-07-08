@@ -48,6 +48,12 @@ export default function LoginPage() {
             body: JSON.stringify({ username: username.trim() }),
           });
         }
+        if (data.session) {
+          // メール確認が不要な設定の場合、signUp直後にセッションが発行される。その場合は確認メール待ちにせずそのまま入る。
+          router.push('/map');
+          router.refresh();
+          return;
+        }
         setMessage('確認メールを送りました。メール内のリンクからログインを完了してください。');
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });

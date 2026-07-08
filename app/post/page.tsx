@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import EmotionPicker from '@/components/form/EmotionPicker';
@@ -37,6 +37,35 @@ const sectionStyle: React.CSSProperties = { marginBottom: 28 };
 const hintStyle: React.CSSProperties = { fontSize: 12, color: '#aaa', marginTop: 4, marginBottom: 0 };
 
 // ──────────────────────────────────────────────
+// 「あとで保存」機能：現地では位置だけ記録し、写真・言葉は帰宅後に追記できるようにする
+interface LocationDraft {
+  id: string;
+  lat: number;
+  lng: number;
+  createdAt: string;
+}
+
+const LOCATION_DRAFTS_KEY = 'hitomap_location_drafts';
+const FORM_AUTOSAVE_KEY = 'hitomap_post_autosave';
+
+function loadLocationDrafts(): LocationDraft[] {
+  try {
+    const raw = localStorage.getItem(LOCATION_DRAFTS_KEY);
+    return raw ? JSON.parse(raw) as LocationDraft[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocationDrafts(drafts: LocationDraft[]) {
+  try {
+    localStorage.setItem(LOCATION_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch {
+    // 保存できない環境では諦める（機能を諦めるだけで投稿自体は継続できる）
+  }
+}
+
+// ──────────────────────────────────────────────
 export default function PostPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,6 +88,91 @@ export default function PostPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [uploadProgress, setUploadProgress] = useState('');
+
+  const [locationDrafts, setLocationDrafts] = useState<LocationDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [restoredNotice, setRestoredNotice] = useState(false);
+  const [quickSaveMsg, setQuickSaveMsg] = useState('');
+
+  // 初回マウント時：未完了の位置記録一覧と、書きかけの下書きを復元
+  useEffect(() => {
+    setLocationDrafts(loadLocationDrafts());
+    try {
+      const raw = localStorage.getItem(FORM_AUTOSAVE_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as Record<string, unknown>;
+        if (d.lat && d.lng) { setLat(d.lat as number); setLng(d.lng as number); }
+        if (d.emotionKey) setEmotionKey(d.emotionKey as string);
+        if (typeof d.intensity === 'number') setIntensity(d.intensity);
+        if (d.title) setTitle(d.title as string);
+        if (d.why) setWhy(d.why as string);
+        if (d.interpretation) setInterpretation(d.interpretation as string);
+        if (d.selfReflection) setSelfReflection(d.selfReflection as string);
+        if (d.wantRevisit) setWantRevisit(Boolean(d.wantRevisit));
+        if (d.wantToShare) setWantToShare(Boolean(d.wantToShare));
+        if (d.nickname) setNickname(d.nickname as string);
+        if (d.activeDraftId) setActiveDraftId(d.activeDraftId as string);
+        setRestoredNotice(true);
+      }
+    } catch {
+      // 復元できなくても投稿自体は継続できる
+    }
+  }, []);
+
+  // 入力のたびに自動保存（アプリを閉じても書きかけの内容が消えないように）
+  useEffect(() => {
+    const hasContent = Boolean(title || why || interpretation || selfReflection || lat);
+    if (!hasContent) return;
+    try {
+      localStorage.setItem(FORM_AUTOSAVE_KEY, JSON.stringify({
+        lat, lng, emotionKey, intensity, title, why, interpretation,
+        selfReflection, wantRevisit, wantToShare, nickname, activeDraftId,
+      }));
+    } catch {
+      // 保存できなくても投稿自体は継続できる
+    }
+  }, [lat, lng, emotionKey, intensity, title, why, interpretation, selfReflection, wantRevisit, wantToShare, nickname, activeDraftId]);
+
+  function clearAutosave() {
+    try { localStorage.removeItem(FORM_AUTOSAVE_KEY); } catch { /* 無視 */ }
+  }
+
+  // 「位置だけ先に記録」：現地ではGPSだけ押して、写真・言葉は帰宅後に書く
+  function quickSaveLocation() {
+    if (!navigator.geolocation) { setGpsError('このブラウザはGPSに対応していません'); return; }
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const draft: LocationDraft = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          createdAt: new Date().toISOString(),
+        };
+        const next = [draft, ...locationDrafts];
+        setLocationDrafts(next);
+        saveLocationDrafts(next);
+        setGpsLoading(false);
+        setQuickSaveMsg('記録しました。あとで「続きを書く」から仕上げられます');
+        setTimeout(() => setQuickSaveMsg(''), 3500);
+      },
+      () => { setGpsError('位置情報の取得に失敗しました'); setGpsLoading(false); },
+      { timeout: 10000 }
+    );
+  }
+
+  function resumeDraft(draft: LocationDraft) {
+    setLat(draft.lat);
+    setLng(draft.lng);
+    setActiveDraftId(draft.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function removeLocationDraft(id: string) {
+    const next = locationDrafts.filter((d) => d.id !== id);
+    setLocationDrafts(next);
+    saveLocationDrafts(next);
+  }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -132,6 +246,8 @@ export default function PostPage() {
 
       const data: CreateTraceResponse = await res.json();
       if (data.ok || res.status === 503) {
+        clearAutosave();
+        if (activeDraftId) removeLocationDraft(activeDraftId);
         router.push('/report');
       } else {
         setSubmitError(data.error ?? '送信に失敗しました');
@@ -158,6 +274,75 @@ export default function PostPage() {
           </button>
           <h1 style={{ margin: 0, fontSize: 20 }}>痕跡を記録する</h1>
         </div>
+
+        {restoredNotice && (
+          <p style={{
+            fontSize: 12, color: '#38ADA9', background: '#E8F8F7',
+            borderRadius: 8, padding: '8px 12px', margin: '0 0 16px',
+          }}>
+            📝 書きかけの内容を復元しました
+          </p>
+        )}
+
+        {quickSaveMsg && (
+          <p style={{
+            fontSize: 12, color: '#4A90E2', background: '#EEF4FF',
+            borderRadius: 8, padding: '8px 12px', margin: '0 0 16px',
+          }}>
+            ✓ {quickSaveMsg}
+          </p>
+        )}
+
+        {!activeDraftId && !lat && (
+          <button type="button" onClick={quickSaveLocation} disabled={gpsLoading}
+            style={{
+              width: '100%', padding: '13px', borderRadius: 10, marginBottom: 20,
+              border: '2px dashed #bbb', background: '#fafafa',
+              color: '#777', fontSize: 13, fontWeight: 700,
+              cursor: gpsLoading ? 'wait' : 'pointer',
+            }}>
+            {gpsLoading ? '記録中…' : '📍 今は位置だけ記録して、あとで書く'}
+          </button>
+        )}
+
+        {locationDrafts.length > 0 && (
+          <section style={{ ...sectionStyle, marginBottom: 20 }}>
+            <label style={labelStyle}>🕓 未完了の記録（{locationDrafts.length}）</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {locationDrafts.map((d) => (
+                <div key={d.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 12px', border: '1.5px solid #eee', borderRadius: 10, background: '#fff',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#999' }}>
+                      {new Date(d.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#bbb' }}>
+                      {d.lat.toFixed(4)} / {d.lng.toFixed(4)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={() => resumeDraft(d)}
+                      style={{
+                        padding: '7px 14px', borderRadius: 8, border: 'none',
+                        background: '#FF6B9D', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      }}>
+                      続きを書く →
+                    </button>
+                    <button type="button" onClick={() => removeLocationDraft(d.id)}
+                      style={{
+                        padding: '7px 10px', borderRadius: 8, border: 'none',
+                        background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                      }}>
+                      削除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <form id="trace-form" onSubmit={handleSubmit}>
           {/* ① 写真 */}

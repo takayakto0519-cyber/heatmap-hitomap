@@ -15,6 +15,12 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
+const REACTIONS = [
+  { key: 'empathy', emoji: '🔥', label: 'わかる', color: '#FF6B9D' },
+  { key: 'want_to_visit', emoji: '🚶', label: '歩いてみたい', color: '#38ADA9' },
+  { key: 'nostalgic', emoji: '🍂', label: '懐かしい', color: '#F6B93B' },
+] as const;
+
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 14,
   border: '1.5px solid #e0e0e0', borderRadius: 8, fontFamily: 'inherit',
@@ -38,6 +44,12 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [editShare, setEditShare] = useState(trace.want_to_share);
   const [authorUsername, setAuthorUsername] = useState<string | null>(null);
 
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
+  const [myReactions, setMyReactions] = useState<string[]>([]);
+  const [reactionLoading, setReactionLoading] = useState<string | null>(null);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+
   useEffect(() => {
     if (!trace.user_id) { setAuthorUsername(null); return; }
     (async () => {
@@ -47,6 +59,56 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
       setAuthorUsername(data?.username ?? null);
     })();
   }, [trace.user_id]);
+
+  useEffect(() => {
+    (async () => {
+      const res = await fetch(`/api/reactions?trace_ids=${trace.id}`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) {
+        setReactionCounts(res.counts?.[trace.id] ?? {});
+        setMyReactions(res.mine?.[trace.id] ?? []);
+      }
+    })();
+    (async () => {
+      const res = await fetch(`/api/bookmarks?trace_id=${trace.id}`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) setBookmarked(Boolean(res.bookmarked));
+    })();
+  }, [trace.id]);
+
+  async function toggleReaction(type: string) {
+    const has = myReactions.includes(type);
+    setReactionLoading(type);
+    try {
+      const res = await fetch('/api/reactions', {
+        method: has ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trace_id: trace.id, reaction_type: type }),
+      });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      const data = await res.json();
+      if (data.ok) {
+        setMyReactions((prev) => has ? prev.filter((t) => t !== type) : [...prev, type]);
+        setReactionCounts((prev) => ({ ...prev, [type]: (prev[type] ?? 0) + (has ? -1 : 1) }));
+      }
+    } finally {
+      setReactionLoading(null);
+    }
+  }
+
+  async function toggleBookmark() {
+    setBookmarkLoading(true);
+    try {
+      const res = await fetch('/api/bookmarks', {
+        method: bookmarked ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trace_id: trace.id }),
+      });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      const data = await res.json();
+      if (data.ok) setBookmarked(!bookmarked);
+    } finally {
+      setBookmarkLoading(false);
+    }
+  }
 
   const archiveType = getArchiveType(trace.archive_type);
   const emotion = archiveType ? null : getEmotion(trace.emotion_key);
@@ -234,6 +296,38 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 {trace.title}
                 {trace.yomi && <span style={{ fontWeight: 400, color: '#aaa', fontSize: 14 }}>（{trace.yomi}）</span>}
               </h2>
+            )}
+
+            {/* 共感（わかる／歩いてみたい／懐かしい）・ブックマーク */}
+            {!editing && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                {REACTIONS.map((r) => {
+                  const active = myReactions.includes(r.key);
+                  const count = reactionCounts[r.key] ?? 0;
+                  return (
+                    <button key={r.key} onClick={() => toggleReaction(r.key)} disabled={reactionLoading === r.key} style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '9px 14px', borderRadius: 20, cursor: reactionLoading === r.key ? 'wait' : 'pointer',
+                      border: `2px solid ${active ? r.color : '#eee'}`,
+                      background: active ? r.color + '18' : '#fff',
+                      color: active ? r.color : '#999',
+                      fontWeight: 700, fontSize: 13,
+                    }}>
+                      {r.emoji} {r.label} {count > 0 ? count : ''}
+                    </button>
+                  );
+                })}
+                <button onClick={toggleBookmark} disabled={bookmarkLoading} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '9px 16px', borderRadius: 20, cursor: bookmarkLoading ? 'wait' : 'pointer',
+                  border: `2px solid ${bookmarked ? '#F6B93B' : '#eee'}`,
+                  background: bookmarked ? '#FFFBF0' : '#fff',
+                  color: bookmarked ? '#B7791F' : '#999',
+                  fontWeight: 700, fontSize: 13,
+                }}>
+                  {bookmarked ? '🔖 保存済み' : '🔖 保存する'}
+                </button>
+              </div>
             )}
 
             {/* 録音（表示モードのみ） */}
