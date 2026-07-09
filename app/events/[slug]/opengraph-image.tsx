@@ -37,7 +37,7 @@ export default async function OgImage({ params }: { params: { slug: string } }) 
         }} />
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '56px 64px' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
-            <img src={`${SITE_URL}/logo.jpg`} width={44} height={44} style={{ borderRadius: 12, marginRight: 12 }} />
+            <img src={`${SITE_URL}/logo.png`} height={44} style={{ marginRight: 12 }} />
             <div style={{
               display: 'flex', padding: '6px 16px', borderRadius: 20,
               background: '#8E44AD', color: '#fff', fontSize: 22, fontWeight: 700,

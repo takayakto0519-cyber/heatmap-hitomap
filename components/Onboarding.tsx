@@ -81,7 +81,7 @@ export default function Onboarding() {
       </button>
 
       {slide.logo ? (
-        <img src="/logo.jpg" alt="ヒトマップ" style={{ width: 96, height: 96, borderRadius: 22, marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} />
+        <img src="/logo.png" alt="ヒトマップ" style={{ height: 88, width: 'auto', marginBottom: 24 }} />
       ) : (
         <div style={{ fontSize: 64, marginBottom: 20 }}>{slide.emoji}</div>
       )}
