@@ -8,7 +8,8 @@ export interface Trace {
   id: string;
   created_at: string; // ISO8601
 
-  photo_url: string | null;
+  photo_url: string | null;       // 先頭の1枚（一覧・ピン・OGP等の代表画像）
+  photo_urls: string[] | null;    // 複数枚投稿（最大4枚、photo_urls[0] === photo_url）
 
   latitude: number;
   longitude: number;
@@ -40,6 +41,7 @@ export interface Trace {
   source_ref: string | null;      // 文献の出典・URL
   voice_relation: string | null;  // resident | former_resident | visitor | heard
   audio_url: string | null;       // 言い伝え・人の声の録音
+  audio_transcript: string | null; // 録音の文字起こし（手動入力）
 
   session_code: string | null;    // 実験回の識別
   nickname: string | null;        // 任意ニックネーム（匿名可）
@@ -63,6 +65,7 @@ export interface Trace {
  */
 export interface TraceInput {
   photo_url?: string | null;
+  photo_urls?: string[] | null;
 
   latitude: number;
   longitude: number;
@@ -92,6 +95,7 @@ export interface TraceInput {
   source_ref?: string | null;
   voice_relation?: string | null;
   audio_url?: string | null;
+  audio_transcript?: string | null;
 
   session_code?: string;
   nickname?: string;

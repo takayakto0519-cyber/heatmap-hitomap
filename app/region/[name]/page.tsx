@@ -7,6 +7,7 @@ import type { Trace, ListTracesResponse, Sponsor, ListSponsorsResponse } from '@
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import RegionTimeline from '@/components/region/RegionTimeline';
+import Storytellers from '@/components/region/Storytellers';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -93,7 +94,10 @@ export default function RegionPage() {
           </p>
         )}
         {!loading && traces.length > 0 && (
-          <RegionTimeline traces={traces} onTraceClick={setSelectedTrace} />
+          <>
+            <RegionTimeline traces={traces} onTraceClick={setSelectedTrace} />
+            <Storytellers traces={traces} />
+          </>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>

@@ -16,6 +16,7 @@ import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import StatsPanel from '@/components/list/StatsPanel';
 import Onboarding from '@/components/Onboarding';
+import { getCurrentQuest } from '@/lib/quests';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -187,8 +188,8 @@ function MapApp() {
 
   // ── 投稿フォーム ─────────────────────────
   const fileRef = useRef<HTMLInputElement>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const MAX_PHOTOS = 4;
+  const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -199,6 +200,9 @@ function MapApp() {
   const [addressCandidates, setAddressCandidates] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
   const [showAddressSearch, setShowAddressSearch] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioTranscript, setAudioTranscript] = useState('');
+  const currentQuest = getCurrentQuest();
+  const [questDismissed, setQuestDismissed] = useState(false);
   const [emotionKey, setEmotionKey] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(3);
   // 投稿タイプ：null = 痕跡 / chimei | denshou | bunken | koe = アーカイブ
@@ -473,11 +477,20 @@ function MapApp() {
   }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = ev => setPhotoPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    const room = MAX_PHOTOS - photos.length;
+    const accepted = files.slice(0, room);
+    accepted.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => setPhotos(prev => [...prev, { file, preview: ev.target?.result as string }]);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removePhoto(index: number) {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
   }
 
   // 投稿完了画面から地図に戻る（自動タイマー・手動「続ける」ボタンの両方から呼ばれる）
@@ -485,12 +498,12 @@ function MapApp() {
     if (submitDoneTimerRef.current) { clearTimeout(submitDoneTimerRef.current); submitDoneTimerRef.current = null; }
     const { lat: postedLat, lng: postedLng } = postedPosRef.current;
     setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
-    setPhotoPreview(null); setPhotoFile(null); setLat(null); setLng(null);
+    setPhotos([]); setLat(null); setLng(null);
     setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
     setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
     setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
     setArchiveTypeKey(null); setYomi(''); setAltNames(''); setEraLabel(''); setSourceRef(''); setVoiceRelation(null);
-    setAudioBlob(null);
+    setAudioBlob(null); setAudioTranscript('');
     setAddressQuery(''); setAddressCandidates([]); setAddressError(''); setShowAddressSearch(false);
     setShowAdvanced(false); setSubmitDone(false); setLastPostedTrace(null);
     fetchTraces();
@@ -506,15 +519,17 @@ function MapApp() {
     if (!lat || !lng) { setSubmitError('位置情報を取得してください'); return; }
     setSubmitting(true); setSubmitError('');
     try {
-      let photoUrl: string | null = null;
-      if (photoFile) {
+      let photoUrls: string[] = [];
+      if (photos.length > 0) {
         if (SUPABASE_READY) {
-          setUploadProgress('写真をアップロード中…');
           const { uploadTracePhoto } = await import('@/lib/supabase/upload');
-          photoUrl = await uploadTracePhoto(photoFile);
+          for (let i = 0; i < photos.length; i++) {
+            setUploadProgress(`写真をアップロード中…（${i + 1}/${photos.length}）`);
+            photoUrls.push(await uploadTracePhoto(photos[i].file));
+          }
           setUploadProgress('');
         } else {
-          photoUrl = photoPreview;
+          photoUrls = photos.map(p => p.preview);
         }
       }
       let audioUrl: string | null = null;
@@ -530,7 +545,8 @@ function MapApp() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          photo_url: photoUrl, latitude: lat, longitude: lng,
+          photo_url: photoUrls[0] ?? null, photo_urls: photoUrls.length > 0 ? photoUrls : null,
+          latitude: lat, longitude: lng,
           title: title.trim(),
           why: why.trim() || null,
           interpretation: interpretation.trim() || null,
@@ -547,6 +563,7 @@ function MapApp() {
           source_ref: sourceRef.trim() || null,
           voice_relation: archiveTypeKey === 'koe' ? voiceRelation : null,
           audio_url: audioUrl,
+          audio_transcript: audioTranscript.trim() || null,
           is_past_memory: isPastMemory,
           memory_date: isPastMemory && memoryDate ? memoryDate : null,
           custom_tags: customTags.length > 0 ? customTags : null,
@@ -1106,6 +1123,25 @@ function MapApp() {
               </div>
             )}
 
+            {!submitDone && !questDismissed && (
+              <div style={{
+                background: 'linear-gradient(135deg, #FBF6FF, #FFF)', border: '1.5px solid #F3EAFB',
+                borderRadius: 14, padding: '12px 14px', marginBottom: 12, position: 'relative',
+              }}>
+                <button type="button" onClick={() => setQuestDismissed(true)} style={{
+                  position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
+                  color: '#ccc', fontSize: 16, cursor: 'pointer', lineHeight: 1,
+                }}>✕</button>
+                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今週のお題</p>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                  {currentQuest.emoji} {currentQuest.title}
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                  {currentQuest.hint}
+                </p>
+              </div>
+            )}
+
             {!submitDone && (
               <form id="trace-form" onSubmit={handleSubmit}>
 
@@ -1140,19 +1176,32 @@ function MapApp() {
                   )}
                 </div>
 
-                {/* STEP 1: 写真 */}
-                <div style={{ background: '#fff', borderRadius: 14, marginBottom: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <input ref={fileRef} type="file" accept="image/*" capture="environment"
+                {/* STEP 1: 写真（最大4枚） */}
+                <div style={{ background: '#fff', borderRadius: 14, marginBottom: 12, padding: photos.length > 0 ? 10 : 0, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple
                     style={{ display: 'none' }} onChange={handlePhoto} />
-                  {photoPreview ? (
-                    <div style={{ position: 'relative' }}>
-                      <img src={photoPreview} alt="preview"
-                        style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }} />
-                      <button type="button" onClick={() => fileRef.current?.click()} style={{
-                        position: 'absolute', bottom: 10, right: 10,
-                        background: 'rgba(0,0,0,0.6)', color: '#fff',
-                        border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
-                      }}>撮り直す</button>
+                  {photos.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+                      {photos.map((p, i) => (
+                        <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
+                          <img src={p.preview} alt={`写真${i + 1}`}
+                            style={{ width: 100, height: 100, borderRadius: 10, objectFit: 'cover', display: 'block' }} />
+                          <button type="button" onClick={() => removePhoto(i)} style={{
+                            position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%',
+                            background: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>✕</button>
+                        </div>
+                      ))}
+                      {photos.length < MAX_PHOTOS && (
+                        <button type="button" onClick={() => fileRef.current?.click()} style={{
+                          width: 100, height: 100, borderRadius: 10, border: '1.5px dashed #ddd', background: '#fafafa',
+                          cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          gap: 4, flexShrink: 0, color: '#bbb', fontSize: 11,
+                        }}>
+                          <span style={{ fontSize: 22 }}>＋</span>追加（{photos.length}/{MAX_PHOTOS}）
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button type="button" onClick={() => fileRef.current?.click()} style={{
@@ -1161,7 +1210,7 @@ function MapApp() {
                       alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}>
                       <span style={{ fontSize: 36 }}>📷</span>
-                      <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る</span>
+                      <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る（最大{MAX_PHOTOS}枚）</span>
                     </button>
                   )}
                 </div>
@@ -1215,6 +1264,14 @@ function MapApp() {
                         <p style={{ fontSize: 11, color: '#bbb', margin: '6px 0 0' }}>
                           話し言葉のまま残すと、文字にならないニュアンスも伝わります
                         </p>
+                        {audioBlob && (
+                          <div style={{ marginTop: 10 }}>
+                            <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>📝 文字起こし（任意）</label>
+                            <textarea value={audioTranscript} onChange={e => setAudioTranscript(e.target.value)}
+                              placeholder="話した内容をそのまま書き起こしておくと、後から探しやすくなります"
+                              rows={3} style={inputStyle} />
+                          </div>
+                        )}
                       </div>
                     )}
 

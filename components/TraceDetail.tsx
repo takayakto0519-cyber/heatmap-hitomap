@@ -7,6 +7,7 @@ import { getCategory } from '@/lib/categories';
 import { getTraceType } from '@/lib/traceTypes';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 import ReportModal from './ReportModal';
+import AudioWaveform from './AudioWaveform';
 
 interface Props {
   trace: Trace;
@@ -44,6 +45,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [editSelf, setEditSelf] = useState(trace.self_reflection ?? '');
   const [editRevisit, setEditRevisit] = useState(trace.want_revisit);
   const [editShare, setEditShare] = useState(trace.want_to_share);
+  const [editTranscript, setEditTranscript] = useState(trace.audio_transcript ?? '');
   const [authorUsername, setAuthorUsername] = useState<string | null>(null);
 
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
@@ -139,6 +141,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
           self_reflection: editSelf.trim() || null,
           want_revisit: editRevisit,
           want_to_share: editShare,
+          audio_transcript: editTranscript.trim() || null,
         }),
       });
       const data = await res.json();
@@ -248,10 +251,19 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
         {/* スクロール領域 */}
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: isOwn ? 80 : 24 }}>
 
-          {/* 写真 */}
+          {/* 写真（複数枚は横スクロールで並べる） */}
           {trace.photo_url && !editing && (
-            <img src={trace.photo_url} alt={trace.title} loading="lazy"
-              style={{ width: '100%', maxHeight: 300, objectFit: 'cover', display: 'block' }} />
+            (trace.photo_urls && trace.photo_urls.length > 1) ? (
+              <div style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
+                {trace.photo_urls.map((url, i) => (
+                  <img key={i} src={url} alt={`${trace.title} ${i + 1}`} loading="lazy"
+                    style={{ width: '100%', maxHeight: 300, objectFit: 'cover', display: 'block', flexShrink: 0, scrollSnapAlign: 'start' }} />
+                ))}
+              </div>
+            ) : (
+              <img src={trace.photo_url} alt={trace.title} loading="lazy"
+                style={{ width: '100%', maxHeight: 300, objectFit: 'cover', display: 'block' }} />
+            )
           )}
 
           <div style={{ padding: '16px 16px 0' }}>
@@ -354,7 +366,16 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             {!editing && trace.audio_url && (
               <div style={{ marginBottom: 14 }}>
                 <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎙️ 録音</p>
-                <audio controls src={trace.audio_url} style={{ width: '100%' }} />
+                <div style={{ background: '#FBF6FF', borderRadius: 10, padding: '8px 10px 0' }}>
+                  <AudioWaveform url={trace.audio_url} />
+                </div>
+                <audio controls src={trace.audio_url} style={{ width: '100%', marginTop: 6 }} />
+                {trace.audio_transcript && (
+                  <div style={{ marginTop: 8, background: '#fafafa', borderRadius: 10, padding: '10px 12px' }}>
+                    <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px', fontWeight: 700 }}>📝 文字起こし</p>
+                    <p style={{ fontSize: 13, color: '#555', margin: 0, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{trace.audio_transcript}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -425,7 +446,16 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 4 }}>自分のどんな記憶・感情とつながった？</label>
                 <textarea value={editSelf} onChange={e => setEditSelf(e.target.value)} rows={2} style={inputStyle} />
               </div>
-            ) : trace.self_reflection ? (
+            ) : null}
+
+            {editing && trace.audio_url && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 4 }}>📝 文字起こし</label>
+                <textarea value={editTranscript} onChange={e => setEditTranscript(e.target.value)} rows={3} style={inputStyle} />
+              </div>
+            )}
+
+            {!editing && trace.self_reflection ? (
               <div style={{ marginBottom: 14 }}>
                 <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>自分との接点</p>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: '#333' }}>{trace.self_reflection}</p>

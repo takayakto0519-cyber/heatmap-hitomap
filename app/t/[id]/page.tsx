@@ -45,7 +45,16 @@ export default async function TracePermalinkPage({ params }: Props) {
   return (
     <div style={{ minHeight: '100dvh', background: '#fafafa' }}>
       {trace.photo_url && (
-        <img src={trace.photo_url} alt={trace.title} style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block' }} />
+        (trace.photo_urls && trace.photo_urls.length > 1) ? (
+          <div style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
+            {trace.photo_urls.map((url, i) => (
+              <img key={i} src={url} alt={`${trace.title} ${i + 1}`}
+                style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block', flexShrink: 0, scrollSnapAlign: 'start' }} />
+            ))}
+          </div>
+        ) : (
+          <img src={trace.photo_url} alt={trace.title} style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block' }} />
+        )
       )}
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px 60px' }}>
         <a href="/map" style={{ fontSize: 13, color: '#38ADA9', textDecoration: 'none', fontWeight: 700 }}>← ヒトマップの地図を見る</a>
@@ -76,7 +85,14 @@ export default async function TracePermalinkPage({ params }: Props) {
         )}
         {trace.audio_url && (
           <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎙️ 録音</p>
             <audio controls src={trace.audio_url} style={{ width: '100%' }} />
+            {trace.audio_transcript && (
+              <div style={{ marginTop: 8, background: '#fafafa', borderRadius: 10, padding: '10px 12px' }}>
+                <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px', fontWeight: 700 }}>📝 文字起こし</p>
+                <p style={{ fontSize: 13, color: '#555', margin: 0, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{trace.audio_transcript}</p>
+              </div>
+            )}
           </div>
         )}
 

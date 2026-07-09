@@ -72,11 +72,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 
     const region = await reverseGeocodeRegion(body.latitude, body.longitude);
 
+    const photoUrls = (body.photo_urls ?? []).filter(Boolean).slice(0, 4);
+    const photoUrl = photoUrls[0] ?? body.photo_url ?? null;
+
     const supabaseServer = await getServerClient();
     const { data, error } = await supabaseServer
       .from('traces')
       .insert({
-        photo_url: body.photo_url ?? null,
+        photo_url: photoUrl,
+        photo_urls: photoUrls.length > 0 ? photoUrls : (photoUrl ? [photoUrl] : null),
         region,
         latitude: body.latitude,
         longitude: body.longitude,
@@ -100,6 +104,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         source_ref: body.source_ref ?? null,
         voice_relation: body.voice_relation ?? null,
         audio_url: body.audio_url ?? null,
+        audio_transcript: body.audio_transcript ?? null,
         session_code: body.session_code ?? null,
         nickname: body.nickname ?? null,
         team,

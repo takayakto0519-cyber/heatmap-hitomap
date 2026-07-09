@@ -37,6 +37,8 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
   {
     id: 'sample-2',
@@ -73,6 +75,8 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
   {
     id: 'sample-3',
@@ -109,6 +113,8 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
   {
     id: 'sample-4',
@@ -145,6 +151,8 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
   {
     id: 'sample-5',
@@ -181,6 +189,8 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
   {
     id: 'sample-6',
@@ -217,6 +227,8 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
   {
     id: 'sample-7',
@@ -253,5 +265,7 @@ export const SAMPLE_TRACES: Trace[] = [
     deleted_by: null,
     region: null,
     team: null,
+    photo_urls: null,
+    audio_transcript: null,
   },
 ];

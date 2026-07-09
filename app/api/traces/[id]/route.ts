@@ -104,7 +104,7 @@ export async function PATCH(
     const allowed = [
       'title', 'why', 'interpretation', 'self_reflection', 'want_revisit', 'want_to_share',
       'archive_type', 'yomi', 'alt_names', 'era_label', 'source_ref', 'voice_relation', 'audio_url',
-      'visibility',
+      'audio_transcript', 'visibility',
     ];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
