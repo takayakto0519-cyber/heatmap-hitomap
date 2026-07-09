@@ -16,7 +16,7 @@ import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import StatsPanel from '@/components/list/StatsPanel';
 import Onboarding from '@/components/Onboarding';
-import { getCurrentQuest } from '@/lib/quests';
+import type { Quest } from '@/lib/quests';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -201,8 +201,15 @@ function MapApp() {
   const [showAddressSearch, setShowAddressSearch] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioTranscript, setAudioTranscript] = useState('');
-  const currentQuest = getCurrentQuest();
+  const [currentQuest, setCurrentQuest] = useState<Quest & { quest_type?: string; target_emotion_key?: string | null } | null>(null);
   const [questDismissed, setQuestDismissed] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/quests/active')
+      .then(r => r.json())
+      .then(d => { if (d.ok) setCurrentQuest(d.quest); })
+      .catch(() => {});
+  }, []);
   const [emotionKey, setEmotionKey] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(3);
   // 投稿タイプ：null = 痕跡 / chimei | denshou | bunken | koe = アーカイブ
@@ -1123,7 +1130,7 @@ function MapApp() {
               </div>
             )}
 
-            {!submitDone && !questDismissed && (
+            {!submitDone && !questDismissed && currentQuest && (
               <div style={{
                 background: 'linear-gradient(135deg, #FBF6FF, #FFF)', border: '1.5px solid #F3EAFB',
                 borderRadius: 14, padding: '12px 14px', marginBottom: 12, position: 'relative',
@@ -1132,13 +1139,38 @@ function MapApp() {
                   position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
                   color: '#ccc', fontSize: 16, cursor: 'pointer', lineHeight: 1,
                 }}>✕</button>
-                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今週のお題</p>
-                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
-                  {currentQuest.emoji} {currentQuest.title}
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
-                  {currentQuest.hint}
-                </p>
+                {currentQuest.quest_type === 'emotion' ? (
+                  <>
+                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今こんな感情を集めています</p>
+                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                      {currentQuest.emoji} {currentQuest.title}
+                    </p>
+                    {currentQuest.target_emotion_key && (
+                      <p style={{ margin: '0 0 4px' }}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+                          background: getEmotion(currentQuest.target_emotion_key)?.color + '22',
+                          color: getEmotion(currentQuest.target_emotion_key)?.color, fontSize: 12, fontWeight: 700,
+                        }}>
+                          {getEmotion(currentQuest.target_emotion_key)?.emoji} {getEmotion(currentQuest.target_emotion_key)?.label}
+                        </span>
+                      </p>
+                    )}
+                    <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                      {currentQuest.hint}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今週のお題</p>
+                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                      {currentQuest.emoji} {currentQuest.title}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                      {currentQuest.hint}
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
