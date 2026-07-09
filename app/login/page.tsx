@@ -97,6 +97,7 @@ export default function LoginPage() {
       alignItems: 'center', justifyContent: 'center', padding: 20, background: '#fafafa',
     }}>
       <div style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+        <img src="/logo.jpg" alt="ヒトマップ" style={{ width: 56, height: 56, borderRadius: 14, marginBottom: 10 }} />
         <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>ヒトマップ</h1>
         <p style={{ fontSize: 12, color: '#999', marginBottom: 18 }}>
           アカウントを作ると、投稿の公開範囲（非公開・フォロワー限定・全国公開）を選べます。

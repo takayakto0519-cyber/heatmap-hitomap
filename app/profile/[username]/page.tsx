@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
@@ -11,6 +11,26 @@ interface Profile {
   username: string;
   display_name: string | null;
   bio: string | null;
+  avatar_url: string | null;
+}
+
+function Avatar({ url, size = 72 }: { url: string | null; size?: number }) {
+  if (url) {
+    return (
+      <img src={url} alt="" style={{
+        width: size, height: size, borderRadius: '50%', objectFit: 'cover',
+        border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,0.15)', flexShrink: 0,
+      }} />
+    );
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: '#F3EAFB', color: '#8E44AD',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.4, fontWeight: 800,
+    }}>👤</div>
+  );
 }
 
 export default function ProfilePage() {
@@ -24,6 +44,14 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<Trace[]>([]);
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+
+  const [editing, setEditing] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -78,6 +106,59 @@ export default function ProfilePage() {
     }
   }
 
+  function startEdit() {
+    if (!profile) return;
+    setEditDisplayName(profile.display_name ?? '');
+    setEditBio(profile.bio ?? '');
+    setEditError('');
+    setEditing(true);
+  }
+
+  async function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !profile) return;
+    setAvatarUploading(true);
+    setEditError('');
+    try {
+      const { uploadAvatar } = await import('@/lib/supabase/upload');
+      const avatarUrl = await uploadAvatar(file, profile.id);
+      const res = await fetch('/api/profile', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: avatarUrl }),
+      });
+      const data = await res.json();
+      if (data.ok) setProfile(data.profile as Profile);
+      else setEditError(data.error ?? 'アイコンの更新に失敗しました');
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'アイコンの更新に失敗しました');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function saveProfile() {
+    setSaving(true);
+    setEditError('');
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: editDisplayName.trim() || null, bio: editBio.trim() || null }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setProfile(data.profile as Profile);
+        setEditing(false);
+      } else {
+        setEditError(data.error ?? '保存に失敗しました');
+      }
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '保存に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <div style={{ padding: 20 }}>読み込み中…</div>;
   if (error || !profile) return <div style={{ padding: 20, color: '#E74C3C' }}>{error ?? 'ユーザーが見つかりません'}</div>;
 
@@ -85,9 +166,57 @@ export default function ProfilePage() {
     <div style={{ padding: 20, maxWidth: 480, margin: '0 auto' }}>
       <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← マップへ戻る</a>
       <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginTop: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>{profile.display_name ?? profile.username}</h1>
-        <p style={{ fontSize: 13, color: '#999', marginBottom: 10 }}>@{profile.username}</p>
-        {profile.bio && <p style={{ fontSize: 13, color: '#555', marginBottom: 14 }}>{profile.bio}</p>}
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ position: 'relative' }}>
+            <Avatar url={profile.avatar_url} />
+            {isMe && (
+              <>
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  title="アイコンを変更"
+                  style={{
+                    position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: '50%',
+                    border: '2px solid #fff', background: '#38ADA9', color: '#fff', fontSize: 12,
+                    cursor: avatarUploading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >{avatarUploading ? '…' : '📷'}</button>
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarPick} style={{ display: 'none' }} />
+              </>
+            )}
+          </div>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{profile.display_name ?? profile.username}</h1>
+            <p style={{ fontSize: 13, color: '#999', margin: '2px 0 0' }}>@{profile.username}</p>
+          </div>
+        </div>
+
+        {editError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 10px' }}>{editError}</p>}
+
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>表示名</label>
+            <input value={editDisplayName} onChange={e => setEditDisplayName(e.target.value)} placeholder={profile.username}
+              style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>自己紹介</label>
+            <textarea value={editBio} onChange={e => setEditBio(e.target.value)} rows={3}
+              placeholder="どんな痕跡を残していきたいか、書いてみてください"
+              style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={saveProfile} disabled={saving} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: saving ? 'wait' : 'pointer', fontSize: 13,
+              }}>{saving ? '保存中…' : '保存する'}</button>
+              <button onClick={() => setEditing(false)} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #ddd',
+                background: '#fff', color: '#888', cursor: 'pointer', fontSize: 13,
+              }}>キャンセル</button>
+            </div>
+          </div>
+        ) : (
+          profile.bio && <p style={{ fontSize: 13, color: '#555', marginBottom: 14 }}>{profile.bio}</p>
+        )}
+
         <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#666', marginBottom: 16 }}>
           <span><strong>{followingCount}</strong> フォロー中</span>
           <span><strong>{followersCount}</strong> フォロワー</span>
@@ -98,6 +227,12 @@ export default function ProfilePage() {
             background: isFollowing ? '#eee' : '#38ADA9',
             color: isFollowing ? '#666' : '#fff', fontWeight: 700, cursor: 'pointer',
           }}>{isFollowing ? 'フォロー中 ✓' : 'フォローする'}</button>
+        )}
+        {isMe && !editing && (
+          <button onClick={startEdit} style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px solid #38ADA9',
+            background: '#fff', color: '#38ADA9', fontWeight: 700, cursor: 'pointer',
+          }}>✏️ プロフィールを編集</button>
         )}
       </div>
 

@@ -5,6 +5,8 @@ export const runtime = 'edge';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+
 export default async function OgImage({ params }: { params: { id: string } }) {
   const { data: trace } = await supabaseServer
     .from('traces').select('title, photo_url, visibility, is_deleted')
@@ -33,6 +35,7 @@ export default async function OgImage({ params }: { params: { id: string } }) {
         }} />
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '56px 64px' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
+            <img src={`${SITE_URL}/logo.jpg`} width={44} height={44} style={{ borderRadius: 12, marginRight: 12 }} />
             <div style={{
               display: 'flex', padding: '6px 16px', borderRadius: 20,
               background: '#FF6B9D', color: '#fff', fontSize: 22, fontWeight: 700,

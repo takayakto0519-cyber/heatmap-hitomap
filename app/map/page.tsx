@@ -231,10 +231,14 @@ function MapApp() {
   const submitDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const postedPosRef = useRef<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
   const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<{ username: string; display_name: string | null; avatar_url: string | null } | null>(null);
   const [postVisibility, setPostVisibility] = useState<'private' | 'followers' | 'pending_review'>('private');
 
   useEffect(() => {
-    fetch('/api/profile').then(r => r.json()).then(d => setCurrentUser(d.user ?? null)).catch(() => {});
+    fetch('/api/profile').then(r => r.json()).then(d => {
+      setCurrentUser(d.user ?? null);
+      setCurrentProfile(d.profile ?? null);
+    }).catch(() => {});
   }, []);
 
   // ── 初期化 ──────────────────────────────
@@ -666,13 +670,29 @@ function MapApp() {
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           {currentUser ? (
-            <button onClick={async () => {
-              const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
-              await createAuthBrowserClient().auth.signOut();
-              setCurrentUser(null);
-            }} style={{
-              background: 'none', border: 'none', color: '#999', fontSize: 11, cursor: 'pointer', padding: 0,
-            }}>👤 {currentUser.email} ・ ログアウト</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {currentProfile?.username ? (
+                <a href={`/profile/${currentProfile.username}`} style={{
+                  display: 'flex', alignItems: 'center', gap: 5, color: '#666', fontSize: 11,
+                  fontWeight: 700, textDecoration: 'none',
+                }}>
+                  {currentProfile.avatar_url ? (
+                    <img src={currentProfile.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : '👤'}
+                  {currentProfile.display_name ?? currentProfile.username}
+                </a>
+              ) : (
+                <span style={{ fontSize: 11, color: '#999' }}>👤 マイページ</span>
+              )}
+              <button onClick={async () => {
+                const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
+                await createAuthBrowserClient().auth.signOut();
+                setCurrentUser(null);
+                setCurrentProfile(null);
+              }} style={{
+                background: 'none', border: 'none', color: '#999', fontSize: 11, cursor: 'pointer', padding: 0,
+              }}>・ ログアウト</button>
+            </div>
           ) : (
             <a href="/login" style={{ color: '#38ADA9', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>ログイン / 新規登録</a>
           )}

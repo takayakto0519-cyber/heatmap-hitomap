@@ -21,6 +21,23 @@ export async function uploadTracePhoto(file: File): Promise<string> {
   return data.publicUrl;
 }
 
+// プロフィールアイコン。写真と同じ公開バケットに userId で名前空間を切って保存する
+export async function uploadAvatar(file: File, userId: string): Promise<string> {
+  const compressed = await compressImage(file);
+  const path = `avatar/${userId}-${Date.now()}.jpg`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
+    cacheControl: '3600',
+    upsert: true,
+    contentType: 'image/jpeg',
+  });
+
+  if (error) throw new Error(`アイコンのアップロードに失敗: ${error.message}`);
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // 言い伝え・人の声の録音を写真と同じ公開バケットにアップロード（新規バケット不要）
 export async function uploadTraceAudio(blob: Blob): Promise<string> {
   const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';

@@ -8,11 +8,13 @@ interface Slide {
   emoji: string;
   title: string;
   body: string;
+  logo?: boolean;
 }
 
 const SLIDES: Slide[] = [
   {
     emoji: '🗺️',
+    logo: true,
     title: 'ヒトマップ',
     body: '言葉は嘘をつける。\nしかし、モノの痕跡は嘘をつかない。',
   },
@@ -78,7 +80,11 @@ export default function Onboarding() {
         スキップ
       </button>
 
-      <div style={{ fontSize: 64, marginBottom: 20 }}>{slide.emoji}</div>
+      {slide.logo ? (
+        <img src="/logo.jpg" alt="ヒトマップ" style={{ width: 96, height: 96, borderRadius: 22, marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} />
+      ) : (
+        <div style={{ fontSize: 64, marginBottom: 20 }}>{slide.emoji}</div>
+      )}
       <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>{slide.title}</h1>
       <p style={{ fontSize: 15, lineHeight: 1.9, whiteSpace: 'pre-line', margin: '0 0 40px', opacity: 0.95 }}>
         {slide.body}

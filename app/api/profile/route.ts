@@ -42,10 +42,11 @@ export async function PATCH(req: NextRequest) {
   if (!userData.user) {
     return NextResponse.json({ ok: false, error: 'ログインが必要です' }, { status: 401 });
   }
-  const body = await req.json().catch(() => ({})) as { display_name?: string; bio?: string };
+  const body = await req.json().catch(() => ({})) as { display_name?: string; bio?: string; avatar_url?: string };
   const updates: Record<string, unknown> = {};
   if ('display_name' in body) updates.display_name = body.display_name ?? null;
   if ('bio' in body) updates.bio = body.bio ?? null;
+  if ('avatar_url' in body) updates.avatar_url = body.avatar_url ?? null;
   const { data, error } = await supabase
     .from('profiles').update(updates).eq('id', userData.user.id).select().single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
