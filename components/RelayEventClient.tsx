@@ -83,6 +83,29 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
 
   const feed = useMemo(() => [...traces].reverse(), [traces]);
 
+  // イベントの広さに地図をあわせる：投稿ピン＋スタート/ゴール地点をすべて収める範囲を計算する
+  const eventPins = useMemo(() => {
+    const list: { lat: number; lng: number; emoji: string; color: string; label: string }[] = [];
+    if (route.event_start_lat != null && route.event_start_lng != null) {
+      list.push({ lat: route.event_start_lat, lng: route.event_start_lng, emoji: '🚩', color: '#27AE60', label: route.event_start_label ?? 'スタート地点' });
+    }
+    if (route.event_end_lat != null && route.event_end_lng != null) {
+      list.push({ lat: route.event_end_lat, lng: route.event_end_lng, emoji: '🏁', color: '#E55039', label: route.event_end_label ?? 'ゴール地点' });
+    }
+    return list;
+  }, [route]);
+
+  const eventFitBounds = useMemo((): [[number, number], [number, number]] | undefined => {
+    const points: [number, number][] = [
+      ...traces.map((t): [number, number] => [t.latitude, t.longitude]),
+      ...eventPins.map((p): [number, number] => [p.lat, p.lng]),
+    ];
+    if (points.length === 0) return undefined;
+    const lats = points.map(p => p[0]);
+    const lngs = points.map(p => p[1]);
+    return [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]];
+  }, [traces, eventPins]);
+
   function handleTraceUpdate(updated: Trace) {
     setTraces(prev => prev.map(t => (t.id === updated.id ? updated : t)));
     setSelectedTrace(updated);
@@ -165,6 +188,9 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
             currentUserId={currentUserId}
             teamColors={teamColors}
             onTraceClick={setSelectedTrace}
+            pins={eventPins}
+            fitBounds={eventFitBounds}
+            allowWideZoom
           />
         </div>
 

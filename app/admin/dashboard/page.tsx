@@ -1,9 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import type { Trace, Sponsor, Route } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
+
+const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
+  ssr: false,
+  loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
+});
 
 type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events';
 
@@ -688,11 +694,19 @@ interface EventFieldsForm {
   event_area: string;
   event_mode: 'route' | 'relay';
   event_session_code: string;
+  event_start_lat: number | null;
+  event_start_lng: number | null;
+  event_start_label: string;
+  event_end_lat: number | null;
+  event_end_lng: number | null;
+  event_end_label: string;
 }
 
 const emptyEventFields: EventFieldsForm = {
   event_slug: '', event_cover_url: '', event_starts_at: '', event_ends_at: '', event_area: '',
   event_mode: 'route', event_session_code: '',
+  event_start_lat: null, event_start_lng: null, event_start_label: '',
+  event_end_lat: null, event_end_lng: null, event_end_label: '',
 };
 
 interface RelayCreateForm {
@@ -704,12 +718,64 @@ interface RelayCreateForm {
   event_area: string;
   event_starts_at: string;
   event_ends_at: string;
+  event_start_lat: number | null;
+  event_start_lng: number | null;
+  event_start_label: string;
+  event_end_lat: number | null;
+  event_end_lng: number | null;
+  event_end_label: string;
 }
 
 const emptyRelayForm: RelayCreateForm = {
   title: '', description: '', event_session_code: '', event_slug: '', event_cover_url: '',
   event_area: '', event_starts_at: '', event_ends_at: '',
+  event_start_lat: null, event_start_lng: null, event_start_label: '',
+  event_end_lat: null, event_end_lng: null, event_end_label: '',
 };
+
+// スタート/ゴール地点ピッカー：地図タップで座標を決め、ラベルを添える（イベントページのRouteMap/TraceMapに反映される）
+function StartEndPicker({ kind, lat, lng, label, onChange }: {
+  kind: 'start' | 'end';
+  lat: number | null; lng: number | null; label: string;
+  onChange: (v: { lat: number | null; lng: number | null; label: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const emoji = kind === 'start' ? '🚩' : '🏁';
+  const title = kind === 'start' ? 'スタート地点' : 'ゴール地点';
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: open ? 6 : 0 }}>
+        <button type="button" onClick={() => setOpen(v => !v)} style={{
+          padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+          border: `1.5px solid ${lat != null ? (kind === 'start' ? '#27AE60' : '#E55039') : '#ddd'}`,
+          background: lat != null ? (kind === 'start' ? '#E8F8F1' : '#FFF0F0') : '#fff',
+          color: lat != null ? (kind === 'start' ? '#27AE60' : '#E55039') : '#888', fontWeight: 700,
+        }}>
+          {emoji} {title}{lat != null ? '設定済み' : '未設定'} {open ? '▴' : '▾'}
+        </button>
+        {lat != null && (
+          <button type="button" onClick={() => onChange({ lat: null, lng: null, label: '' })} style={{
+            background: 'none', border: 'none', color: '#ccc', fontSize: 11, cursor: 'pointer',
+          }}>解除</button>
+        )}
+      </div>
+      {open && (
+        <div style={{ marginTop: 6 }}>
+          <input placeholder={`${title}の名前（例：渋谷駅ハチ公口）`} value={label}
+            onChange={e => onChange({ lat, lng, label: e.target.value })}
+            style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 6 }} />
+          <div style={{ height: 200, borderRadius: 8, overflow: 'hidden', border: '1px solid #eee' }}>
+            <LocationPickerMap
+              lat={lat ?? 35.681236} lng={lng ?? 139.767125}
+              onChange={(la, ln) => onChange({ lat: la, lng: ln, label })}
+            />
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: '#aaa' }}>地図をタップして{title}を指定してください</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -778,6 +844,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       event_area: r.event_area ?? '',
       event_mode: r.event_mode === 'relay' ? 'relay' : 'route',
       event_session_code: r.event_session_code ?? '',
+      event_start_lat: r.event_start_lat, event_start_lng: r.event_start_lng, event_start_label: r.event_start_label ?? '',
+      event_end_lat: r.event_end_lat, event_end_lng: r.event_end_lng, event_end_label: r.event_end_label ?? '',
     });
   }
 
@@ -794,6 +862,10 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_area: eventFields.event_area.trim() || null,
           event_mode: eventFields.event_mode,
           event_session_code: eventFields.event_mode === 'relay' ? (eventFields.event_session_code.trim() || null) : null,
+          event_start_lat: eventFields.event_start_lat, event_start_lng: eventFields.event_start_lng,
+          event_start_label: eventFields.event_start_label.trim() || null,
+          event_end_lat: eventFields.event_end_lat, event_end_lng: eventFields.event_end_lng,
+          event_end_label: eventFields.event_end_label.trim() || null,
         }),
       });
       const data = await res.json();
@@ -829,6 +901,10 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_area: relayForm.event_area.trim() || null,
           event_starts_at: inputValueToIso(relayForm.event_starts_at),
           event_ends_at: inputValueToIso(relayForm.event_ends_at),
+          event_start_lat: relayForm.event_start_lat, event_start_lng: relayForm.event_start_lng,
+          event_start_label: relayForm.event_start_label.trim() || null,
+          event_end_lat: relayForm.event_end_lat, event_end_lng: relayForm.event_end_lng,
+          event_end_label: relayForm.event_end_label.trim() || null,
         }),
       });
       const patchData = await patchRes.json();
@@ -923,6 +999,15 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                   onChange={e => setRelayForm(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
               </div>
             </div>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>
+              スタート・ゴール地点（ルート未定でも、地図で場所だけ先に決められます）
+            </label>
+            <StartEndPicker kind="start"
+              lat={relayForm.event_start_lat} lng={relayForm.event_start_lng} label={relayForm.event_start_label}
+              onChange={v => setRelayForm(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
+            <StartEndPicker kind="end"
+              lat={relayForm.event_end_lat} lng={relayForm.event_end_lng} label={relayForm.event_end_label}
+              onChange={v => setRelayForm(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button onClick={createRelayEvent} disabled={relaySaving} style={{
                 flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
@@ -1062,6 +1147,15 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                       onChange={e => setEventFields(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
                   </div>
                 </div>
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>
+                  スタート・ゴール地点（ルート未定でも、地図で場所だけ先に決められます）
+                </label>
+                <StartEndPicker kind="start"
+                  lat={eventFields.event_start_lat} lng={eventFields.event_start_lng} label={eventFields.event_start_label}
+                  onChange={v => setEventFields(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
+                <StartEndPicker kind="end"
+                  lat={eventFields.event_end_lat} lng={eventFields.event_end_lng} label={eventFields.event_end_label}
+                  onChange={v => setEventFields(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   <button onClick={() => saveEventFields(r.id)} disabled={eventSaving} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',

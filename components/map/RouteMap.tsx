@@ -24,13 +24,32 @@ function FitToRoute({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
+function flagIcon(emoji: string, color: string) {
+  const html = `<div style="
+    width:30px;height:30px;background:${color};border:3px solid #fff;
+    border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+    box-shadow:0 1px 5px rgba(0,0,0,0.4);
+    display:flex;align-items:center;justify-content:center;
+  "><span style="transform:rotate(45deg);font-size:14px;">${emoji}</span></div>`;
+  return L.divIcon({ html, iconSize: [30, 30], iconAnchor: [15, 29], popupAnchor: [0, -28], className: '' });
+}
+
+interface EventPoint { lat: number; lng: number; label: string }
+
 interface Props {
   traces: Trace[];
   visitedIds?: string[];
+  startPoint?: EventPoint | null;
+  endPoint?: EventPoint | null;
 }
 
-export default function RouteMap({ traces, visitedIds = [] }: Props) {
+export default function RouteMap({ traces, visitedIds = [], startPoint, endPoint }: Props) {
   const positions: [number, number][] = traces.map(t => [t.latitude, t.longitude]);
+  const fitPositions: [number, number][] = [
+    ...positions,
+    ...(startPoint ? [[startPoint.lat, startPoint.lng] as [number, number]] : []),
+    ...(endPoint ? [[endPoint.lat, endPoint.lng] as [number, number]] : []),
+  ];
   const fallback: [number, number] = positions[0] ?? [35.681236, 139.767125];
 
   return (
@@ -39,8 +58,18 @@ export default function RouteMap({ traces, visitedIds = [] }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <FitToRoute positions={positions} />
+      <FitToRoute positions={fitPositions} />
       <Polyline positions={positions} pathOptions={{ color: '#8E44AD', weight: 3, dashArray: '6 8' }} />
+      {startPoint && (
+        <Marker position={[startPoint.lat, startPoint.lng]} icon={flagIcon('🚩', '#27AE60')}>
+          <Popup>{startPoint.label}</Popup>
+        </Marker>
+      )}
+      {endPoint && (
+        <Marker position={[endPoint.lat, endPoint.lng]} icon={flagIcon('🏁', '#E55039')}>
+          <Popup>{endPoint.label}</Popup>
+        </Marker>
+      )}
       {traces.map((t, i) => (
         <Marker key={t.id} position={[t.latitude, t.longitude]} icon={numberedIcon(i + 1, visitedIds.includes(t.id))}>
           <Popup>

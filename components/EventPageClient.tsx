@@ -77,7 +77,13 @@ export default function EventPageClient({ route, traces }: Props) {
         )}
 
         <div style={{ height: 260, borderRadius: 14, overflow: 'hidden', margin: '16px 0', border: '1px solid #eee' }}>
-          <RouteMap traces={traces} />
+          <RouteMap
+            traces={traces}
+            startPoint={route.event_start_lat != null && route.event_start_lng != null
+              ? { lat: route.event_start_lat, lng: route.event_start_lng, label: route.event_start_label ?? 'スタート地点' } : null}
+            endPoint={route.event_end_lat != null && route.event_end_lng != null
+              ? { lat: route.event_end_lat, lng: route.event_end_lng, label: route.event_end_label ?? 'ゴール地点' } : null}
+          />
         </div>
 
         <p style={{ fontSize: 12, color: '#999', margin: '0 0 16px' }}>

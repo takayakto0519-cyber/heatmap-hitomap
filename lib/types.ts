@@ -163,6 +163,14 @@ export interface Route {
   event_mode: string;              // 'route'（事前ルート型） | 'relay'（発見連鎖型）
   event_session_code: string | null; // relay型イベントの参加者投稿を束ねるsession_code
 
+  // スタート・ゴール地点（relay型は投稿ルートが事前に決まっていないため、運営がピンだけ先に設定できるようにする）
+  event_start_lat: number | null;
+  event_start_lng: number | null;
+  event_start_label: string | null;
+  event_end_lat: number | null;
+  event_end_lng: number | null;
+  event_end_label: string | null;
+
   is_public_recommendation: boolean; // ログインユーザーが「おすすめルート」として公開申請したか
   review_status: string | null;      // null | 'pending' | 'approved' | 'rejected'（運営承認）
   highlights: string | null;         // 見どころ・おすすめポイント（自由記述）

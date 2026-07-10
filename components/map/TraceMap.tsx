@@ -30,8 +30,22 @@ import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 // ログイン時、自分の投稿と他人の投稿を枠線の色で見分けられるようにする
 const SELF_PIN_COLOR = '#4A90E2';
 
-// 痕跡は町の縮尺でこそ証になる。ズームアウトしても「全国」までは絶対に見せない（zoom 10 ≒ 一つの市域）
-const MIN_TOWN_SCALE_ZOOM = 10;
+// 痕跡は町の縮尺でこそ証になる。ズームアウトしても一度に見える範囲は町・地区どまりにする（zoom 12 ≒ 一つの町・地区）
+const MIN_TOWN_SCALE_ZOOM = 12;
+
+// スタート・ゴール地点など、感情色に依らない旗ピンを立てるための共通関数
+function createFlagPin(emoji: string, color: string) {
+  const html = `<div style="
+    width:30px;height:30px;
+    background:${color};
+    border:3px solid #fff;
+    border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg);
+    box-shadow:0 1px 5px rgba(0,0,0,0.4);
+    display:flex;align-items:center;justify-content:center;
+  "><span style="transform:rotate(45deg);font-size:14px;">${emoji}</span></div>`;
+  return L.divIcon({ html, iconSize: [30, 30], iconAnchor: [15, 29], popupAnchor: [0, -28], className: '' });
+}
 
 // 共感ヒート：反応が重なるほどピンの色が濃く・大きくなる
 // overrideColor が指定されている場合（relayイベントのチーム色分けなど）は感情色より優先する
@@ -195,12 +209,14 @@ interface Props {
   currentUserId?: string | null;
   teamColors?: Record<string, string>;
   avatarUrls?: Record<string, string>;
-  // 個人の踏破マップ（プロフィールpage）など、全国規模で自分の足跡を俯瞰する用途に限定した例外。
-  // 公開ヒートマップでは絶対に使わないこと（「全国地図が薄まる」問題の回避策と矛盾するため）。
+  // 個人の踏破マップ（プロフィールpage）、およびイベントページ（山手線一周など町の縮尺を超える範囲を扱うイベント）に限定した例外。
+  // 通常の発見用ヒートマップ（/map, /region等）では絶対に使わないこと（「全国地図が薄まる」問題の回避策と矛盾するため）。
   allowWideZoom?: boolean;
+  // イベントのスタート・ゴール地点など、感情ピンとは別に立てる固定ラベル付きマーカー
+  pins?: { lat: number; lng: number; emoji: string; color: string; label: string }[];
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -238,6 +254,11 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       {highlightIds && traces.filter(t => highlightIds.includes(t.id)).map(t => (
         <Circle key={`hl-${t.id}`} center={[t.latitude, t.longitude]} radius={35}
           pathOptions={{ color: '#38ADA9', fillColor: '#38ADA9', fillOpacity: 0.15, weight: 2 }} />
+      ))}
+      {pins && pins.map((p, i) => (
+        <Marker key={`pin-${i}`} position={[p.lat, p.lng]} icon={createFlagPin(p.emoji, p.color)}>
+          <Popup>{p.label}</Popup>
+        </Marker>
       ))}
 
       {mode === 'heat'

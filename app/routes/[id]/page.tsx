@@ -122,7 +122,14 @@ export default function RoutePage() {
       </header>
 
       <div style={{ height: '45%', flexShrink: 0 }}>
-        <RouteMap traces={traces} visitedIds={visitedIds} />
+        <RouteMap
+          traces={traces}
+          visitedIds={visitedIds}
+          startPoint={route.event_start_lat != null && route.event_start_lng != null
+            ? { lat: route.event_start_lat, lng: route.event_start_lng, label: route.event_start_label ?? 'スタート地点' } : null}
+          endPoint={route.event_end_lat != null && route.event_end_lng != null
+            ? { lat: route.event_end_lat, lng: route.event_end_lng, label: route.event_end_label ?? 'ゴール地点' } : null}
+        />
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
