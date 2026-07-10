@@ -198,6 +198,9 @@ function MapApp() {
   const [openInEditMode, setOpenInEditMode] = useState(false);
   // クイック記録の直後に出す、感情・写真の1タップ追記シート
   const [quickAddTrace, setQuickAddTrace] = useState<Trace | null>(null);
+  // クイック記録直後、立ち止まらず見られる軽い確認（タップした時だけ詳細シートを開く）
+  const [quickToast, setQuickToast] = useState<Trace | null>(null);
+  const quickToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── ユーザー設定 ─────────────────────────
   const [myTraceIds, setMyTraceIds] = useState<string[]>([]);
@@ -758,7 +761,11 @@ function MapApp() {
       const updatedIds = [...myTraceIds, data.trace.id];
       setMyTraceIds(updatedIds);
       localStorage.setItem('hitomap_my_traces', JSON.stringify(updatedIds));
-      setQuickAddTrace(data.trace);
+      // 画面を注視しなくても分かるよう振動でも知らせ、確認は軽いトーストだけにする（歩きながらでも立ち止まらず続けられる）
+      if (navigator.vibrate) navigator.vibrate(80);
+      if (quickToastTimerRef.current) clearTimeout(quickToastTimerRef.current);
+      setQuickToast(data.trace);
+      quickToastTimerRef.current = setTimeout(() => setQuickToast(null), 4000);
     } catch (err) {
       setQuickRecordError(err instanceof Error ? err.message : '記録に失敗しました');
     } finally {
@@ -1303,30 +1310,11 @@ function MapApp() {
                 setTab('post');
               } : undefined}
             />
-            {/* クイック記録：現地では位置＋1タップだけ。写真・言葉は後から追記できる */}
+            {/* ピンを立てる（地図タップで場所を指定して本記録） */}
             <div style={{
               position: 'absolute', bottom: 16, right: 16, zIndex: 500,
               display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
             }}>
-              {quickRecordError && (
-                <p style={{
-                  margin: 0, fontSize: 11, color: '#fff', background: '#E55039',
-                  padding: '5px 10px', borderRadius: 8, maxWidth: 220, textAlign: 'right',
-                }}>{quickRecordError}</p>
-              )}
-              <button
-                type="button"
-                onClick={handleQuickRecord}
-                disabled={quickRecording}
-                style={{
-                  padding: '12px 16px', borderRadius: 24, border: 'none',
-                  background: '#F6B93B', color: '#fff',
-                  fontWeight: 700, fontSize: 13, cursor: quickRecording ? 'wait' : 'pointer',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.2)', opacity: quickRecording ? 0.7 : 1,
-                }}
-              >
-                {quickRecording ? '記録中…' : '⚡ クイック記録（位置だけ）'}
-              </button>
               <button
                 type="button"
                 onClick={() => setPinDropMode(v => !v)}
@@ -2129,6 +2117,57 @@ function MapApp() {
             transition: 'all 0.2s',
           }}>
             {uploadProgress || (submitting ? '記録中…' : '記録する →')}
+          </button>
+        </div>
+      )}
+
+      {/* ── クイック記録（全タブ共通）：町歩き中は立ち止まらず、位置だけその場で1タップ記録する ── */}
+      {tab !== 'post' && (
+        <div style={{
+          position: 'fixed', right: 16, bottom: tab === 'map' ? 150 : 78, zIndex: 600,
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+        }}>
+          {quickToast && (
+            <button
+              onClick={() => { setQuickAddTrace(quickToast); setQuickToast(null); }}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
+                padding: '10px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                background: 'rgba(30,30,30,0.92)', color: '#fff', textAlign: 'right',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.25)', maxWidth: 220,
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700 }}>📍 記録しました</span>
+              <span style={{ fontSize: 11, opacity: 0.8 }}>タップで感情・写真を追加 →</span>
+            </button>
+          )}
+          {quickRecordError && (
+            <p style={{
+              margin: 0, fontSize: 11, color: '#fff', background: '#E55039',
+              padding: '5px 10px', borderRadius: 8, maxWidth: 220, textAlign: 'right',
+            }}>{quickRecordError}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleQuickRecord}
+            disabled={quickRecording}
+            style={{
+              width: 64, height: 64, borderRadius: '50%', border: 'none',
+              background: '#F6B93B', color: '#fff',
+              fontWeight: 700, fontSize: 11, cursor: quickRecording ? 'wait' : 'pointer',
+              boxShadow: '0 3px 14px rgba(0,0,0,0.3)', opacity: quickRecording ? 0.7 : 1,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+              lineHeight: 1.2,
+            }}
+          >
+            {quickRecording ? (
+              <span style={{ fontSize: 20 }}>…</span>
+            ) : (
+              <>
+                <span style={{ fontSize: 22 }}>⚡</span>
+                <span>記録</span>
+              </>
+            )}
           </button>
         </div>
       )}
