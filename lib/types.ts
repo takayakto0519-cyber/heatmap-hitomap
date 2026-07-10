@@ -170,6 +170,11 @@ export interface Route {
   event_end_lat: number | null;
   event_end_lng: number | null;
   event_end_label: string | null;
+  event_waypoints: { lat: number; lng: number; label: string }[] | null; // スタート→経由地点→ゴールの順で経路線を描くための中継地点
+
+  event_fee: string | null;          // 参加費（自由記述。例：「無料」「500円（当日徴収）」）
+  event_meeting_info: string | null; // 集合場所・持ち物・注意事項などの自由記述
+  event_photo_urls: string[] | null; // イベント紹介用の複数枚写真（[0]がヒーロー画像として使われる）
 
   is_public_recommendation: boolean; // ログインユーザーが「おすすめルート」として公開申請したか
   review_status: string | null;      // null | 'pending' | 'approved' | 'rejected'（運営承認）

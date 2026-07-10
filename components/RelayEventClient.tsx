@@ -95,16 +95,29 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
     return list;
   }, [route]);
 
+  const waypoints = route.event_waypoints ?? [];
+
+  // スタート→経由地点→ゴールの順に線でつなぎ、どういう経路を歩くのかが見えるようにする
+  const eventRouteLine = useMemo((): [number, number][] | undefined => {
+    const points: [number, number][] = [
+      ...(route.event_start_lat != null && route.event_start_lng != null ? [[route.event_start_lat, route.event_start_lng] as [number, number]] : []),
+      ...waypoints.map((w): [number, number] => [w.lat, w.lng]),
+      ...(route.event_end_lat != null && route.event_end_lng != null ? [[route.event_end_lat, route.event_end_lng] as [number, number]] : []),
+    ];
+    return points.length >= 2 ? points : undefined;
+  }, [route, waypoints]);
+
   const eventFitBounds = useMemo((): [[number, number], [number, number]] | undefined => {
     const points: [number, number][] = [
       ...traces.map((t): [number, number] => [t.latitude, t.longitude]),
       ...eventPins.map((p): [number, number] => [p.lat, p.lng]),
+      ...waypoints.map((w): [number, number] => [w.lat, w.lng]),
     ];
     if (points.length === 0) return undefined;
     const lats = points.map(p => p[0]);
     const lngs = points.map(p => p[1]);
     return [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]];
-  }, [traces, eventPins]);
+  }, [traces, eventPins, waypoints]);
 
   function handleTraceUpdate(updated: Trace) {
     setTraces(prev => prev.map(t => (t.id === updated.id ? updated : t)));
@@ -148,6 +161,27 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
           <p style={{ margin: '16px 0', fontSize: 15, lineHeight: 1.8, color: '#333', whiteSpace: 'pre-wrap' }}>{route.description}</p>
         )}
 
+        {(route.event_photo_urls ?? []).length > 1 && (
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 0 16px' }}>
+            {(route.event_photo_urls ?? []).slice(1).map((url, i) => (
+              <img key={i} src={url} alt="" loading="lazy" style={{ width: 140, height: 100, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }} />
+            ))}
+          </div>
+        )}
+
+        {(route.event_fee || route.event_meeting_info) && (
+          <div style={{ margin: '0 0 16px', background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: '12px 14px' }}>
+            {route.event_fee && (
+              <p style={{ margin: '0 0 6px', fontSize: 13, color: '#333' }}>
+                <strong style={{ color: '#38ADA9' }}>参加費：</strong>{route.event_fee}
+              </p>
+            )}
+            {route.event_meeting_info && (
+              <p style={{ margin: 0, fontSize: 13, color: '#555', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{route.event_meeting_info}</p>
+            )}
+          </div>
+        )}
+
         {route.event_session_code && (
           <p style={{
             margin: '0 0 16px', fontSize: 13, color: '#38ADA9', background: '#EAF7F6',
@@ -189,6 +223,8 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
             teamColors={teamColors}
             onTraceClick={setSelectedTrace}
             pins={eventPins}
+            waypoints={waypoints}
+            routeLine={eventRouteLine}
             fitBounds={eventFitBounds}
             allowWideZoom
           />

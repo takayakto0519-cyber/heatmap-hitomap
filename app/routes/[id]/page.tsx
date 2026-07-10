@@ -129,6 +129,7 @@ export default function RoutePage() {
             ? { lat: route.event_start_lat, lng: route.event_start_lng, label: route.event_start_label ?? 'スタート地点' } : null}
           endPoint={route.event_end_lat != null && route.event_end_lng != null
             ? { lat: route.event_end_lat, lng: route.event_end_lng, label: route.event_end_label ?? 'ゴール地点' } : null}
+          waypoints={route.event_waypoints ?? []}
         />
       </div>
 

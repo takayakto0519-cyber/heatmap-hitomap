@@ -47,6 +47,16 @@ function createFlagPin(emoji: string, color: string) {
   return L.divIcon({ html, iconSize: [30, 30], iconAnchor: [15, 29], popupAnchor: [0, -28], className: '' });
 }
 
+// スタート・ゴールの間の経由地点。番号つきの小さな丸ピンで、経路上の順番が分かるようにする
+function createWaypointPin(n: number) {
+  const html = `<div style="
+    width:24px;height:24px;background:#8E44AD;border:2.5px solid #fff;border-radius:50%;
+    box-shadow:0 1px 5px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:800;font-size:11px;
+  ">${n}</div>`;
+  return L.divIcon({ html, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14], className: '' });
+}
+
 // 共感ヒート：反応が重なるほどピンの色が濃く・大きくなる
 // overrideColor が指定されている場合（relayイベントのチーム色分けなど）は感情色より優先する
 // 誰の痕跡かひと目で分かるよう、ピンの右下に投稿者アイコンを小さく重ねる
@@ -214,9 +224,11 @@ interface Props {
   allowWideZoom?: boolean;
   // イベントのスタート・ゴール地点など、感情ピンとは別に立てる固定ラベル付きマーカー
   pins?: { lat: number; lng: number; emoji: string; color: string; label: string }[];
+  // スタート・ゴールの間の経由地点（番号つきピン）。routeLineと組み合わせて経路を線で見せる
+  waypoints?: { lat: number; lng: number; label: string }[];
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins, waypoints }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -258,6 +270,11 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       {pins && pins.map((p, i) => (
         <Marker key={`pin-${i}`} position={[p.lat, p.lng]} icon={createFlagPin(p.emoji, p.color)}>
           <Popup>{p.label}</Popup>
+        </Marker>
+      ))}
+      {waypoints && waypoints.map((w, i) => (
+        <Marker key={`wp-${i}`} position={[w.lat, w.lng]} icon={createWaypointPin(i + 1)}>
+          <Popup>{w.label || `経由地点${i + 1}`}</Popup>
         </Marker>
       ))}
 

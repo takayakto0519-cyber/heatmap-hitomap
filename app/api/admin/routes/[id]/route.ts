@@ -25,6 +25,10 @@ interface RouteAdminUpdateBody {
   event_end_lat?: number | null;
   event_end_lng?: number | null;
   event_end_label?: string | null;
+  event_waypoints?: { lat: number; lng: number; label: string }[] | null;
+  event_fee?: string | null;
+  event_meeting_info?: string | null;
+  event_photo_urls?: string[] | null;
 }
 
 const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
@@ -33,6 +37,8 @@ const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
   'event_mode', 'event_session_code', 'review_status',
   'event_start_lat', 'event_start_lng', 'event_start_label',
   'event_end_lat', 'event_end_lng', 'event_end_label',
+  'event_waypoints',
+  'event_fee', 'event_meeting_info', 'event_photo_urls',
 ];
 
 // PATCH /api/admin/routes/[id] — 協賛・イベント公開情報の設定（手動、決済は伴わない。合言葉必須）

@@ -700,6 +700,10 @@ interface EventFieldsForm {
   event_end_lat: number | null;
   event_end_lng: number | null;
   event_end_label: string;
+  event_waypoints: { lat: number; lng: number; label: string }[];
+  event_fee: string;
+  event_meeting_info: string;
+  event_photo_urls: string[];
 }
 
 const emptyEventFields: EventFieldsForm = {
@@ -707,6 +711,8 @@ const emptyEventFields: EventFieldsForm = {
   event_mode: 'route', event_session_code: '',
   event_start_lat: null, event_start_lng: null, event_start_label: '',
   event_end_lat: null, event_end_lng: null, event_end_label: '',
+  event_waypoints: [],
+  event_fee: '', event_meeting_info: '', event_photo_urls: [],
 };
 
 interface RelayCreateForm {
@@ -724,6 +730,10 @@ interface RelayCreateForm {
   event_end_lat: number | null;
   event_end_lng: number | null;
   event_end_label: string;
+  event_waypoints: { lat: number; lng: number; label: string }[];
+  event_fee: string;
+  event_meeting_info: string;
+  event_photo_urls: string[];
 }
 
 const emptyRelayForm: RelayCreateForm = {
@@ -731,6 +741,8 @@ const emptyRelayForm: RelayCreateForm = {
   event_area: '', event_starts_at: '', event_ends_at: '',
   event_start_lat: null, event_start_lng: null, event_start_label: '',
   event_end_lat: null, event_end_lng: null, event_end_label: '',
+  event_waypoints: [],
+  event_fee: '', event_meeting_info: '', event_photo_urls: [],
 };
 
 // スタート/ゴール地点ピッカー：地図タップで座標を決め、ラベルを添える（イベントページのRouteMap/TraceMapに反映される）
@@ -782,21 +794,95 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p style={{ margin: '-2px 0 2px', fontSize: 11, color: '#aaa', lineHeight: 1.5 }}>{children}</p>;
 }
 
-// ヒーロー画像：URLを手入力させず、写真を選ぶだけで済むようにする
-function CoverImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+// 経由地点：スタートとゴールの間に何箇所でも置け、順番どおりに線でつながる
+function WaypointsEditor({ waypoints, onChange }: {
+  waypoints: { lat: number; lng: number; label: string }[];
+  onChange: (waypoints: { lat: number; lng: number; label: string }[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  function addWaypoint() {
+    onChange([...waypoints, { lat: 35.681236, lng: 139.767125, label: '' }]);
+    setOpen(true);
+  }
+  function updateWaypoint(i: number, patch: Partial<{ lat: number; lng: number; label: string }>) {
+    onChange(waypoints.map((w, idx) => idx === i ? { ...w, ...patch } : w));
+  }
+  function removeWaypoint(i: number) {
+    onChange(waypoints.filter((_, idx) => idx !== i));
+  }
+  function moveWaypoint(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= waypoints.length) return;
+    const next = [...waypoints];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  }
+
+  return (
+    <div>
+      <button type="button" onClick={() => setOpen(v => !v)} style={{
+        padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+        border: `1.5px solid ${waypoints.length > 0 ? '#38ADA9' : '#ddd'}`,
+        background: waypoints.length > 0 ? '#E8F8F7' : '#fff',
+        color: waypoints.length > 0 ? '#38ADA9' : '#888', fontWeight: 700,
+      }}>
+        📍 経由地点{waypoints.length > 0 ? `（${waypoints.length}件）` : 'なし'} {open ? '▴' : '▾'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {waypoints.map((w, i) => (
+            <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, padding: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{
+                  width: 20, height: 20, borderRadius: '50%', background: '#38ADA9', color: '#fff',
+                  fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>{i + 1}</span>
+                <input placeholder={`経由地点${i + 1}の名前（例：〇〇商店街）`} value={w.label}
+                  onChange={e => updateWaypoint(i, { label: e.target.value })}
+                  style={{ ...inputStyle, flex: 1 }} />
+                <button type="button" onClick={() => moveWaypoint(i, -1)} disabled={i === 0} style={{
+                  background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#eee' : '#888', fontSize: 14,
+                }}>▲</button>
+                <button type="button" onClick={() => moveWaypoint(i, 1)} disabled={i === waypoints.length - 1} style={{
+                  background: 'none', border: 'none', cursor: i === waypoints.length - 1 ? 'default' : 'pointer', color: i === waypoints.length - 1 ? '#eee' : '#888', fontSize: 14,
+                }}>▼</button>
+                <button type="button" onClick={() => removeWaypoint(i)} style={{
+                  background: 'none', border: 'none', color: '#E55039', fontSize: 12, cursor: 'pointer',
+                }}>削除</button>
+              </div>
+              <div style={{ height: 160, borderRadius: 8, overflow: 'hidden', border: '1px solid #eee' }}>
+                <LocationPickerMap lat={w.lat} lng={w.lng} onChange={(la, ln) => updateWaypoint(i, { lat: la, lng: ln })} />
+              </div>
+            </div>
+          ))}
+          <button type="button" onClick={addWaypoint} style={{
+            padding: '8px 0', borderRadius: 8, border: '1.5px dashed #38ADA9',
+            background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+          }}>＋ 経由地点を追加</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// イベント写真（複数枚）：1枚目が自動でヒーロー画像になる
+function EventPhotosUploader({ urls, onChange }: { urls: string[]; onChange: (urls: string[]) => void }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const MAX_PHOTOS = 6;
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).slice(0, MAX_PHOTOS - urls.length);
+    if (files.length === 0) return;
     setUploading(true);
     setError('');
     try {
       const { uploadTracePhoto } = await import('@/lib/supabase/upload');
-      const url = await uploadTracePhoto(file);
-      onChange(url);
+      const uploaded: string[] = [];
+      for (const file of files) uploaded.push(await uploadTracePhoto(file));
+      onChange([...urls, ...uploaded]);
     } catch (err) {
       setError(err instanceof Error ? err.message : '画像のアップロードに失敗しました');
     } finally {
@@ -804,26 +890,38 @@ function CoverImageUploader({ value, onChange }: { value: string; onChange: (url
       if (inputRef.current) inputRef.current.value = '';
     }
   }
+  function removeAt(i: number) {
+    onChange(urls.filter((_, idx) => idx !== i));
+  }
 
   return (
     <div>
-      {value && (
-        <img src={value} alt="" style={{ width: '100%', maxHeight: 130, objectFit: 'cover', borderRadius: 8, marginBottom: 6, display: 'block' }} />
+      {urls.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 6 }}>
+          {urls.map((url, i) => (
+            <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
+              <img src={url} alt="" style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+              {i === 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, left: 2, padding: '1px 6px', borderRadius: 8,
+                  background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, fontWeight: 700,
+                }}>ヒーロー</span>
+              )}
+              <button type="button" onClick={() => removeAt(i)} style={{
+                position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
+                background: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>✕</button>
+            </div>
+          ))}
+        </div>
       )}
-      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} style={{
-          flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
-          background: '#fafafa', color: '#555', fontSize: 12, fontWeight: 700,
-          cursor: uploading ? 'wait' : 'pointer',
-        }}>{uploading ? 'アップロード中…' : value ? '🖼 画像を変更する' : '🖼 画像を選ぶ（任意）'}</button>
-        {value && (
-          <button type="button" onClick={() => onChange('')} style={{
-            padding: '9px 14px', borderRadius: 8, border: '1.5px solid #ddd',
-            background: '#fff', color: '#E55039', fontSize: 12, cursor: 'pointer',
-          }}>削除</button>
-        )}
-      </div>
+      <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: 'none' }} />
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading || urls.length >= MAX_PHOTOS} style={{
+        width: '100%', padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
+        background: '#fafafa', color: '#555', fontSize: 12, fontWeight: 700,
+        cursor: uploading ? 'wait' : 'pointer',
+      }}>{uploading ? 'アップロード中…' : `🖼 写真を追加（任意・最大${MAX_PHOTOS}枚、${urls.length}/${MAX_PHOTOS}）`}</button>
       {error && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E55039' }}>{error}</p>}
     </div>
   );
@@ -898,6 +996,9 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       event_session_code: r.event_session_code ?? '',
       event_start_lat: r.event_start_lat, event_start_lng: r.event_start_lng, event_start_label: r.event_start_label ?? '',
       event_end_lat: r.event_end_lat, event_end_lng: r.event_end_lng, event_end_label: r.event_end_label ?? '',
+      event_waypoints: r.event_waypoints ?? [],
+      event_fee: r.event_fee ?? '', event_meeting_info: r.event_meeting_info ?? '',
+      event_photo_urls: r.event_photo_urls ?? (r.event_cover_url ? [r.event_cover_url] : []),
     });
   }
 
@@ -908,7 +1009,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         method: 'PATCH', headers: authHeaders(),
         body: JSON.stringify({
           event_slug: eventFields.event_slug.trim() || null,
-          event_cover_url: eventFields.event_cover_url.trim() || null,
+          event_cover_url: eventFields.event_photo_urls[0] ?? null,
+          event_photo_urls: eventFields.event_photo_urls.length > 0 ? eventFields.event_photo_urls : null,
           event_starts_at: inputValueToIso(eventFields.event_starts_at),
           event_ends_at: inputValueToIso(eventFields.event_ends_at),
           event_area: eventFields.event_area.trim() || null,
@@ -918,6 +1020,9 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_start_label: eventFields.event_start_label.trim() || null,
           event_end_lat: eventFields.event_end_lat, event_end_lng: eventFields.event_end_lng,
           event_end_label: eventFields.event_end_label.trim() || null,
+          event_waypoints: eventFields.event_waypoints.length > 0 ? eventFields.event_waypoints : null,
+          event_fee: eventFields.event_fee.trim() || null,
+          event_meeting_info: eventFields.event_meeting_info.trim() || null,
         }),
       });
       const data = await res.json();
@@ -949,7 +1054,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         method: 'PATCH', headers: authHeaders(),
         body: JSON.stringify({
           event_slug: relayForm.event_slug.trim() || null,
-          event_cover_url: relayForm.event_cover_url.trim() || null,
+          event_cover_url: relayForm.event_photo_urls[0] ?? null,
+          event_photo_urls: relayForm.event_photo_urls.length > 0 ? relayForm.event_photo_urls : null,
           event_area: relayForm.event_area.trim() || null,
           event_starts_at: inputValueToIso(relayForm.event_starts_at),
           event_ends_at: inputValueToIso(relayForm.event_ends_at),
@@ -957,6 +1063,9 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_start_label: relayForm.event_start_label.trim() || null,
           event_end_lat: relayForm.event_end_lat, event_end_lng: relayForm.event_end_lng,
           event_end_label: relayForm.event_end_label.trim() || null,
+          event_waypoints: relayForm.event_waypoints.length > 0 ? relayForm.event_waypoints : null,
+          event_fee: relayForm.event_fee.trim() || null,
+          event_meeting_info: relayForm.event_meeting_info.trim() || null,
         }),
       });
       const patchData = await patchRes.json();
@@ -1038,16 +1147,26 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             <input placeholder="例：yamanote-2026" value={relayForm.event_slug}
               onChange={e => setRelayForm(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />
 
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑤ ページ上部の画像</label>
-            <Hint>イベントページの一番上に大きく表示される写真です。設定しなくてもきれいな色の背景が自動で使われます。</Hint>
-            <CoverImageUploader value={relayForm.event_cover_url} onChange={url => setRelayForm(f => ({ ...f, event_cover_url: url }))} />
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑤ イベント写真</label>
+            <Hint>1枚目がページ上部の大きな画像になります。設定しなくてもきれいな色の背景が自動で使われます。</Hint>
+            <EventPhotosUploader urls={relayForm.event_photo_urls} onChange={urls => setRelayForm(f => ({ ...f, event_photo_urls: urls }))} />
 
             <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑥ エリア名</label>
             <Hint>ページ上部に表示される、開催場所のざっくりした名前です。</Hint>
             <input placeholder="例：山手線" value={relayForm.event_area}
               onChange={e => setRelayForm(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
 
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑦ 開催期間（任意）</label>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑦ 参加費（任意）</label>
+            <Hint>「無料」「500円（当日集合場所で徴収）」のように自由に書いてください。</Hint>
+            <input placeholder="例：無料" value={relayForm.event_fee}
+              onChange={e => setRelayForm(f => ({ ...f, event_fee: e.target.value }))} style={inputStyle} />
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑧ 集合場所・持ち物などの詳細（任意）</label>
+            <Hint>参加者に事前に伝えておきたいことを自由に書いてください（例：集合時間・持ち物・雨天時の対応など）。</Hint>
+            <textarea placeholder="例：JR渋谷駅ハチ公口に10時集合。歩きやすい靴でお越しください。雨天決行。" value={relayForm.event_meeting_info} rows={3}
+              onChange={e => setRelayForm(f => ({ ...f, event_meeting_info: e.target.value }))} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑨ 開催期間（任意）</label>
             <div style={{ display: 'flex', gap: 6 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <label style={{ fontSize: 10, color: '#aaa', display: 'block' }}>開始日時</label>
@@ -1061,14 +1180,17 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
               </div>
             </div>
 
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑧ スタート・ゴール地点（任意）</label>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑩ スタート・ゴール地点（任意）</label>
             <Hint>歩くルートがまだ決まっていなくても、待ち合わせ場所だけ地図で先に決められます。</Hint>
             <StartEndPicker kind="start"
               lat={relayForm.event_start_lat} lng={relayForm.event_start_lng} label={relayForm.event_start_label}
               onChange={v => setRelayForm(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
+            <WaypointsEditor waypoints={relayForm.event_waypoints}
+              onChange={wp => setRelayForm(f => ({ ...f, event_waypoints: wp }))} />
             <StartEndPicker kind="end"
               lat={relayForm.event_end_lat} lng={relayForm.event_end_lng} label={relayForm.event_end_label}
               onChange={v => setRelayForm(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
+            <p style={{ margin: '-4px 0 0', fontSize: 11, color: '#aaa' }}>スタート→経由地点→ゴールの順で地図に線が引かれます。</p>
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button onClick={createRelayEvent} disabled={relaySaving} style={{
                 flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
@@ -1193,13 +1315,21 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 <Hint>「hitomap.com/events/○○」の○○の部分になります。英数字とハイフンだけで、他と被らない文字にしてください。</Hint>
                 <input placeholder="例：shibuya-2026" value={eventFields.event_slug}
                   onChange={e => setEventFields(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />
-                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>ページ上部の画像</label>
-                <Hint>イベントページの一番上に大きく表示される写真です。設定しなくてもきれいな色の背景が自動で使われます。</Hint>
-                <CoverImageUploader value={eventFields.event_cover_url} onChange={url => setEventFields(f => ({ ...f, event_cover_url: url }))} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>イベント写真</label>
+                <Hint>1枚目がページ上部の大きな画像になります。設定しなくてもきれいな色の背景が自動で使われます。</Hint>
+                <EventPhotosUploader urls={eventFields.event_photo_urls} onChange={urls => setEventFields(f => ({ ...f, event_photo_urls: urls }))} />
                 <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>エリア名</label>
                 <Hint>ページ上部に表示される、開催場所のざっくりした名前です（例：渋谷、山手線）。</Hint>
                 <input placeholder="例：渋谷" value={eventFields.event_area}
                   onChange={e => setEventFields(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>参加費（任意）</label>
+                <Hint>「無料」「500円（当日集合場所で徴収）」のように自由に書いてください。</Hint>
+                <input placeholder="例：無料" value={eventFields.event_fee}
+                  onChange={e => setEventFields(f => ({ ...f, event_fee: e.target.value }))} style={inputStyle} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>集合場所・持ち物などの詳細（任意）</label>
+                <Hint>参加者に事前に伝えておきたいことを自由に書いてください（例：集合時間・持ち物・雨天時の対応など）。</Hint>
+                <textarea placeholder="例：JR渋谷駅ハチ公口に10時集合。歩きやすい靴でお越しください。雨天決行。" value={eventFields.event_meeting_info} rows={3}
+                  onChange={e => setEventFields(f => ({ ...f, event_meeting_info: e.target.value }))} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
                 <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>開催期間（任意）</label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1218,9 +1348,12 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 <StartEndPicker kind="start"
                   lat={eventFields.event_start_lat} lng={eventFields.event_start_lng} label={eventFields.event_start_label}
                   onChange={v => setEventFields(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
+                <WaypointsEditor waypoints={eventFields.event_waypoints}
+                  onChange={wp => setEventFields(f => ({ ...f, event_waypoints: wp }))} />
                 <StartEndPicker kind="end"
                   lat={eventFields.event_end_lat} lng={eventFields.event_end_lng} label={eventFields.event_end_label}
                   onChange={v => setEventFields(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
+                <p style={{ margin: '-4px 0 0', fontSize: 11, color: '#c3a6dd' }}>スタート→経由地点→ゴールの順で地図に線が引かれます。</p>
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   <button onClick={() => saveEventFields(r.id)} disabled={eventSaving} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
