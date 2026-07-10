@@ -5,15 +5,18 @@ import { QRCodeSVG } from 'qrcode.react';
 
 interface Props {
   onClose: () => void;
+  url?: string;          // 未指定時はサイトのトップURL（従来どおり）
+  title?: string;
+  description?: string;
 }
 
-export default function QRModal({ onClose }: Props) {
-  const [url, setUrl] = useState('');
+export default function QRModal({ onClose, url: fixedUrl, title, description }: Props) {
+  const [url, setUrl] = useState(fixedUrl ?? '');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setUrl(window.location.origin);
-  }, []);
+    if (!fixedUrl) setUrl(window.location.origin);
+  }, [fixedUrl]);
 
   async function copyUrl() {
     await navigator.clipboard.writeText(url);
@@ -41,9 +44,9 @@ export default function QRModal({ onClose }: Props) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>×</button>
 
-        <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800 }}>QRコード</h2>
+        <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800 }}>{title ?? 'QRコード'}</h2>
         <p style={{ margin: '0 0 18px', fontSize: 12, color: '#aaa' }}>
-          スキャンしてアプリを開く
+          {description ?? 'スキャンしてアプリを開く'}
         </p>
 
         {url && (

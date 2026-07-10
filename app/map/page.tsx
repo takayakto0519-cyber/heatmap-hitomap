@@ -366,6 +366,18 @@ function MapApp() {
   function saveSessionCode(code: string) {
     setSessionCode(code);
     localStorage.setItem('hitomap_session_code', code);
+    // そのイベントで前に使ったチーム名があれば呼び出し、参加のたびに入力しなくて済むようにする
+    if (code.trim()) {
+      const savedTeam = localStorage.getItem(`hitomap_team_${code.trim()}`);
+      if (savedTeam) setTeam(savedTeam);
+    }
+  }
+
+  function saveTeam(code: string, teamName: string) {
+    setTeam(teamName);
+    if (code.trim() && teamName.trim()) {
+      localStorage.setItem(`hitomap_team_${code.trim()}`, teamName.trim());
+    }
   }
 
   // ?region= 付きで開いた場合、その自治体の範囲に自動でfitBoundsする
@@ -384,6 +396,20 @@ function MapApp() {
   }, [regionParam]);
 
   // PWAのホーム画面ショートカット（/map?quick=1）から起動された場合、開いた瞬間にクイック記録を1回だけ実行する
+  // イベント参加リンク（/map?session_code=xxx&team=yyy）から開かれた場合、実験回コード・チーム名を自動でセットする
+  // （そのまま &quick=1 を付ければ、開いた瞬間にクイック記録まで済ませられる）
+  const joinAutoTriggeredRef = useRef(false);
+  useEffect(() => {
+    const joinCode = searchParams.get('session_code');
+    const joinTeam = searchParams.get('team');
+    if ((!joinCode && !joinTeam) || joinAutoTriggeredRef.current) return;
+    joinAutoTriggeredRef.current = true;
+    if (joinCode) saveSessionCode(joinCode);
+    if (joinCode && joinTeam) saveTeam(joinCode, joinTeam);
+    router.replace('/map');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const quickAutoTriggeredRef = useRef(false);
   useEffect(() => {
     if (searchParams.get('quick') !== '1' || quickAutoTriggeredRef.current) return;
@@ -748,6 +774,7 @@ function MapApp() {
           title: quickTitle,
           session_code: sessionCode.trim() || undefined,
           nickname: nickname.trim() || undefined,
+          team: team.trim() || undefined,
           visibility: currentUser ? postVisibility : undefined,
         }),
       });

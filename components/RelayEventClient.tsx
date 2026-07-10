@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { Route, Trace } from '@/lib/types';
 import TraceDetail from '@/components/TraceDetail';
+import QRModal from '@/components/QRModal';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -30,6 +31,8 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+  const [joinTeam, setJoinTeam] = useState('');
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => setCurrentUserId(d.user?.id ?? null)).catch(() => {});
@@ -155,7 +158,21 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
       </div>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '20px 20px 60px' }}>
-        <a href="/map" style={{ fontSize: 13, color: '#38ADA9', textDecoration: 'none', fontWeight: 700 }}>← ヒトマップの地図を見る</a>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <a href="/map" style={{ fontSize: 13, color: '#38ADA9', textDecoration: 'none', fontWeight: 700 }}>← ヒトマップの地図を見る</a>
+          <button onClick={() => setShowQr(true)} style={{
+            background: 'none', border: '1px solid #ddd', borderRadius: 8,
+            padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 700,
+          }}>📱 現地で見せるQR</button>
+        </div>
+        {showQr && (
+          <QRModal
+            onClose={() => setShowQr(false)}
+            url={typeof window !== 'undefined' ? window.location.href : undefined}
+            title="このイベントのQRコード"
+            description="現地でこのQRを見せると、参加者がすぐこのページを開けます"
+          />
+        )}
 
         {route.description && (
           <p style={{ margin: '16px 0', fontSize: 15, lineHeight: 1.8, color: '#333', whiteSpace: 'pre-wrap' }}>{route.description}</p>
@@ -183,12 +200,39 @@ export default function RelayEventClient({ route, traces: initialTraces }: Props
         )}
 
         {route.event_session_code && (
-          <p style={{
-            margin: '0 0 16px', fontSize: 13, color: '#38ADA9', background: '#EAF7F6',
-            padding: '10px 14px', borderRadius: 10,
+          <div style={{
+            margin: '0 0 16px', background: '#EAF7F6', border: '1.5px solid #38ADA9',
+            borderRadius: 12, padding: '14px 14px',
           }}>
-            参加するには、投稿画面の「実験回コード」に <strong>{route.event_session_code}</strong> を、「チーム名」に自分のチーム名を入力して投稿してください。
-          </p>
+            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#2C7A75', fontWeight: 700 }}>
+              🏳 チーム名を入れて参加する（次からは入力不要になります）
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={joinTeam}
+                onChange={e => setJoinTeam(e.target.value)}
+                placeholder="チーム名（例：赤組）"
+                style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 13,
+                  border: '1.5px solid #ddd', outline: 'none',
+                }}
+              />
+              <a
+                href={joinTeam.trim() ? `/map?session_code=${encodeURIComponent(route.event_session_code)}&team=${encodeURIComponent(joinTeam.trim())}` : undefined}
+                aria-disabled={!joinTeam.trim()}
+                onClick={e => { if (!joinTeam.trim()) e.preventDefault(); }}
+                style={{
+                  padding: '10px 18px', borderRadius: 8, border: 'none', textDecoration: 'none',
+                  background: joinTeam.trim() ? '#38ADA9' : '#ccc', color: '#fff',
+                  fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap',
+                  cursor: joinTeam.trim() ? 'pointer' : 'default',
+                }}
+              >参加する →</a>
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 11, color: '#5FA8A3' }}>
+              実験回コード <strong>{route.event_session_code}</strong> と、あなたのチーム名が自動で入力された状態で地図が開きます。
+            </p>
+          </div>
         )}
 
         {/* チーム別スコアボード */}
