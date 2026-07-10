@@ -195,6 +195,7 @@ function MapApp() {
 
   // ── モーダル ─────────────────────────────
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+  const [openInEditMode, setOpenInEditMode] = useState(false);
   // クイック記録の直後に出す、感情・写真の1タップ追記シート
   const [quickAddTrace, setQuickAddTrace] = useState<Trace | null>(null);
 
@@ -801,6 +802,34 @@ function MapApp() {
     setMapFlyToZoom(17);
     setMapFlyTo([trace.latitude, trace.longitude]);
     setTimeout(() => setMapFlyTo(null), 2000);
+  }
+
+  function isOwnTrace(t: Trace): boolean {
+    return t.user_id ? t.user_id === currentUser?.id : myTraceIds.includes(t.id);
+  }
+
+  // 一覧カードの✏️編集：詳細画面を編集モードで開いた状態にする
+  function handleCardEdit(t: Trace) {
+    setOpenInEditMode(true);
+    setSelectedTrace(t);
+  }
+
+  // 一覧カードの🗑削除：ニックネーム確認が要る匿名投稿だけは詳細画面に任せ、それ以外はその場で削除する
+  async function handleCardDelete(t: Trace) {
+    if (!t.user_id && t.nickname) {
+      setSelectedTrace(t);
+      return;
+    }
+    if (!confirm(`「${t.title}」を削除しますか？`)) return;
+    const res = await fetch(`/api/traces/${t.id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setTraces(prev => prev.filter(x => x.id !== t.id));
+    } else {
+      alert(data.error ?? '削除に失敗しました');
+    }
   }
 
   const canSubmit = Boolean(title.trim() && lat && lng && !submitting && !submitDone);
@@ -1988,6 +2017,9 @@ function MapApp() {
                         trace={t}
                         userPos={userPos}
                         avatarUrl={t.user_id ? avatarUrls[t.user_id] : undefined}
+                        isOwn={!routeMode && isOwnTrace(t)}
+                        onEdit={routeMode ? undefined : handleCardEdit}
+                        onDelete={routeMode ? undefined : handleCardDelete}
                         onClick={() => routeMode ? toggleRouteSelection(t.id) : setSelectedTrace(t)}
                         onShowOnMap={routeMode ? undefined : handleShowOnMap}
                       />
@@ -2151,11 +2183,12 @@ function MapApp() {
         <TraceDetail
           key={selectedTrace.id}
           trace={selectedTrace}
-          isOwn={selectedTrace.user_id ? selectedTrace.user_id === currentUser?.id : myTraceIds.includes(selectedTrace.id)}
-          onClose={() => setSelectedTrace(null)}
+          isOwn={isOwnTrace(selectedTrace)}
+          initialEditing={openInEditMode}
+          onClose={() => { setSelectedTrace(null); setOpenInEditMode(false); }}
           onUpdate={handleTraceUpdate}
           onDelete={handleTraceDelete}
-          onNavigateTo={setSelectedTrace}
+          onNavigateTo={t => { setOpenInEditMode(false); setSelectedTrace(t); }}
         />
       )}
       {quickAddTrace && (

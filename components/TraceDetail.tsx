@@ -19,6 +19,7 @@ interface Props {
   onUpdate: (updated: Trace) => void;
   onDelete: (id: string) => void;
   onNavigateTo?: (trace: Trace) => void;
+  initialEditing?: boolean;
 }
 
 const REACTIONS = [
@@ -33,9 +34,9 @@ const inputStyle: React.CSSProperties = {
   resize: 'vertical' as const, outline: 'none', background: '#fafafa',
 };
 
-export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, onDelete, onNavigateTo }: Props) {
+export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, onDelete, onNavigateTo, initialEditing }: Props) {
   const [trace, setTrace] = useState(initial);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(Boolean(initialEditing && isOwn));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);

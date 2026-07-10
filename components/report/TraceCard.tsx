@@ -15,9 +15,12 @@ interface Props {
   onShowOnMap?: (trace: Trace) => void;
   userPos?: [number, number] | null;
   avatarUrl?: string;
+  isOwn?: boolean;
+  onEdit?: (trace: Trace) => void;
+  onDelete?: (trace: Trace) => void;
 }
 
-export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, avatarUrl }: Props) {
+export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, avatarUrl, isOwn, onEdit, onDelete }: Props) {
   const archiveType = getArchiveType(t.archive_type);
   const emotion = archiveType ? null : getEmotion(t.emotion_key);
   const category = archiveType ? null : getCategory(t.category);
@@ -173,19 +176,48 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
             {t.nickname && <span>· {t.nickname}</span>}
           </div>
 
-          {/* 地図で見る */}
-          {onShowOnMap && (
-            <button
-              onClick={e => { e.stopPropagation(); onShowOnMap(t); }}
-              style={{
-                background: 'none', border: '1px solid #eee', borderRadius: 8,
-                color: '#38ADA9', fontSize: 11, cursor: 'pointer',
-                padding: '3px 8px', fontWeight: 700,
-              }}
-            >
-              🗺 地図
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {/* 自分の記録：編集・削除（開いて探さなくていいよう、カード上に直接出す） */}
+            {isOwn && onEdit && (
+              <button
+                onClick={e => { e.stopPropagation(); onEdit(t); }}
+                title="編集する"
+                style={{
+                  background: 'none', border: '1px solid #eee', borderRadius: 8,
+                  color: '#FF6B9D', fontSize: 11, cursor: 'pointer',
+                  padding: '3px 8px', fontWeight: 700,
+                }}
+              >
+                ✏️ 編集
+              </button>
+            )}
+            {isOwn && onDelete && (
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(t); }}
+                title="削除する"
+                style={{
+                  background: 'none', border: '1px solid #eee', borderRadius: 8,
+                  color: '#E55039', fontSize: 11, cursor: 'pointer',
+                  padding: '3px 8px', fontWeight: 700,
+                }}
+              >
+                🗑 削除
+              </button>
+            )}
+            {/* 地図で見る */}
+            {onShowOnMap && (
+              <button
+                onClick={e => { e.stopPropagation(); onShowOnMap(t); }}
+                style={{
+                  background: 'none', border: '1px solid #eee', borderRadius: 8,
+                  color: '#38ADA9', fontSize: 11, cursor: 'pointer',
+                  padding: '3px 8px', fontWeight: 700,
+                }}
+              >
+                🗺 地図
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>
