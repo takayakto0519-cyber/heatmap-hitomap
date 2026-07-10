@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { Trace, Sponsor, Route } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
@@ -777,6 +777,58 @@ function StartEndPicker({ kind, lat, lng, label, onChange }: {
   );
 }
 
+// フィールドの下に添える、非エンジニアにも分かる一言説明
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p style={{ margin: '-2px 0 2px', fontSize: 11, color: '#aaa', lineHeight: 1.5 }}>{children}</p>;
+}
+
+// ヒーロー画像：URLを手入力させず、写真を選ぶだけで済むようにする
+function CoverImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    try {
+      const { uploadTracePhoto } = await import('@/lib/supabase/upload');
+      const url = await uploadTracePhoto(file);
+      onChange(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '画像のアップロードに失敗しました');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  return (
+    <div>
+      {value && (
+        <img src={value} alt="" style={{ width: '100%', maxHeight: 130, objectFit: 'cover', borderRadius: 8, marginBottom: 6, display: 'block' }} />
+      )}
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} style={{
+          flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
+          background: '#fafafa', color: '#555', fontSize: 12, fontWeight: 700,
+          cursor: uploading ? 'wait' : 'pointer',
+        }}>{uploading ? 'アップロード中…' : value ? '🖼 画像を変更する' : '🖼 画像を選ぶ（任意）'}</button>
+        {value && (
+          <button type="button" onClick={() => onChange('')} style={{
+            padding: '9px 14px', borderRadius: 8, border: '1.5px solid #ddd',
+            background: '#fff', color: '#E55039', fontSize: 12, cursor: 'pointer',
+          }}>削除</button>
+        )}
+      </div>
+      {error && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E55039' }}>{error}</p>}
+    </div>
+  );
+}
+
 function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
@@ -969,39 +1021,48 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         <Card>
           <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>🏃 新規relayイベントを作成</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>タイトル</label>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>① イベント名</label>
             <input placeholder="例：ヒトマップ×山手線一周プロジェクト" value={relayForm.title}
               onChange={e => setRelayForm(f => ({ ...f, title: e.target.value }))} style={inputStyle} />
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>説明文</label>
-            <textarea placeholder="イベントの説明" value={relayForm.description} rows={3}
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>② 説明文</label>
+            <textarea placeholder="どんなイベントか、参加者に伝えたいことを書いてください" value={relayForm.description} rows={3}
               onChange={e => setRelayForm(f => ({ ...f, description: e.target.value }))} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>参加者投稿を束ねるコード（実験回コードとして参加者に案内）</label>
-            <input placeholder="例：yamanote2026" value={relayForm.event_session_code}
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>③ 参加コード</label>
+            <Hint>参加者が投稿するときにこの文字を入力してもらうと、投稿がこのイベントに自動でまとまります。</Hint>
+            <input placeholder="例：yamanote2026（好きな英数字でOK）" value={relayForm.event_session_code}
               onChange={e => setRelayForm(f => ({ ...f, event_session_code: e.target.value }))} style={inputStyle} />
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>URL（英数字とハイフン）</label>
-            <input placeholder="event_slug 例：yamanote-2026" value={relayForm.event_slug}
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>④ イベントページのアドレス</label>
+            <Hint>「hitomap.com/events/○○」の○○の部分になります。英数字とハイフンだけで、他と被らない文字にしてください。</Hint>
+            <input placeholder="例：yamanote-2026" value={relayForm.event_slug}
               onChange={e => setRelayForm(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>ヒーロー画像URL</label>
-            <input placeholder="event_cover_url" value={relayForm.event_cover_url}
-              onChange={e => setRelayForm(f => ({ ...f, event_cover_url: e.target.value }))} style={inputStyle} />
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>エリア名</label>
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑤ ページ上部の画像</label>
+            <Hint>イベントページの一番上に大きく表示される写真です。設定しなくてもきれいな色の背景が自動で使われます。</Hint>
+            <CoverImageUploader value={relayForm.event_cover_url} onChange={url => setRelayForm(f => ({ ...f, event_cover_url: url }))} />
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑥ エリア名</label>
+            <Hint>ページ上部に表示される、開催場所のざっくりした名前です。</Hint>
             <input placeholder="例：山手線" value={relayForm.event_area}
               onChange={e => setRelayForm(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑦ 開催期間（任意）</label>
             <div style={{ display: 'flex', gap: 6 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <label style={{ fontSize: 11, color: '#666', fontWeight: 700, display: 'block' }}>開始</label>
+                <label style={{ fontSize: 10, color: '#aaa', display: 'block' }}>開始日時</label>
                 <input type="datetime-local" value={relayForm.event_starts_at}
                   onChange={e => setRelayForm(f => ({ ...f, event_starts_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <label style={{ fontSize: 11, color: '#666', fontWeight: 700, display: 'block' }}>終了</label>
+                <label style={{ fontSize: 10, color: '#aaa', display: 'block' }}>終了日時</label>
                 <input type="datetime-local" value={relayForm.event_ends_at}
                   onChange={e => setRelayForm(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
               </div>
             </div>
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>
-              スタート・ゴール地点（ルート未定でも、地図で場所だけ先に決められます）
-            </label>
+
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑧ スタート・ゴール地点（任意）</label>
+            <Hint>歩くルートがまだ決まっていなくても、待ち合わせ場所だけ地図で先に決められます。</Hint>
             <StartEndPicker kind="start"
               lat={relayForm.event_start_lat} lng={relayForm.event_start_lng} label={relayForm.event_start_label}
               onChange={v => setRelayForm(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
@@ -1105,6 +1166,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             {eventEditingId === r.id ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, padding: 10, background: '#FBF6FF', borderRadius: 8 }}>
                 <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>イベント形式</label>
+                <Hint>route＝運営が決めた順路を歩いてもらう型。relay＝参加者が自由に見つけて投稿していく型（コースは決まっていなくてもOK）。</Hint>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setEventFields(f => ({ ...f, event_mode: 'route' }))} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
@@ -1121,35 +1183,38 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 </div>
                 {eventFields.event_mode === 'relay' && (
                   <>
-                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>参加者投稿を束ねるコード（実験回コードとして案内）</label>
-                    <input placeholder="例：yamanote2026" value={eventFields.event_session_code}
+                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>参加コード</label>
+                    <Hint>参加者が投稿するときにこの文字を入力してもらうと、投稿がこのイベントに自動でまとまります。</Hint>
+                    <input placeholder="例：yamanote2026（好きな英数字でOK）" value={eventFields.event_session_code}
                       onChange={e => setEventFields(f => ({ ...f, event_session_code: e.target.value }))} style={inputStyle} />
                   </>
                 )}
-                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>URL（英数字とハイフン、例: shibuya-2026）</label>
-                <input placeholder="event_slug" value={eventFields.event_slug}
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>イベントページのアドレス</label>
+                <Hint>「hitomap.com/events/○○」の○○の部分になります。英数字とハイフンだけで、他と被らない文字にしてください。</Hint>
+                <input placeholder="例：shibuya-2026" value={eventFields.event_slug}
                   onChange={e => setEventFields(f => ({ ...f, event_slug: e.target.value }))} style={inputStyle} />
-                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>ヒーロー画像URL</label>
-                <input placeholder="event_cover_url" value={eventFields.event_cover_url}
-                  onChange={e => setEventFields(f => ({ ...f, event_cover_url: e.target.value }))} style={inputStyle} />
-                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>エリア名（例：渋谷、山手線）</label>
-                <input placeholder="event_area" value={eventFields.event_area}
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>ページ上部の画像</label>
+                <Hint>イベントページの一番上に大きく表示される写真です。設定しなくてもきれいな色の背景が自動で使われます。</Hint>
+                <CoverImageUploader value={eventFields.event_cover_url} onChange={url => setEventFields(f => ({ ...f, event_cover_url: url }))} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>エリア名</label>
+                <Hint>ページ上部に表示される、開催場所のざっくりした名前です（例：渋谷、山手線）。</Hint>
+                <input placeholder="例：渋谷" value={eventFields.event_area}
                   onChange={e => setEventFields(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>開催期間（任意）</label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700, display: 'block' }}>開始</label>
+                    <label style={{ fontSize: 10, color: '#c3a6dd', display: 'block' }}>開始日時</label>
                     <input type="datetime-local" value={eventFields.event_starts_at}
                       onChange={e => setEventFields(f => ({ ...f, event_starts_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700, display: 'block' }}>終了</label>
+                    <label style={{ fontSize: 10, color: '#c3a6dd', display: 'block' }}>終了日時</label>
                     <input type="datetime-local" value={eventFields.event_ends_at}
                       onChange={e => setEventFields(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
                   </div>
                 </div>
-                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>
-                  スタート・ゴール地点（ルート未定でも、地図で場所だけ先に決められます）
-                </label>
+                <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>スタート・ゴール地点（任意）</label>
+                <Hint>歩くルートがまだ決まっていなくても、待ち合わせ場所だけ地図で先に決められます。</Hint>
                 <StartEndPicker kind="start"
                   lat={eventFields.event_start_lat} lng={eventFields.event_start_lng} label={eventFields.event_start_label}
                   onChange={v => setEventFields(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
