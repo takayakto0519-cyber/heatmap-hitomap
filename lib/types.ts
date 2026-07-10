@@ -10,6 +10,7 @@ export interface Trace {
 
   photo_url: string | null;       // 先頭の1枚（一覧・ピン・OGP等の代表画像）
   photo_urls: string[] | null;    // 複数枚投稿（最大4枚、photo_urls[0] === photo_url）
+  video_url: string | null;       // 短い動画（言い伝え・人の声の記録に効果的）
 
   latitude: number;
   longitude: number;
@@ -66,6 +67,7 @@ export interface Trace {
 export interface TraceInput {
   photo_url?: string | null;
   photo_urls?: string[] | null;
+  video_url?: string | null;
 
   latitude: number;
   longitude: number;

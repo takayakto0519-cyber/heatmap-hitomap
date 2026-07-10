@@ -14,6 +14,7 @@ import IntensityPicker from '@/components/form/IntensityPicker';
 import AudioRecorder from '@/components/form/AudioRecorder';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
+import QuickAddSheet from '@/components/QuickAddSheet';
 import StatsPanel from '@/components/list/StatsPanel';
 import Onboarding from '@/components/Onboarding';
 import type { Quest } from '@/lib/quests';
@@ -61,8 +62,21 @@ function MapApp() {
   // ── タブ・マップ ──────────────────────────
   const [tab, setTab] = useState<Tab>('map');
   const [mapMode, setMapMode] = useState<MapMode>('pin');
+  // 感情レイヤー：「薄い日常」（intensity 1-2）と「深い想い」（intensity 4-5）を層として切り替える
+  const [intensityLayer, setIntensityLayer] = useState<'all' | 'light' | 'deep'>('all');
+  // ヒートマップの時間スライダー：「1ヶ月前→今」のように感情の堆積が動いて見えるようにする
+  const [timeSliderOn, setTimeSliderOn] = useState(false);
+  const [timeSliderPct, setTimeSliderPct] = useState(100);
+  // 眠っている痕跡発見：現在地の近くで開拓余地がある町を提案する
+  const [unexploredOpen, setUnexploredOpen] = useState(false);
+  const [unexploredLoading, setUnexploredLoading] = useState(false);
+  const [unexploredResult, setUnexploredResult] = useState<{
+    sparse: { region: string; count: number; distanceKm: number }[];
+    blank: { region: string; distanceKm: number; direction: string }[];
+  } | null>(null);
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
-  const [nearbyOnly, setNearbyOnly] = useState(false);
+  // regionもnearbyもない「文脈なし」の直接アクセスは、全国が見えてしまう前に現在地の町へ自動で絞る
+  const [nearbyOnly, setNearbyOnly] = useState(() => !regionParam);
   const [filterEmotion, setFilterEmotion] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   // 'trace' = 痕跡のみ / それ以外は archive_type のキー / null = すべて
@@ -181,6 +195,8 @@ function MapApp() {
 
   // ── モーダル ─────────────────────────────
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+  // クイック記録の直後に出す、感情・写真の1タップ追記シート
+  const [quickAddTrace, setQuickAddTrace] = useState<Trace | null>(null);
 
   // ── ユーザー設定 ─────────────────────────
   const [myTraceIds, setMyTraceIds] = useState<string[]>([]);
@@ -190,6 +206,9 @@ function MapApp() {
   const fileRef = useRef<HTMLInputElement>(null);
   const MAX_PHOTOS = 4;
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const videoRef = useRef<HTMLInputElement>(null);
+  const [video, setVideo] = useState<{ file: File; preview: string } | null>(null);
+  const [videoError, setVideoError] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -251,6 +270,37 @@ function MapApp() {
       setCurrentProfile(d.profile ?? null);
     }).catch(() => {});
   }, []);
+
+  // すれ違い通知：ログイン中のみ、未読件数をベルアイコンに出す
+  interface AppNotification {
+    id: string; type: string; trace_id: string | null; actor_trace_id: string | null;
+    message: string; is_read: boolean; created_at: string;
+  }
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  const fetchNotifications = useCallback(() => {
+    fetch('/api/notifications').then(r => r.json()).then(d => {
+      if (d.ok) { setNotifications(d.notifications ?? []); setUnreadCount(d.unreadCount ?? 0); }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    fetchNotifications();
+  }, [currentUser, fetchNotifications]);
+
+  async function openNotifPanel() {
+    setShowNotifPanel(v => !v);
+    if (!showNotifPanel && unreadCount > 0) {
+      await fetch('/api/notifications', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }),
+      });
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    }
+  }
 
   // ── 初期化 ──────────────────────────────
   useEffect(() => {
@@ -329,6 +379,17 @@ function MapApp() {
     })();
   }, [regionParam]);
 
+  // PWAのホーム画面ショートカット（/map?quick=1）から起動された場合、開いた瞬間にクイック記録を1回だけ実行する
+  const quickAutoTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get('quick') !== '1' || quickAutoTriggeredRef.current) return;
+    quickAutoTriggeredRef.current = true;
+    setTab('map');
+    handleQuickRecord();
+    router.replace('/map');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // ── データ取得（常に全件取得。session_codeフィルタはクライアント側で行う）──
   const fetchTraces = useCallback(() => {
     setLoading(true);
@@ -360,6 +421,28 @@ function MapApp() {
       .catch(() => {});
   }, [traces]);
 
+  // 誰の痕跡かひと目で分かるよう、投稿者のアイコンをまとめて取得する
+  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const userIds = [...new Set(traces.map(t => t.user_id).filter((id): id is string => Boolean(id)))];
+    if (userIds.length === 0) return;
+    fetch(`/api/profiles/avatars?ids=${userIds.join(',')}`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setAvatarUrls(d.avatars ?? {}); })
+      .catch(() => {});
+  }, [traces]);
+
+  // 書きかけの記録：自分のクイック記録で、感情も写真もまだ足せていないもの
+  const unfinishedOwn = traces.filter(t =>
+    myTraceIds.includes(t.id) && !t.archive_type && !t.emotion_key && !t.photo_url
+  );
+
+  // 時間スライダー：投稿の created_at の範囲を0〜100%のつまみに割り当て、選んだ時点までの投稿だけを見せる
+  const traceTimes = traces.map(t => new Date(t.created_at).getTime());
+  const timeMin = traceTimes.length > 0 ? Math.min(...traceTimes) : 0;
+  const timeMax = traceTimes.length > 0 ? Math.max(...traceTimes) : 0;
+  const timeSliderCutoff = timeMin + ((timeMax - timeMin) * timeSliderPct) / 100;
+
   // ── フィルタ・ソート ─────────────────────
   // マップ用：感情・カテゴリ・近くのみ（セッションコードでは絞らない→全件見える）
   const filteredForMap = traces.filter(t => {
@@ -368,6 +451,12 @@ function MapApp() {
     if (filterArchive && filterArchive !== 'trace' && t.archive_type !== filterArchive) return false;
     if (filterEmotion && t.emotion_key !== filterEmotion) return false;
     if (filterCategory && t.category !== filterCategory) return false;
+    if (intensityLayer !== 'all' && !t.archive_type) {
+      if (t.intensity == null) return false;
+      if (intensityLayer === 'light' && t.intensity > 2) return false;
+      if (intensityLayer === 'deep' && t.intensity < 4) return false;
+    }
+    if (timeSliderOn && new Date(t.created_at).getTime() > timeSliderCutoff) return false;
     if (nearbyOnly && userPos) {
       return haversine(userPos[0], userPos[1], t.latitude, t.longitude) <= NEARBY_RADIUS;
     }
@@ -500,12 +589,29 @@ function MapApp() {
     setPhotos(prev => prev.filter((_, i) => i !== index));
   }
 
+  const MAX_VIDEO_MB = 30;
+  function handleVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setVideoError('');
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setVideoError(`動画は${MAX_VIDEO_MB}MBまでです。短く撮り直してください`);
+      return;
+    }
+    setVideo({ file, preview: URL.createObjectURL(file) });
+  }
+  function removeVideo() {
+    if (video) URL.revokeObjectURL(video.preview);
+    setVideo(null);
+  }
+
   // 投稿完了画面から地図に戻る（自動タイマー・手動「続ける」ボタンの両方から呼ばれる）
   const finishSubmitPost = useCallback(() => {
     if (submitDoneTimerRef.current) { clearTimeout(submitDoneTimerRef.current); submitDoneTimerRef.current = null; }
     const { lat: postedLat, lng: postedLng } = postedPosRef.current;
     setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
-    setPhotos([]); setLat(null); setLng(null);
+    setPhotos([]); setVideo(null); setVideoError(''); setLat(null); setLng(null);
     setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
     setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
     setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
@@ -548,11 +654,19 @@ function MapApp() {
           setUploadProgress('');
         }
       }
+      let videoUrl: string | null = null;
+      if (video && SUPABASE_READY) {
+        setUploadProgress('動画をアップロード中…');
+        const { uploadTraceVideo } = await import('@/lib/supabase/upload');
+        videoUrl = await uploadTraceVideo(video.file);
+        setUploadProgress('');
+      }
       const res = await fetch('/api/traces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           photo_url: photoUrls[0] ?? null, photo_urls: photoUrls.length > 0 ? photoUrls : null,
+          video_url: videoUrl,
           latitude: lat, longitude: lng,
           title: title.trim(),
           why: why.trim() || null,
@@ -643,7 +757,7 @@ function MapApp() {
       const updatedIds = [...myTraceIds, data.trace.id];
       setMyTraceIds(updatedIds);
       localStorage.setItem('hitomap_my_traces', JSON.stringify(updatedIds));
-      setSelectedTrace(data.trace);
+      setQuickAddTrace(data.trace);
     } catch (err) {
       setQuickRecordError(err instanceof Error ? err.message : '記録に失敗しました');
     } finally {
@@ -655,12 +769,33 @@ function MapApp() {
     setTraces(prev => prev.map(t => t.id === updated.id ? updated : t));
     setSelectedTrace(updated);
   }
+  function handleQuickAddUpdate(updated: Trace) {
+    setTraces(prev => prev.map(t => t.id === updated.id ? updated : t));
+    setQuickAddTrace(updated);
+  }
   function handleTraceDelete(id: string) {
     setTraces(prev => prev.filter(t => t.id !== id));
     setSelectedTrace(null);
   }
 
   // カードから地図へジャンプ
+  async function openUnexplored() {
+    setUnexploredOpen(true);
+    if (!userPos) return;
+    setUnexploredLoading(true);
+    try {
+      const res = await fetch(`/api/discover/unexplored?lat=${userPos[0]}&lng=${userPos[1]}`).then(r => r.json());
+      if (res.ok) setUnexploredResult({ sparse: res.sparse ?? [], blank: res.blank ?? [] });
+    } finally {
+      setUnexploredLoading(false);
+    }
+  }
+
+  function goToUnexploredRegion(region: string) {
+    setUnexploredOpen(false);
+    router.push(`/map?region=${encodeURIComponent(region)}`);
+  }
+
   function handleShowOnMap(trace: Trace) {
     setTab('map');
     setMapFlyToZoom(17);
@@ -693,6 +828,7 @@ function MapApp() {
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {currentUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentProfile?.username ? (
@@ -721,47 +857,63 @@ function MapApp() {
             <a href="/login" style={{ color: '#38ADA9', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>ログイン / 新規登録</a>
           )}
 
-          {/* タブ別コントロール */}
+          {currentUser && (
+            <div style={{ position: 'relative' }}>
+              <button onClick={openNotifPanel} style={{
+                position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 18, padding: '2px 6px',
+              }}>
+                🔔
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -2, right: 0, minWidth: 14, height: 14, borderRadius: 7,
+                    background: '#E55039', color: '#fff', fontSize: 9, fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                  }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+              </button>
+              {showNotifPanel && (
+                <>
+                  <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
+                  <div style={{
+                    position: 'absolute', top: 30, right: 0, width: 260, maxHeight: 320, overflowY: 'auto',
+                    background: '#fff', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', zIndex: 999,
+                    padding: 8,
+                  }}>
+                    {notifications.length === 0 ? (
+                      <p style={{ margin: 0, padding: 12, fontSize: 12, color: '#bbb', textAlign: 'center' }}>まだ通知はありません</p>
+                    ) : notifications.map(n => (
+                      <a key={n.id} href={n.trace_id ? `/t/${n.trace_id}` : '#'} style={{
+                        display: 'block', padding: '8px 10px', borderRadius: 8, textDecoration: 'none',
+                        color: '#444', fontSize: 12, lineHeight: 1.5,
+                        background: n.is_read ? 'transparent' : '#FFF0F5',
+                      }}>
+                        {n.type === 'crossed_paths' ? '🚶 ' : ''}{n.message}
+                        <span style={{ display: 'block', fontSize: 10, color: '#bbb', marginTop: 2 }}>
+                          {new Date(n.created_at).toLocaleString('ja-JP')}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          </div>
+
+          {/* タブ別コントロール：常時見せるのは「今見るモード」の1組だけに絞り、それ以外は下の「絞り込み・発見」に集約する */}
           {tab === 'map' && (
             <div style={{ display: 'flex', gap: 5 }}>
-              <button onClick={() => {
-                if (!nearbyOnly && !userPos) {
-                  navigator.geolocation.getCurrentPosition(
-                    p => { setUserPos([p.coords.latitude, p.coords.longitude]); setNearbyOnly(true); },
-                    undefined, { enableHighAccuracy: true }
-                  );
-                } else { setNearbyOnly(n => !n); }
-              }} style={{
-                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                border: `1.5px solid ${nearbyOnly ? '#38ADA9' : '#ddd'}`,
-                background: nearbyOnly ? '#E8F8F7' : '#fff',
-                color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
-              }}>📍 近く</button>
-              <button onClick={() => setShowRegionSearch(v => !v)} style={{
-                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                border: `1.5px solid ${showRegionSearch ? '#38ADA9' : '#ddd'}`,
-                background: showRegionSearch ? '#E8F8F7' : '#fff',
-                color: showRegionSearch ? '#38ADA9' : '#666', fontWeight: showRegionSearch ? 700 : 400,
-              }}>🔍 地域</button>
-              <button onClick={() => {
-                setDetourMode(v => !v);
-                if (detourMode) { setDetourDestination(null); setDetourQuery(''); setDetourCandidates([]); }
-              }} style={{
-                padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                border: `1.5px solid ${detourMode ? '#38ADA9' : '#ddd'}`,
-                background: detourMode ? '#E8F8F7' : '#fff',
-                color: detourMode ? '#38ADA9' : '#666', fontWeight: detourMode ? 700 : 400,
-              }}>🚶 寄り道</button>
               {(['pin', 'heat'] as MapMode[]).map(m => (
                 <button key={m} onClick={() => {
                   setMapMode(m);
                   // ヒートは感情データを持つ痕跡のみが対象。アーカイブ種別で絞られたままだと0件になるためリセットする。
                   if (m === 'heat' && filterArchive && filterArchive !== 'trace') setFilterArchive(null);
                 }} style={{
-                  padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                  border: '1.5px solid #ddd',
+                  padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                  border: '1.5px solid #222',
                   background: mapMode === m ? '#222' : '#fff',
-                  color: mapMode === m ? '#fff' : '#666', fontWeight: mapMode === m ? 700 : 400,
+                  color: mapMode === m ? '#fff' : '#222', fontWeight: 700,
                 }}>{m === 'pin' ? '📍 ピン' : '🌡 ヒート'}</button>
               ))}
             </div>
@@ -797,17 +949,85 @@ function MapApp() {
           )}
         </div>
 
-        {/* 絞り込みの開閉トグル：フィルター行が最大2段になり画面を圧迫するため、必要な時だけ開く */}
-        {(tab === 'map' || tab === 'list') && (hasArchive || emotionCounts.length > 0) && !(tab === 'map' && mapMode === 'heat') && (
-          <button onClick={() => setFiltersOpen(v => !v)} style={{
-            display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-            padding: '4px 10px', borderRadius: 14, fontSize: 12, cursor: 'pointer', marginBottom: 4,
-            border: `1.5px solid ${(filterArchive || filterEmotion) ? '#FF6B9D' : '#ddd'}`,
-            background: (filterArchive || filterEmotion) ? '#FFF0F5' : '#fff',
-            color: (filterArchive || filterEmotion) ? '#FF6B9D' : '#666', fontWeight: (filterArchive || filterEmotion) ? 700 : 400,
-          }}>
-            絞り込み{(filterArchive || filterEmotion) ? '中' : ''} {filtersOpen ? '▴' : '▾'}
-          </button>
+        {/* 絞り込み・発見の開閉トグル：位置／感情レイヤー／時間／種別 の操作をすべてここに集約し、常時表示のボタン数を減らす */}
+        {(tab === 'map' || (tab === 'list' && (hasArchive || emotionCounts.length > 0))) && (() => {
+          const isActive = Boolean(
+            filterArchive || filterEmotion || nearbyOnly || detourMode || showRegionSearch ||
+            intensityLayer !== 'all' || timeSliderOn
+          );
+          return (
+            <button onClick={() => setFiltersOpen(v => !v)} style={{
+              display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+              padding: '5px 12px', borderRadius: 14, fontSize: 12, cursor: 'pointer', marginBottom: 4,
+              border: `1.5px solid ${isActive ? '#FF6B9D' : '#ddd'}`,
+              background: isActive ? '#FFF0F5' : '#fff',
+              color: isActive ? '#FF6B9D' : '#666', fontWeight: isActive ? 700 : 400,
+            }}>
+              🔍 絞り込み・発見{isActive ? '中' : ''} {filtersOpen ? '▴' : '▾'}
+            </button>
+          );
+        })()}
+
+        {/* 位置・発見ツール（マップのみ）：近く／地域／寄り道／眠る痕跡 */}
+        {filtersOpen && tab === 'map' && (
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+            <button onClick={() => {
+              if (!nearbyOnly && !userPos) {
+                navigator.geolocation.getCurrentPosition(
+                  p => { setUserPos([p.coords.latitude, p.coords.longitude]); setNearbyOnly(true); },
+                  undefined, { enableHighAccuracy: true }
+                );
+              } else { setNearbyOnly(n => !n); }
+            }} style={{
+              padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              border: `1.5px solid ${nearbyOnly ? '#38ADA9' : '#ddd'}`,
+              background: nearbyOnly ? '#E8F8F7' : '#fff',
+              color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
+            }}>📍 近く</button>
+            <button onClick={() => setShowRegionSearch(v => !v)} style={{
+              padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              border: `1.5px solid ${showRegionSearch ? '#38ADA9' : '#ddd'}`,
+              background: showRegionSearch ? '#E8F8F7' : '#fff',
+              color: showRegionSearch ? '#38ADA9' : '#666', fontWeight: showRegionSearch ? 700 : 400,
+            }}>🔍 地域</button>
+            <button onClick={() => {
+              setDetourMode(v => !v);
+              if (detourMode) { setDetourDestination(null); setDetourQuery(''); setDetourCandidates([]); }
+            }} style={{
+              padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              border: `1.5px solid ${detourMode ? '#38ADA9' : '#ddd'}`,
+              background: detourMode ? '#E8F8F7' : '#fff',
+              color: detourMode ? '#38ADA9' : '#666', fontWeight: detourMode ? 700 : 400,
+            }}>🚶 寄り道</button>
+            <button onClick={openUnexplored} style={{
+              padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              border: '1.5px solid #F3EAFB', background: '#FBF6FF', color: '#8E44AD', fontWeight: 700,
+            }}>🧭 眠る痕跡</button>
+          </div>
+        )}
+
+        {/* 感情レイヤー・時間（マップのみ、ヒート以外） */}
+        {filtersOpen && tab === 'map' && !(mapMode === 'heat') && (
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+            {([
+              ['all', 'すべて'],
+              ['light', '☁ 薄い日常'],
+              ['deep', '🌊 深い想い'],
+            ] as [typeof intensityLayer, string][]).map(([key, label]) => (
+              <button key={key} onClick={() => setIntensityLayer(key)} style={{
+                padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
+                border: `1.5px solid ${intensityLayer === key ? '#8E44AD' : '#ddd'}`,
+                background: intensityLayer === key ? '#F3EAFB' : '#fff',
+                color: intensityLayer === key ? '#8E44AD' : '#888', fontWeight: intensityLayer === key ? 700 : 400,
+              }}>{label}</button>
+            ))}
+            <button onClick={() => setTimeSliderOn(v => !v)} style={{
+              padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
+              border: `1.5px solid ${timeSliderOn ? '#38ADA9' : '#ddd'}`,
+              background: timeSliderOn ? '#E8F8F7' : '#fff',
+              color: timeSliderOn ? '#38ADA9' : '#888', fontWeight: timeSliderOn ? 700 : 400,
+            }}>🕰 時間で見る</button>
+          </div>
         )}
 
         {/* アーカイブタイプフィルター（マップ・一覧）。ヒートは感情データを持つ痕跡専用のため、ヒート表示中は出さない */}
@@ -964,10 +1184,49 @@ function MapApp() {
             ))}
           </div>
         )}
+
+        {/* 時間スライダー：「1ヶ月前→今」のように感情の堆積が動いて見える（見やすさ優先でヘッダー内に固定表示） */}
+        {tab === 'map' && timeSliderOn && timeMax > timeMin && (
+          <div style={{
+            marginTop: 8, padding: '12px 14px', borderRadius: 12,
+            background: '#EFFBFA', border: '1.5px solid #38ADA9',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+              <p style={{ margin: 0, fontSize: 14, color: '#1F7A76', fontWeight: 800 }}>
+                🕰 {new Date(timeSliderCutoff).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: '#38ADA9', fontWeight: 700 }}>{filtered.length}件を表示中</p>
+            </div>
+            <input
+              type="range" min={0} max={100} value={timeSliderPct}
+              onChange={e => setTimeSliderPct(Number(e.target.value))}
+              style={{ width: '100%', height: 28, accentColor: '#38ADA9', cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#5FA8A4', fontWeight: 600, marginTop: 2 }}>
+              <span>{new Date(timeMin).toLocaleDateString('ja-JP')}</span>
+              <span>今</span>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ── メインコンテンツ ── */}
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+
+        {/* 書きかけの記録：クイック記録した位置に、感情・写真をまだ足せていない分を知らせる */}
+        {tab === 'map' && !fetchError && unfinishedOwn.length > 0 && !quickAddTrace && (
+          <button
+            onClick={() => setQuickAddTrace(unfinishedOwn[0])}
+            style={{
+              position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+              background: '#8E44AD', color: '#fff', padding: '7px 16px', border: 'none',
+              borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', zIndex: 500,
+              whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            ✍️ 書きかけの記録が{unfinishedOwn.length}件あります・続きを書く
+          </button>
+        )}
 
         {/* エラーバナー */}
         {fetchError && (
@@ -992,6 +1251,7 @@ function MapApp() {
               traces={filteredForMap}
               mode={mapMode}
               currentUserId={currentUser?.id}
+              avatarUrls={avatarUrls}
               center={userPos ?? undefined}
               flyTo={mapFlyTo ?? undefined}
               flyToZoom={mapFlyToZoom}
@@ -1086,6 +1346,7 @@ function MapApp() {
                 </div>
               </div>
             )}
+
           </div>
         )}
 
@@ -1245,6 +1506,32 @@ function MapApp() {
                       <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る（最大{MAX_PHOTOS}枚）</span>
                     </button>
                   )}
+                </div>
+
+                {/* 短い動画（任意・1本まで）：言い伝え・語り部の記録に効果的 */}
+                <div style={{ background: '#fff', borderRadius: 14, marginBottom: 12, padding: video ? 10 : 0, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <input ref={videoRef} type="file" accept="video/*" capture="environment"
+                    style={{ display: 'none' }} onChange={handleVideo} />
+                  {video ? (
+                    <div style={{ position: 'relative' }}>
+                      <video src={video.preview} controls style={{ width: '100%', maxHeight: 200, borderRadius: 10, display: 'block', background: '#000' }} />
+                      <button type="button" onClick={removeVideo} style={{
+                        position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>✕</button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => videoRef.current?.click()} style={{
+                      width: '100%', height: 90, border: 'none', background: '#fafafa',
+                      cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}>
+                      <span style={{ fontSize: 26 }}>🎥</span>
+                      <span style={{ fontSize: 13, color: '#bbb' }}>短い動画を撮る（任意・最大{MAX_VIDEO_MB}MB）</span>
+                    </button>
+                  )}
+                  {videoError && <p style={{ margin: '6px 10px 0', fontSize: 11, color: '#E55039' }}>{videoError}</p>}
                 </div>
 
                 {/* STEP 2: タイトル（必須） */}
@@ -1700,6 +1987,7 @@ function MapApp() {
                       <TraceCard
                         trace={t}
                         userPos={userPos}
+                        avatarUrl={t.user_id ? avatarUrls[t.user_id] : undefined}
                         onClick={() => routeMode ? toggleRouteSelection(t.id) : setSelectedTrace(t)}
                         onShowOnMap={routeMode ? undefined : handleShowOnMap}
                       />
@@ -1869,6 +2157,70 @@ function MapApp() {
           onDelete={handleTraceDelete}
           onNavigateTo={setSelectedTrace}
         />
+      )}
+      {quickAddTrace && (
+        <QuickAddSheet
+          key={quickAddTrace.id}
+          trace={quickAddTrace}
+          onClose={() => setQuickAddTrace(null)}
+          onUpdate={handleQuickAddUpdate}
+        />
+      )}
+      {unexploredOpen && (
+        <>
+          <div onClick={() => setUnexploredOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000 }} />
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1001,
+            background: '#fff', borderRadius: '20px 20px 0 0', maxHeight: '70dvh', overflowY: 'auto',
+            padding: '18px 16px calc(18px + env(safe-area-inset-bottom))', boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
+          }}>
+            <p style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 16 }}>🧭 眠っている痕跡を探す</p>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#999' }}>現在地の近くで、まだ記録が少ない・全くない町を提案します</p>
+
+            {!userPos ? (
+              <p style={{ fontSize: 13, color: '#E55039' }}>現在地が分からないため探せません。「📍 近く」で位置を取得してください</p>
+            ) : unexploredLoading ? (
+              <p style={{ fontSize: 13, color: '#999' }}>探しています…（数秒かかります）</p>
+            ) : unexploredResult && (unexploredResult.sparse.length > 0 || unexploredResult.blank.length > 0) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {unexploredResult.blank.length > 0 && (
+                  <div>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8E44AD', fontWeight: 700 }}>⚪ まだ誰の痕跡もない町</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {unexploredResult.blank.map(b => (
+                        <button key={b.region} onClick={() => goToUnexploredRegion(b.region)} style={{
+                          textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #F3EAFB',
+                          background: '#FBF6FF', cursor: 'pointer', fontSize: 13, color: '#333',
+                        }}>
+                          <strong>{b.region}</strong>
+                          <span style={{ color: '#999', fontSize: 11 }}> ・ {b.direction}へ約{b.distanceKm}km</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {unexploredResult.sparse.length > 0 && (
+                  <div>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: '#38ADA9', fontWeight: 700 }}>🌱 記録がまだ少ない町</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {unexploredResult.sparse.map(s => (
+                        <button key={s.region} onClick={() => goToUnexploredRegion(s.region)} style={{
+                          textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E8F8F7',
+                          background: '#F3FDFC', cursor: 'pointer', fontSize: 13, color: '#333',
+                        }}>
+                          <strong>{s.region}</strong>
+                          <span style={{ color: '#999', fontSize: 11 }}> ・ {s.count}件 ・ 約{s.distanceKm}km</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : unexploredResult ? (
+              <p style={{ fontSize: 13, color: '#999' }}>近くはすでによく歩かれているようです。範囲を広げて探してみましょう。</p>
+            ) : null}
+          </div>
+        </>
       )}
     </div>
   );

@@ -118,11 +118,10 @@ export default function TopPage() {
           </div>
         )}
 
-        <a href="/map" style={{
-          display: 'block', textAlign: 'center', marginTop: 20, padding: '12px',
-          borderRadius: 10, border: '1.5px solid #ddd', color: '#666', fontSize: 13, fontWeight: 700,
-          textDecoration: 'none',
-        }}>🗾 全国の地図を見る</a>
+        {/* 「全国の地図を見る」は意図的に置かない：痕跡は町の縮尺でこそ証になる。まず一つの町を選んでもらう */}
+        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: '#ccc' }}>
+          痕跡は、町の縮尺でこそ生きた証になる。まず一つの町を選んでください。
+        </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 24 }}>
           <a href="/terms" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>利用規約</a>

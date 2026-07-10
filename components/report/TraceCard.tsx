@@ -14,9 +14,10 @@ interface Props {
   onClick?: () => void;
   onShowOnMap?: (trace: Trace) => void;
   userPos?: [number, number] | null;
+  avatarUrl?: string;
 }
 
-export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos }: Props) {
+export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, avatarUrl }: Props) {
   const archiveType = getArchiveType(t.archive_type);
   const emotion = archiveType ? null : getEmotion(t.emotion_key);
   const category = archiveType ? null : getCategory(t.category);
@@ -162,7 +163,10 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos }: P
 
         {/* フッター行 */}
         <div style={{ marginTop: 'auto', paddingTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 6, fontSize: 11, color: '#bbb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#bbb' }}>
+            {avatarUrl && (
+              <img src={avatarUrl} alt="" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} />
+            )}
             {t.want_revisit && <span>🔁</span>}
             {t.want_to_share && <span>🗣</span>}
             <time>{new Date(t.created_at).toLocaleDateString('ja-JP')}</time>

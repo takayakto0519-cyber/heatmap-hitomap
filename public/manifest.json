@@ -14,5 +14,14 @@
       "type": "image/jpeg",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "クイック記録（位置だけ）",
+      "short_name": "クイック記録",
+      "description": "思いついた瞬間に、位置だけをすぐ記録する",
+      "url": "/map?quick=1",
+      "icons": [{ "src": "/logo.jpg", "sizes": "any" }]
+    }
   ]
 }

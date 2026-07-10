@@ -93,7 +93,7 @@ export async function PATCH(
 
     // アカウント投稿の編集は本人のみ（未ログイン・匿名投稿は従来どおり誰でも可）
     const { data: existing } = await supabase
-      .from('traces').select('user_id').eq('id', id).single();
+      .from('traces').select('*').eq('id', id).single();
     if (existing?.user_id) {
       const myId = await getCurrentUserId();
       if (myId !== existing.user_id) {
@@ -101,10 +101,18 @@ export async function PATCH(
       }
     }
 
+    // 版管理：「痕跡は上書きしない」思想の実装。編集前の状態をスナップショットとして残す（失敗しても編集自体は継続）
+    if (existing) {
+      try {
+        await supabase.from('trace_versions').insert({ trace_id: id, snapshot: existing });
+      } catch { /* trace_versions未作成の環境でも編集自体は継続させる */ }
+    }
+
     const allowed = [
       'title', 'why', 'interpretation', 'self_reflection', 'want_revisit', 'want_to_share',
       'archive_type', 'yomi', 'alt_names', 'era_label', 'source_ref', 'voice_relation', 'audio_url',
-      'audio_transcript', 'visibility',
+      'audio_transcript', 'visibility', 'emotion_key', 'intensity', 'category', 'photo_url', 'photo_urls',
+      'video_url',
     ];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {

@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Trace } from '@/lib/types';
 import { getEmotion } from '@/lib/emotions';
-import { getCategory } from '@/lib/categories';
+import { getCategory, CATEGORIES } from '@/lib/categories';
 import { getTraceType } from '@/lib/traceTypes';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 import ReportModal from './ReportModal';
 import AudioWaveform from './AudioWaveform';
+import EmotionPicker from './form/EmotionPicker';
+import IntensityPicker from './form/IntensityPicker';
+import ResonanceTowns from './ResonanceTowns';
 
 interface Props {
   trace: Trace;
@@ -46,8 +49,23 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [editRevisit, setEditRevisit] = useState(trace.want_revisit);
   const [editShare, setEditShare] = useState(trace.want_to_share);
   const [editTranscript, setEditTranscript] = useState(trace.audio_transcript ?? '');
+  const [editEmotion, setEditEmotion] = useState(trace.emotion_key);
+  const [editIntensity, setEditIntensity] = useState(trace.intensity ?? 3);
+  const [editCategory, setEditCategory] = useState(trace.category);
+  const [editPhotoUrl, setEditPhotoUrl] = useState(trace.photo_url);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [editVideoUrl, setEditVideoUrl] = useState(trace.video_url);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoError, setVideoError] = useState('');
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [authorUsername, setAuthorUsername] = useState<string | null>(null);
+  const [authorAvatarUrl, setAuthorAvatarUrl] = useState<string | null>(null);
 
+  const [versions, setVersions] = useState<{ id: string; edited_at: string; title: string | null; why: string | null }[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [versionsLoaded, setVersionsLoaded] = useState(false);
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [myReactions, setMyReactions] = useState<string[]>([]);
   const [reactionLoading, setReactionLoading] = useState<string | null>(null);
@@ -57,12 +75,13 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [nearbyTraces, setNearbyTraces] = useState<Trace[]>([]);
 
   useEffect(() => {
-    if (!trace.user_id) { setAuthorUsername(null); return; }
+    if (!trace.user_id) { setAuthorUsername(null); setAuthorAvatarUrl(null); return; }
     (async () => {
       const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
       const supabase = createAuthBrowserClient();
-      const { data } = await supabase.from('profiles').select('username').eq('id', trace.user_id!).maybeSingle();
+      const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', trace.user_id!).maybeSingle();
       setAuthorUsername(data?.username ?? null);
+      setAuthorAvatarUrl(data?.avatar_url ?? null);
     })();
   }, [trace.user_id]);
 
@@ -83,6 +102,16 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
       if (res?.ok) setNearbyTraces(res.traces ?? []);
     })();
   }, [trace.id]);
+
+  async function toggleVersions() {
+    const opening = !versionsOpen;
+    setVersionsOpen(opening);
+    if (opening && !versionsLoaded) {
+      const res = await fetch(`/api/traces/${trace.id}/versions`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) setVersions(res.versions ?? []);
+      setVersionsLoaded(true);
+    }
+  }
 
   async function toggleReaction(type: string) {
     const has = myReactions.includes(type);
@@ -127,6 +156,46 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const voiceRelation = getVoiceRelation(trace.voice_relation);
   const sourceIsUrl = !!trace.source_ref && /^https?:\/\//.test(trace.source_ref);
 
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoError('');
+    setPhotoUploading(true);
+    try {
+      const { uploadTracePhoto } = await import('@/lib/supabase/upload');
+      const url = await uploadTracePhoto(file);
+      setEditPhotoUrl(url);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : '写真のアップロードに失敗しました');
+    } finally {
+      setPhotoUploading(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }
+
+  const MAX_VIDEO_MB = 30;
+  async function handleVideoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoError('');
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setVideoError(`動画は${MAX_VIDEO_MB}MBまでです。短く撮り直してください`);
+      if (videoInputRef.current) videoInputRef.current.value = '';
+      return;
+    }
+    setVideoUploading(true);
+    try {
+      const { uploadTraceVideo } = await import('@/lib/supabase/upload');
+      const url = await uploadTraceVideo(file);
+      setEditVideoUrl(url);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : '動画のアップロードに失敗しました');
+    } finally {
+      setVideoUploading(false);
+      if (videoInputRef.current) videoInputRef.current.value = '';
+    }
+  }
+
   async function handleSave() {
     if (!editTitle.trim()) return;
     setSaving(true);
@@ -142,6 +211,12 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
           want_revisit: editRevisit,
           want_to_share: editShare,
           audio_transcript: editTranscript.trim() || null,
+          emotion_key: editEmotion,
+          intensity: editIntensity,
+          category: editCategory,
+          photo_url: editPhotoUrl,
+          photo_urls: editPhotoUrl ? [editPhotoUrl] : null,
+          video_url: editVideoUrl,
         }),
       });
       const data = await res.json();
@@ -173,6 +248,24 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
     } finally {
       setDeleting(false);
     }
+  }
+
+  function startEditing() {
+    setEditTitle(trace.title);
+    setEditWhy(trace.why ?? '');
+    setEditInterp(trace.interpretation ?? '');
+    setEditSelf(trace.self_reflection ?? '');
+    setEditRevisit(trace.want_revisit);
+    setEditShare(trace.want_to_share);
+    setEditTranscript(trace.audio_transcript ?? '');
+    setEditEmotion(trace.emotion_key);
+    setEditIntensity(trace.intensity ?? 3);
+    setEditCategory(trace.category);
+    setEditPhotoUrl(trace.photo_url);
+    setPhotoError('');
+    setEditVideoUrl(trace.video_url);
+    setVideoError('');
+    setEditing(true);
   }
 
   async function handleShare() {
@@ -266,6 +359,55 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             )
           )}
 
+          {/* 動画（表示モードのみ） */}
+          {trace.video_url && !editing && (
+            <video controls src={trace.video_url} style={{ width: '100%', maxHeight: 300, display: 'block', background: '#000' }} />
+          )}
+
+          {editing && (
+            <div style={{ padding: '16px 16px 0' }}>
+              <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>📷 写真</label>
+              {editPhotoUrl && (
+                <img src={editPhotoUrl} alt="" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 8, display: 'block' }} />
+              )}
+              <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} id="trace-photo-input" />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={() => photoInputRef.current?.click()} disabled={photoUploading} style={{
+                  flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
+                  background: '#fafafa', color: '#555', fontSize: 13, fontWeight: 700,
+                  cursor: photoUploading ? 'wait' : 'pointer',
+                }}>{photoUploading ? 'アップロード中…' : editPhotoUrl ? '写真を変更' : '📷 写真を追加'}</button>
+                {editPhotoUrl && (
+                  <button type="button" onClick={() => setEditPhotoUrl(null)} style={{
+                    padding: '9px 14px', borderRadius: 8, border: '1.5px solid #ddd',
+                    background: '#fff', color: '#E55039', fontSize: 13, cursor: 'pointer',
+                  }}>削除</button>
+                )}
+              </div>
+              {photoError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#E55039' }}>{photoError}</p>}
+
+              <label style={{ fontSize: 12, color: '#aaa', display: 'block', margin: '16px 0 6px' }}>🎥 動画（任意・1本まで）</label>
+              {editVideoUrl && (
+                <video controls src={editVideoUrl} style={{ width: '100%', maxHeight: 200, borderRadius: 10, marginBottom: 8, display: 'block', background: '#000' }} />
+              )}
+              <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoSelect} style={{ display: 'none' }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={() => videoInputRef.current?.click()} disabled={videoUploading} style={{
+                  flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
+                  background: '#fafafa', color: '#555', fontSize: 13, fontWeight: 700,
+                  cursor: videoUploading ? 'wait' : 'pointer',
+                }}>{videoUploading ? 'アップロード中…' : editVideoUrl ? '動画を変更' : '🎥 動画を追加'}</button>
+                {editVideoUrl && (
+                  <button type="button" onClick={() => setEditVideoUrl(null)} style={{
+                    padding: '9px 14px', borderRadius: 8, border: '1.5px solid #ddd',
+                    background: '#fff', color: '#E55039', fontSize: 13, cursor: 'pointer',
+                  }}>削除</button>
+                )}
+              </div>
+              {videoError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#E55039' }}>{videoError}</p>}
+            </div>
+          )}
+
           <div style={{ padding: '16px 16px 0' }}>
 
             {/* タグ行 */}
@@ -328,6 +470,35 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 {trace.title}
                 {trace.yomi && <span style={{ fontWeight: 400, color: '#aaa', fontSize: 14 }}>（{trace.yomi}）</span>}
               </h2>
+            )}
+
+            {editing && !archiveType && (
+              <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>どんな感情？</label>
+                  <EmotionPicker value={editEmotion} onChange={setEditEmotion} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>強さ</label>
+                  <IntensityPicker value={editIntensity} onChange={setEditIntensity} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>何に心が動いた？</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {CATEGORIES.map((c) => {
+                      const selected = editCategory === c.key;
+                      return (
+                        <button key={c.key} type="button" onClick={() => setEditCategory(c.key)} style={{
+                          display: 'flex', alignItems: 'center', gap: 4, padding: '8px 12px', borderRadius: 20,
+                          border: `2px solid ${selected ? '#38ADA9' : '#ddd'}`,
+                          background: selected ? '#38ADA9' : '#fff',
+                          color: selected ? '#fff' : '#333', fontSize: 13, cursor: 'pointer',
+                        }}>{c.emoji} {c.label}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* 共感（わかる／歩いてみたい／懐かしい）・ブックマーク */}
@@ -499,6 +670,9 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             {/* 日時・ニックネーム */}
             {!editing && (
               <p style={{ fontSize: 11, color: '#ccc', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {authorAvatarUrl && (
+                  <img src={authorAvatarUrl} alt="" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                )}
                 <span>
                   {new Date(trace.created_at).toLocaleString('ja-JP')}
                   {authorUsername ? (
@@ -558,6 +732,34 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 </div>
               </div>
             )}
+
+            {!editing && !archiveType && trace.emotion_key && trace.region && (
+              <ResonanceTowns traceId={trace.id} />
+            )}
+
+            {!editing && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #f5f5f5' }}>
+                <button onClick={toggleVersions} style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 12, color: '#bbb', fontWeight: 700,
+                }}>🕰 変更履歴を見る（痕跡は上書きしない）{versionsOpen ? ' ▴' : ' ▾'}</button>
+                {versionsOpen && (
+                  versionsLoaded && versions.length === 0 ? (
+                    <p style={{ margin: '8px 0 0', fontSize: 12, color: '#ccc' }}>まだ編集履歴はありません</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                      {versions.map((v) => (
+                        <div key={v.id} style={{ background: '#fafafa', borderRadius: 8, padding: '8px 10px' }}>
+                          <p style={{ margin: '0 0 3px', fontSize: 10, color: '#bbb' }}>{new Date(v.edited_at).toLocaleString('ja-JP')} 時点</p>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#666' }}>{v.title}</p>
+                          {v.why && <p style={{ margin: '3px 0 0', fontSize: 12, color: '#888' }}>{v.why}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -615,7 +817,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                   border: '1.5px solid #ddd', background: '#fff',
                   color: '#E55039', cursor: 'pointer', fontSize: 14,
                 }}>削除</button>
-                <button onClick={() => setEditing(true)} style={{
+                <button onClick={startEditing} style={{
                   flex: 2, padding: '12px', borderRadius: 10,
                   border: 'none', background: '#FF6B9D',
                   color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,

@@ -30,43 +30,64 @@ import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 // ログイン時、自分の投稿と他人の投稿を枠線の色で見分けられるようにする
 const SELF_PIN_COLOR = '#4A90E2';
 
+// 痕跡は町の縮尺でこそ証になる。ズームアウトしても「全国」までは絶対に見せない（zoom 10 ≒ 一つの市域）
+const MIN_TOWN_SCALE_ZOOM = 10;
+
 // 共感ヒート：反応が重なるほどピンの色が濃く・大きくなる
 // overrideColor が指定されている場合（relayイベントのチーム色分けなど）は感情色より優先する
-function createEmotionPin(emotionKey: string | null, reactionCount = 0, isMine = false, overrideColor?: string) {
+// 誰の痕跡かひと目で分かるよう、ピンの右下に投稿者アイコンを小さく重ねる
+function avatarBadgeHtml(avatarUrl: string | undefined, badgeSize: number): string {
+  if (!avatarUrl) return '';
+  const safeUrl = avatarUrl.replace(/'/g, '%27');
+  return `<div style="
+    position:absolute;right:-2px;bottom:-2px;
+    width:${badgeSize}px;height:${badgeSize}px;border-radius:50%;
+    border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);
+    background-image:url('${safeUrl}');background-size:cover;background-position:center;background-color:#eee;
+  "></div>`;
+}
+
+function createEmotionPin(emotionKey: string | null, reactionCount = 0, isMine = false, overrideColor?: string, avatarUrl?: string) {
   const color = overrideColor ?? getEmotionColor(emotionKey);
   const size = 22 + Math.min(reactionCount, 8) * 2.5;
   const half = size / 2;
   const opacity = Math.min(0.55 + reactionCount * 0.08, 1);
   const borderColor = isMine ? SELF_PIN_COLOR : '#fff';
   const borderWidth = isMine ? 4 : 3;
-  const html = `<div style="
-    width:${size}px;height:${size}px;
-    background:${color};
-    opacity:${opacity};
-    border:${borderWidth}px solid ${borderColor};
-    border-radius:50%;
-    box-shadow:0 1px 5px rgba(0,0,0,0.4);
-  "></div>`;
+  const html = `<div style="position:relative;width:${size}px;height:${size}px;">
+    <div style="
+      width:100%;height:100%;
+      background:${color};
+      opacity:${opacity};
+      border:${borderWidth}px solid ${borderColor};
+      border-radius:50%;
+      box-shadow:0 1px 5px rgba(0,0,0,0.4);
+    "></div>
+    ${avatarBadgeHtml(avatarUrl, Math.max(12, size * 0.42))}
+  </div>`;
   return L.divIcon({ html, iconSize: [size, size], iconAnchor: [half, half], popupAnchor: [0, -half - 3], className: '' });
 }
 
 // 拡大するとピンが写真サムネイルになる（ヒートが集まった場所がどんな場所か一目で分かるように）
 const PHOTO_THUMB_ZOOM = 16;
 
-function createPhotoPin(photoUrl: string, borderColor: string, isMine = false) {
+function createPhotoPin(photoUrl: string, borderColor: string, isMine = false, avatarUrl?: string) {
   const safeUrl = photoUrl.replace(/'/g, '%27');
   const size = 44;
   const half = size / 2;
   const ring = isMine ? `box-shadow:0 0 0 3px ${SELF_PIN_COLOR}, 0 2px 6px rgba(0,0,0,0.35);` : 'box-shadow:0 2px 6px rgba(0,0,0,0.35);';
-  const html = `<div style="
-    width:${size}px;height:${size}px;
-    border-radius:50%;
-    border:3px solid ${borderColor};
-    ${ring}
-    background-image:url('${safeUrl}');
-    background-size:cover;background-position:center;
-    background-color:#eee;
-  "></div>`;
+  const html = `<div style="position:relative;width:${size}px;height:${size}px;">
+    <div style="
+      width:100%;height:100%;
+      border-radius:50%;
+      border:3px solid ${borderColor};
+      ${ring}
+      background-image:url('${safeUrl}');
+      background-size:cover;background-position:center;
+      background-color:#eee;
+    "></div>
+    ${avatarBadgeHtml(avatarUrl, 16)}
+  </div>`;
   return L.divIcon({ html, iconSize: [size, size], iconAnchor: [half, half], popupAnchor: [0, -half - 4], className: '' });
 }
 
@@ -173,9 +194,13 @@ interface Props {
   reactionCounts?: Record<string, number>;
   currentUserId?: string | null;
   teamColors?: Record<string, string>;
+  avatarUrls?: Record<string, string>;
+  // 個人の踏破マップ（プロフィールpage）など、全国規模で自分の足跡を俯瞰する用途に限定した例外。
+  // 公開ヒートマップでは絶対に使わないこと（「全国地図が薄まる」問題の回避策と矛盾するため）。
+  allowWideZoom?: boolean;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -191,6 +216,7 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
     <MapContainer
       center={computedCenter}
       zoom={zoom}
+      minZoom={allowWideZoom ? undefined : MIN_TOWN_SCALE_ZOOM}
       style={{ height: '100%', width: '100%' }}
       scrollWheelZoom
     >
@@ -233,13 +259,14 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
             const reactionCount = reactionCounts?.[t.id] ?? 0;
             const isMine = Boolean(currentUserId) && t.user_id === currentUserId;
             const teamColor = teamColors && t.team ? teamColors[t.team] : undefined;
+            const avatarUrl = t.user_id ? avatarUrls?.[t.user_id] : undefined;
             const icon = archiveType
               ? (archiveType.key === 'chimei' && currentZoom >= CHIMEI_LABEL_ZOOM
                   ? createChimeiLabel(t.title, t.yomi, archiveType.color)
                   : createArchivePin(archiveType))
               : (t.photo_url && currentZoom >= PHOTO_THUMB_ZOOM
-                  ? createPhotoPin(t.photo_url, teamColor ?? getEmotionColor(t.emotion_key), isMine)
-                  : createEmotionPin(t.emotion_key, reactionCount, isMine, teamColor));
+                  ? createPhotoPin(t.photo_url, teamColor ?? getEmotionColor(t.emotion_key), isMine, avatarUrl)
+                  : createEmotionPin(t.emotion_key, reactionCount, isMine, teamColor, avatarUrl));
             const sourceIsUrl = !!t.source_ref && /^https?:\/\//.test(t.source_ref);
             return (
               <Marker key={t.id} position={[t.latitude, t.longitude]} icon={icon}>
@@ -297,6 +324,9 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
                     {t.why && <p style={{ margin: 0, fontSize: 12, color: '#555' }}>{t.why}</p>}
                     {t.audio_url && (
                       <audio controls src={t.audio_url} style={{ width: '100%', height: 32 }} />
+                    )}
+                    {t.video_url && (
+                      <video controls src={t.video_url} style={{ width: '100%', maxHeight: 130, borderRadius: 6, background: '#000' }} />
                     )}
                     {t.source_ref && (
                       sourceIsUrl ? (

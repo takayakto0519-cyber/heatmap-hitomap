@@ -2,9 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import type { Trace } from '@/lib/types';
+
+const TraceMap = dynamic(() => import('@/components/map/TraceMap'), { ssr: false });
+
+// 踏破バッジ：投稿した町（region）のユニーク数で段階を決める
+const BADGE_TIERS = [
+  { min: 1, emoji: '🥉', label: '最初の一歩' },
+  { min: 5, emoji: '🥈', label: '歩く人' },
+  { min: 15, emoji: '🥇', label: '旅する人' },
+  { min: 30, emoji: '👑', label: '痕跡の探求者' },
+] as const;
+
+function currentBadge(regionCount: number) {
+  return [...BADGE_TIERS].reverse().find((b) => regionCount >= b.min) ?? null;
+}
 
 interface Profile {
   id: string;
@@ -44,6 +59,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<Trace[]>([]);
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
+  const [myTraces, setMyTraces] = useState<Trace[]>([]);
 
   const [editing, setEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -81,6 +97,9 @@ export default function ProfilePage() {
         setFollowingCount(followRes.followingCount ?? 0);
         setFollowersCount(followRes.followersCount ?? 0);
         setIsFollowing(followRes.isFollowing ?? false);
+
+        const tracesRes = await fetch(`/api/traces?user_id=${rows.id}&limit=500`).then(r => r.json()).catch(() => null);
+        if (tracesRes?.ok) setMyTraces(tracesRes.traces ?? []);
       } catch (e) {
         setError(e instanceof Error ? e.message : '読み込みに失敗しました');
       } finally {
@@ -221,6 +240,24 @@ export default function ProfilePage() {
           <span><strong>{followingCount}</strong> フォロー中</span>
           <span><strong>{followersCount}</strong> フォロワー</span>
         </div>
+
+        {(() => {
+          const regionCount = new Set(myTraces.map(t => t.region).filter(Boolean)).size;
+          const badge = currentBadge(regionCount);
+          if (!badge) return null;
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+              background: '#FBF6FF', border: '1px solid #F3EAFB', borderRadius: 10, padding: '10px 14px',
+            }}>
+              <span style={{ fontSize: 26 }}>{badge.emoji}</span>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#8E44AD' }}>{badge.label}</p>
+                <p style={{ margin: 0, fontSize: 11, color: '#999' }}>{regionCount}の町に痕跡を残した</p>
+              </div>
+            </div>
+          );
+        })()}
         {!isMe && (
           <button onClick={toggleFollow} style={{
             width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
@@ -235,6 +272,15 @@ export default function ProfilePage() {
           }}>✏️ プロフィールを編集</button>
         )}
       </div>
+
+      {myTraces.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🥾 歩いた軌跡（{myTraces.length}件）</h2>
+          <div style={{ height: 260, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+            <TraceMap traces={myTraces} mode="pin" allowWideZoom onTraceClick={setSelectedTrace} />
+          </div>
+        </div>
+      )}
 
       {isMe && (
         <div style={{ marginTop: 20 }}>
@@ -254,10 +300,16 @@ export default function ProfilePage() {
       {selectedTrace && (
         <TraceDetail
           trace={selectedTrace}
-          isOwn={false}
+          isOwn={isMe && selectedTrace.user_id === profile.id}
           onClose={() => setSelectedTrace(null)}
-          onUpdate={(updated) => setBookmarks(prev => prev.map(t => t.id === updated.id ? updated : t))}
-          onDelete={(id) => setBookmarks(prev => prev.filter(t => t.id !== id))}
+          onUpdate={(updated) => {
+            setBookmarks(prev => prev.map(t => t.id === updated.id ? updated : t));
+            setMyTraces(prev => prev.map(t => t.id === updated.id ? updated : t));
+          }}
+          onDelete={(id) => {
+            setBookmarks(prev => prev.filter(t => t.id !== id));
+            setMyTraces(prev => prev.filter(t => t.id !== id));
+          }}
         />
       )}
     </div>

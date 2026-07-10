@@ -38,6 +38,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
   {
@@ -76,6 +77,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
   {
@@ -114,6 +116,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
   {
@@ -152,6 +155,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
   {
@@ -190,6 +194,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
   {
@@ -228,6 +233,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
   {
@@ -266,6 +272,7 @@ export const SAMPLE_TRACES: Trace[] = [
     region: null,
     team: null,
     photo_urls: null,
+    video_url: null,
     audio_transcript: null,
   },
 ];

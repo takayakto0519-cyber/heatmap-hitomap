@@ -12,6 +12,48 @@ import type {
 } from '@/lib/types';
 import { SAMPLE_TRACES } from '@/lib/sampleTraces';
 import { getCurrentUserId } from '@/lib/supabase/requestClient';
+import { notifyDiscord } from '@/lib/discord';
+import { haversine } from '@/lib/geo';
+
+const CROSSED_PATHS_RADIUS_M = 50;
+
+// すれ違い通知：新しい投稿の近くに、別の登録ユーザーの既存の公開投稿があれば知らせる（失敗しても投稿自体は継続する）
+async function notifyCrossedPaths(
+  supabaseServer: Awaited<ReturnType<typeof getServerClient>>,
+  newTrace: Trace
+) {
+  try {
+    const degRadius = (CROSSED_PATHS_RADIUS_M / 111000) * 1.5;
+    const { data: nearby } = await supabaseServer
+      .from('traces')
+      .select('id, user_id, title, latitude, longitude')
+      .eq('is_deleted', false)
+      .eq('visibility', 'public')
+      .not('user_id', 'is', null)
+      .neq('id', newTrace.id)
+      .gte('latitude', newTrace.latitude - degRadius)
+      .lte('latitude', newTrace.latitude + degRadius)
+      .gte('longitude', newTrace.longitude - degRadius)
+      .lte('longitude', newTrace.longitude + degRadius);
+
+    const notifiedUsers = new Set<string>();
+    for (const t of nearby ?? []) {
+      const ownerId = t.user_id as string;
+      if (ownerId === newTrace.user_id || notifiedUsers.has(ownerId)) continue;
+      if (haversine(newTrace.latitude, newTrace.longitude, t.latitude, t.longitude) > CROSSED_PATHS_RADIUS_M) continue;
+      notifiedUsers.add(ownerId);
+      await supabaseServer.from('notifications').insert({
+        user_id: ownerId,
+        type: 'crossed_paths',
+        trace_id: t.id,
+        actor_trace_id: newTrace.id,
+        message: `あなたが「${t.title}」を残した場所に、新しい痕跡「${newTrace.title}」が残されました`,
+      });
+    }
+  } catch {
+    // notifications未作成の環境でも投稿自体は継続させる
+  }
+}
 
 // Supabaseが設定済みかどうか。未設定ならローカル確認用のサンプルにフォールバック。
 const SUPABASE_READY = Boolean(
@@ -60,7 +102,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 
     const userId = await getCurrentUserId();
     const team = body.team?.trim() || null;
-    // 匿名投稿は従来どおり即時 public。ログイン投稿のみ公開範囲を選べる（private/followers/pending_review）。
+    // 匿名投稿は全国公開前に運営審査を通す（pending_review）。ログイン投稿のみ公開範囲を選べる（private/followers/pending_review）。
     // ただしリレー型イベント参加（team指定あり）の投稿は、ログイン有無にかかわらず必ずpublicにする。
     // ログイン投稿はデフォルトprivateになるため、そのままだとチームメンバー同士に投稿が見えなくなってしまう。
     const allowedVisibility = ['private', 'followers', 'pending_review'];
@@ -68,7 +110,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
       ? 'public'
       : userId && body.visibility && allowedVisibility.includes(body.visibility)
         ? body.visibility
-        : userId ? 'private' : 'public';
+        : userId ? 'private' : 'pending_review';
 
     const region = await reverseGeocodeRegion(body.latitude, body.longitude);
 
@@ -110,12 +152,24 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         team,
         user_id: userId,
         visibility,
+        // video_url は未マイグレーション環境（video_urlカラム未追加）でも既存投稿が壊れないよう、指定時のみ送る
+        ...(body.video_url ? { video_url: body.video_url } : {}),
       })
       .select()
       .single();
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    const who = userId ? 'ログイン投稿' : '匿名投稿';
+    const statusNote = visibility === 'pending_review' ? '⏳ 審査待ち（匿名投稿）' : `公開範囲: ${visibility}`;
+    notifyDiscord(
+      `📍 新しい痕跡が投稿されました\n**${body.title}**${region ? `（${region}）` : ''}\n${who} ・ ${statusNote}`
+    );
+
+    if (visibility === 'public') {
+      await notifyCrossedPaths(supabaseServer, data as Trace);
     }
 
     return NextResponse.json({ ok: true, trace: data as Trace }, { status: 201 });
@@ -130,6 +184,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResponse>> {
   const sessionCode = req.nextUrl.searchParams.get('session_code');
   const region = req.nextUrl.searchParams.get('region');
+  const userIdFilter = req.nextUrl.searchParams.get('user_id');
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
 
   // Supabase未設定時はサンプルを返す（ブラウザでの動作確認用）
@@ -167,6 +222,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
 
   if (sessionCode) query = query.eq('session_code', sessionCode);
   if (region) query = query.eq('region', region);
+  if (userIdFilter) query = query.eq('user_id', userIdFilter);
 
   const { data, error } = await query;
 

@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { Trace, Sponsor, Route } from '@/lib/types';
-import { EMOTIONS } from '@/lib/emotions';
+import { EMOTIONS, getEmotion } from '@/lib/emotions';
+import { getCategory } from '@/lib/categories';
 
-type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'sponsors' | 'routes' | 'quests';
+type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events';
 
 const inputStyle: React.CSSProperties = {
   padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd',
@@ -29,6 +30,77 @@ interface Report {
   status: string;
   created_at: string;
   trace: { id: string; title: string; photo_url: string | null; is_deleted: boolean } | null;
+}
+
+interface AdminUser {
+  id: string;
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  traceCount: number;
+  lastPostedAt: string | null;
+  followerCount: number;
+  followingCount: number;
+}
+
+// 投稿の「誰が」を表示するため、user_id→プロフィールの対応表を1回だけ取得して使い回す
+function useAuthorMap(authHeaders: () => HeadersInit) {
+  const [authorMap, setAuthorMap] = useState<Record<string, { username: string; avatar_url: string | null }>>({});
+  useEffect(() => {
+    fetch('/api/admin/profiles', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return;
+        const map: Record<string, { username: string; avatar_url: string | null }> = {};
+        for (const u of d.users as AdminUser[]) map[u.id] = { username: u.username, avatar_url: u.avatar_url };
+        setAuthorMap(map);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return authorMap;
+}
+
+// 投稿カードの「誰が」表示（アカウント投稿はアイコン+ユーザー名、匿名投稿はニックネーム）
+function AuthorLine({ trace, authorMap }: { trace: Trace; authorMap: Record<string, { username: string; avatar_url: string | null }> }) {
+  if (trace.user_id) {
+    const author = authorMap[trace.user_id];
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {author?.avatar_url ? (
+          <img src={author.avatar_url} alt="" style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover' }} />
+        ) : '👤'}
+        {author ? `@${author.username}` : 'ログインユーザー'}
+      </span>
+    );
+  }
+  return <span>🕶 {trace.nickname ?? '匿名'}</span>;
+}
+
+// 投稿内容が一目でわかるタグ行（感情・カテゴリ・動画有無）
+function ContentTags({ trace }: { trace: Trace }) {
+  const emotion = getEmotion(trace.emotion_key);
+  const category = getCategory(trace.category);
+  if (!emotion && !category && !trace.video_url) return null;
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', margin: '4px 0' }}>
+      {emotion && (
+        <span style={{ padding: '2px 8px', borderRadius: 20, background: emotion.color + '22', color: emotion.color, fontSize: 11, fontWeight: 700 }}>
+          {emotion.emoji} {emotion.label}
+        </span>
+      )}
+      {category && (
+        <span style={{ padding: '2px 8px', borderRadius: 20, background: '#f0f0f0', color: '#666', fontSize: 11 }}>
+          {category.emoji} {category.label}
+        </span>
+      )}
+      {trace.video_url && (
+        <span style={{ padding: '2px 8px', borderRadius: 20, background: '#EEF4FF', color: '#4A90E2', fontSize: 11, fontWeight: 700 }}>🎥 動画</span>
+      )}
+    </div>
+  );
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -77,10 +149,10 @@ export default function AdminDashboardPage() {
 
   if (!unlocked) {
     return (
-      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', padding: 16, boxSizing: 'border-box' }}>
         <form
           onSubmit={e => { e.preventDefault(); tryUnlock(password); }}
-          style={{ background: '#fff', padding: 24, borderRadius: 16, width: 320, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}
+          style={{ background: '#fff', padding: 24, borderRadius: 16, width: '100%', maxWidth: 320, boxSizing: 'border-box', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}
         >
           <h1 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>運営ダッシュボード（合言葉）</h1>
           <input
@@ -108,9 +180,11 @@ export default function AdminDashboardPage() {
             ['review', '承認待ち', badgeCounts?.pendingReview ?? 0],
             ['traces', '投稿管理', 0],
             ['reports', '通報', badgeCounts?.pendingReports ?? 0],
+            ['users', '登録ユーザー', 0],
             ['sponsors', 'スポンサー', 0],
             ['routes', 'ルート', 0],
             ['quests', 'クエスト', 0],
+            ['events', 'イベント計画', 0],
           ] as [Tab, string, number][]).map(([id, label, count]) => {
             const urgent = count > 0 && tab !== id;
             return (
@@ -137,9 +211,11 @@ export default function AdminDashboardPage() {
         {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
         {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
         {tab === 'reports' && <ReportsTab authHeaders={authHeaders} />}
+        {tab === 'users' && <UsersTab authHeaders={authHeaders} />}
         {tab === 'sponsors' && <SponsorsTab authHeaders={authHeaders} />}
         {tab === 'routes' && <RoutesTab authHeaders={authHeaders} />}
         {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
+        {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
       </div>
     </div>
   );
@@ -158,6 +234,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState<'csv' | 'geojson' | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/stats', { headers: authHeaders() })
@@ -165,6 +242,24 @@ function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       .then(d => { if (d.ok) setStats(d.stats); else setError(d.error ?? '取得に失敗しました'); })
       .catch(() => setError('通信エラー'));
   }, [authHeaders]);
+
+  async function exportData(format: 'csv' | 'geojson') {
+    setExporting(format);
+    try {
+      const res = await fetch(`/api/admin/export?format=${format}`, { headers: authHeaders() });
+      if (!res.ok) { setError('書き出しに失敗しました'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      a.href = url;
+      a.download = `hitomap_traces_${stamp}.${format === 'geojson' ? 'geojson' : 'csv'}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(null);
+    }
+  }
 
   if (error) return <p style={{ color: '#E74C3C' }}>{error}</p>;
   if (!stats) return <p style={{ color: '#999' }}>読み込み中…</p>;
@@ -181,14 +276,33 @@ function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-      {items.map(([label, value, emoji, urgent]) => (
-        <Card key={label} style={urgent ? { background: '#FFF5F3', boxShadow: '0 1px 4px rgba(229,80,57,0.15)', border: '1px solid #FFD9D0' } : undefined}>
-          <div style={{ fontSize: 22 }}>{emoji}</div>
-          <div style={{ fontSize: 26, fontWeight: 800, marginTop: 6, color: urgent ? '#E55039' : '#222' }}>{value}</div>
-          <div style={{ fontSize: 12, color: urgent ? '#E55039' : '#888', marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
-        </Card>
-      ))}
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+        {items.map(([label, value, emoji, urgent]) => (
+          <Card key={label} style={urgent ? { background: '#FFF5F3', boxShadow: '0 1px 4px rgba(229,80,57,0.15)', border: '1px solid #FFD9D0' } : undefined}>
+            <div style={{ fontSize: 22 }}>{emoji}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, marginTop: 6, color: urgent ? '#E55039' : '#222' }}>{value}</div>
+            <div style={{ fontSize: 12, color: urgent ? '#E55039' : '#888', marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
+          </Card>
+        ))}
+      </div>
+
+      <Card style={{ marginTop: 16 }}>
+        <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>📤 データ書き出し</p>
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>全国公開済みの投稿のみを対象に書き出します（審査待ち・非公開・削除済みは含みません）。</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => exportData('csv')} disabled={exporting !== null} style={{
+            flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
+            background: '#fff', color: '#555', fontWeight: 700, fontSize: 13,
+            cursor: exporting ? 'wait' : 'pointer',
+          }}>{exporting === 'csv' ? '書き出し中…' : 'CSVを書き出す'}</button>
+          <button onClick={() => exportData('geojson')} disabled={exporting !== null} style={{
+            flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
+            background: '#fff', color: '#555', fontWeight: 700, fontSize: 13,
+            cursor: exporting ? 'wait' : 'pointer',
+          }}>{exporting === 'geojson' ? '書き出し中…' : 'GeoJSONを書き出す'}</button>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -198,6 +312,7 @@ function ReviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const authorMap = useAuthorMap(authHeaders);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -235,9 +350,10 @@ function ReviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontWeight: 700, marginBottom: 4 }}>{t.title}</p>
+                <ContentTags trace={t} />
                 {t.why && <p style={{ fontSize: 13, color: '#555', margin: '0 0 6px' }}>{t.why}</p>}
                 <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>
-                  {t.nickname ?? '匿名'} ・ {new Date(t.created_at).toLocaleString('ja-JP')} ・ {t.latitude.toFixed(4)}, {t.longitude.toFixed(4)}
+                  <AuthorLine trace={t} authorMap={authorMap} /> ・ {new Date(t.created_at).toLocaleString('ja-JP')} ・ {t.latitude.toFixed(4)}, {t.longitude.toFixed(4)}
                 </p>
               </div>
             </div>
@@ -265,6 +381,7 @@ function TracesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const authorMap = useAuthorMap(authHeaders);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -312,16 +429,20 @@ function TracesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           {traces.length === 0 && <p style={{ color: '#aaa' }}>該当する投稿はありません。</p>}
           {traces.map(t => (
             <div key={t.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
+              display: 'flex', alignItems: 'flex-start', gap: 10,
               background: '#fff', borderRadius: 10, padding: '10px 12px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
               opacity: t.is_deleted ? 0.55 : 1,
             }}>
-              {t.photo_url && <img src={t.photo_url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
+              {t.photo_url && <img src={t.photo_url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</p>
+                <ContentTags trace={t} />
+                {t.why && (
+                  <p style={{ margin: '2px 0 4px', fontSize: 12, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.why}</p>
+                )}
                 <p style={{ margin: 0, fontSize: 11, color: '#aaa' }}>
-                  {t.visibility} ・ {new Date(t.created_at).toLocaleDateString('ja-JP')}
+                  <AuthorLine trace={t} authorMap={authorMap} /> ・ {t.visibility} ・ {new Date(t.created_at).toLocaleDateString('ja-JP')}
                   {t.is_deleted && ' ・ 削除済み'}
                 </p>
               </div>
@@ -603,6 +724,23 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [showRelayCreate, setShowRelayCreate] = useState(false);
   const [relayForm, setRelayForm] = useState<RelayCreateForm>(emptyRelayForm);
   const [relaySaving, setRelaySaving] = useState(false);
+  const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
+  const [routeTraces, setRouteTraces] = useState<Record<string, Trace[]>>({});
+  const [routeTracesLoading, setRouteTracesLoading] = useState<string | null>(null);
+
+  async function toggleExpand(id: string) {
+    if (expandedRouteId === id) { setExpandedRouteId(null); return; }
+    setExpandedRouteId(id);
+    if (!routeTraces[id]) {
+      setRouteTracesLoading(id);
+      try {
+        const res = await fetch(`/api/routes/${id}`).then(r => r.json());
+        if (res.ok) setRouteTraces(prev => ({ ...prev, [id]: res.traces ?? [] }));
+      } finally {
+        setRouteTracesLoading(null);
+      }
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -774,12 +912,12 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             <input placeholder="例：山手線" value={relayForm.event_area}
               onChange={e => setRelayForm(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
             <div style={{ display: 'flex', gap: 6 }}>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <label style={{ fontSize: 11, color: '#666', fontWeight: 700, display: 'block' }}>開始</label>
                 <input type="datetime-local" value={relayForm.event_starts_at}
                   onChange={e => setRelayForm(f => ({ ...f, event_starts_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <label style={{ fontSize: 11, color: '#666', fontWeight: 700, display: 'block' }}>終了</label>
                 <input type="datetime-local" value={relayForm.event_ends_at}
                   onChange={e => setRelayForm(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
@@ -809,12 +947,43 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         {routes.map(r => (
           <Card key={r.id}>
             <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>{r.title}</p>
-            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#888' }}>
+            {r.description && <p style={{ margin: '0 0 6px', fontSize: 12, color: '#666' }}>{r.description}</p>}
+            {r.highlights && (
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: '#8E44AD', background: '#FBF6FF', padding: '6px 9px', borderRadius: 8, whiteSpace: 'pre-wrap' }}>
+                👀 {r.highlights}
+              </p>
+            )}
+            <p style={{ margin: '0 0 4px', fontSize: 12, color: '#888' }}>
               {r.trace_ids.length}地点 ・ {new Date(r.created_at).toLocaleDateString('ja-JP')}
               {r.sponsor_name && ` ・ 協賛：${r.sponsor_name}`}
               {r.review_status === 'approved' && <span style={{ color: '#38ADA9', fontWeight: 700 }}> ・ ✨承認済み</span>}
               {r.review_status === 'rejected' && <span style={{ color: '#E74C3C', fontWeight: 700 }}> ・ 却下済み</span>}
             </p>
+            {r.trace_ids.length > 0 && (
+              <button onClick={() => toggleExpand(r.id)} style={{
+                background: 'none', border: 'none', color: '#38ADA9', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0, marginBottom: 8,
+              }}>
+                {expandedRouteId === r.id ? '▴ 地点を閉じる' : '▾ 地点の中身を見る'}
+              </button>
+            )}
+            {expandedRouteId === r.id && (
+              <div style={{ marginBottom: 8, paddingLeft: 4, borderLeft: '2px solid #eee' }}>
+                {routeTracesLoading === r.id ? (
+                  <p style={{ fontSize: 12, color: '#aaa', margin: 0 }}>読み込み中…</p>
+                ) : (routeTraces[r.id] ?? []).length === 0 ? (
+                  <p style={{ fontSize: 12, color: '#aaa', margin: 0 }}>地点データがありません。</p>
+                ) : (
+                  (routeTraces[r.id] ?? []).map((t, i) => (
+                    <p key={t.id} style={{ margin: '2px 0', fontSize: 12, color: '#555', display: 'flex', gap: 6 }}>
+                      <span style={{ color: '#bbb' }}>{i + 1}.</span>
+                      {t.photo_url && <img src={t.photo_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover' }} />}
+                      {t.title}
+                      {getEmotion(t.emotion_key) && <span>{getEmotion(t.emotion_key)!.emoji}</span>}
+                    </p>
+                  ))
+                )}
+              </div>
+            )}
             {r.event_slug && (
               <p style={{ margin: '0 0 8px', fontSize: 12 }}>
                 <a href={`/events/${r.event_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: r.event_mode === 'relay' ? '#38ADA9' : '#8E44AD', fontWeight: 700 }}>
@@ -882,12 +1051,12 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 <input placeholder="event_area" value={eventFields.event_area}
                   onChange={e => setEventFields(f => ({ ...f, event_area: e.target.value }))} style={inputStyle} />
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700, display: 'block' }}>開始</label>
                     <input type="datetime-local" value={eventFields.event_starts_at}
                       onChange={e => setEventFields(f => ({ ...f, event_starts_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700, display: 'block' }}>終了</label>
                     <input type="datetime-local" value={eventFields.event_ends_at}
                       onChange={e => setEventFields(f => ({ ...f, event_ends_at: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
@@ -1116,6 +1285,226 @@ function QuestsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             </div>
           </Card>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 登録ユーザー ──────────────────────────
+function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/profiles', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setUsers(d.users); else setError(d.error ?? '取得に失敗しました'); })
+      .catch(() => setError('通信エラー'))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
+        アカウント登録済みのユーザー {users.length}人（ヒトマップ本体の投稿・フォローと連携した実データです）
+      </p>
+      {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+      {users.length === 0 && <p style={{ color: '#aaa' }}>登録ユーザーはまだいません。</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {users.map(u => (
+          <Card key={u.id}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {u.avatar_url ? (
+                <img src={u.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{
+                  width: 44, height: 44, borderRadius: '50%', background: '#f0f0f0', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                }}>👤</div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>
+                  {u.display_name ?? u.username}
+                  <a href={`/profile/${u.username}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, fontSize: 11, color: '#38ADA9', fontWeight: 400 }}>
+                    @{u.username} ↗
+                  </a>
+                </p>
+                {u.bio && <p style={{ margin: '2px 0', fontSize: 12, color: '#666' }}>{u.bio}</p>}
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aaa' }}>
+                  📍{u.traceCount}件の投稿 ・ 👥フォロワー{u.followerCount} ・ フォロー中{u.followingCount}
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#ccc' }}>
+                  登録: {new Date(u.created_at).toLocaleDateString('ja-JP')}
+                  {u.lastPostedAt && ` ・ 最終投稿: ${new Date(u.lastPostedAt).toLocaleDateString('ja-JP')}`}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── イベント計画 ──────────────────────────
+interface EventPlan {
+  id: string;
+  title: string;
+  memo: string | null;
+  status: string;
+  event_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const EVENT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  idea: { label: '💡 アイデア', color: '#8E44AD' },
+  planning: { label: '📝 検討中', color: '#F6B93B' },
+  confirmed: { label: '✅ 確定', color: '#38ADA9' },
+  done: { label: '🏁 完了', color: '#aaa' },
+};
+
+function EventPlansTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [plans, setPlans] = useState<EventPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch('/api/admin/event-plans', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          setPlans(d.plans);
+          const memoMap: Record<string, string> = {};
+          for (const p of d.plans as EventPlan[]) memoMap[p.id] = p.memo ?? '';
+          setEditingMemo(memoMap);
+        } else setError(d.error ?? '取得に失敗しました');
+      })
+      .catch(() => setError('通信エラー'))
+      .finally(() => setLoading(false));
+  }, [authHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function createPlan() {
+    if (!newTitle.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/event-plans', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ title: newTitle.trim(), event_date: newDate || null }),
+      });
+      const data = await res.json();
+      if (data.ok) { setNewTitle(''); setNewDate(''); setShowCreate(false); load(); }
+      else setError(data.error ?? '作成に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updatePlan(id: string, fields: Record<string, unknown>) {
+    const res = await fetch(`/api/admin/event-plans/${id}`, {
+      method: 'PATCH', headers: authHeaders(), body: JSON.stringify(fields),
+    });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '更新に失敗しました');
+  }
+
+  async function deletePlan(id: string) {
+    if (!confirm('このイベント計画を削除しますか？')) return;
+    const res = await fetch(`/api/admin/event-plans/${id}`, { method: 'DELETE', headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
+  }
+
+  if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+        今後どんなイベントをやるか、協力者とここでメモを練っていくための計画表です。
+      </p>
+      {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+
+      {showCreate ? (
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input placeholder="イベント名（例：山手線一周・痕跡リレー）" value={newTitle}
+              onChange={e => setNewTitle(e.target.value)} style={inputStyle} />
+            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={inputStyle} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={createPlan} disabled={saving || !newTitle.trim()} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: 'pointer',
+              }}>{saving ? '作成中…' : '追加する'}</button>
+              <button onClick={() => setShowCreate(false)} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #ddd',
+                background: '#fff', color: '#888', cursor: 'pointer',
+              }}>キャンセル</button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <button onClick={() => setShowCreate(true)} style={{
+          display: 'block', width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px dashed #38ADA9',
+          background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 14,
+        }}>＋ 新しいイベント案を追加</button>
+      )}
+
+      {plans.length === 0 && <p style={{ color: '#aaa' }}>まだイベント案がありません。</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {plans.map(p => {
+          const statusInfo = EVENT_STATUS_LABELS[p.status] ?? EVENT_STATUS_LABELS.idea;
+          return (
+            <Card key={p.id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div>
+                  <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 15 }}>
+                    {p.title}
+                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
+                  </p>
+                  {p.event_date && <p style={{ margin: 0, fontSize: 12, color: '#999' }}>📅 {p.event_date}</p>}
+                </div>
+                <button onClick={() => deletePlan(p.id)} style={{
+                  padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                }}>削除</button>
+              </div>
+
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+                {Object.entries(EVENT_STATUS_LABELS).map(([key, info]) => (
+                  <button key={key} onClick={() => updatePlan(p.id, { status: key })} style={{
+                    padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+                    border: `1.5px solid ${p.status === key ? info.color : '#ddd'}`,
+                    background: p.status === key ? info.color + '18' : '#fff',
+                    color: p.status === key ? info.color : '#999', fontWeight: p.status === key ? 700 : 400,
+                  }}>{info.label}</button>
+                ))}
+              </div>
+
+              <textarea
+                value={editingMemo[p.id] ?? ''}
+                onChange={e => setEditingMemo(prev => ({ ...prev, [p.id]: e.target.value }))}
+                onBlur={() => { if ((editingMemo[p.id] ?? '') !== (p.memo ?? '')) updatePlan(p.id, { memo: editingMemo[p.id] || null }); }}
+                placeholder="協力者と練っているメモ（会場案・企画内容・TODOなど自由に）"
+                rows={4}
+                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                最終更新: {new Date(p.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+              </p>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

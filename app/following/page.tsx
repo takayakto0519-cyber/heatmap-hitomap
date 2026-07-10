@@ -17,6 +17,9 @@ interface Suggestion {
   username: string;
   display_name: string | null;
   followersCount: number;
+  similarity: number;
+  sharedEmotion: string | null;
+  sampleTitle: string | null;
 }
 
 export default function FollowingFeedPage() {
@@ -90,23 +93,35 @@ export default function FollowingFeedPage() {
 
         {!loading && !needsLogin && suggestions.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 10px', color: '#444' }}>✨ おすすめの人</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 2px', color: '#444' }}>✨ おすすめの人</h2>
+            <p style={{ fontSize: 11, color: '#bbb', margin: '0 0 10px' }}>
+              {suggestions.some((s) => s.similarity > 0) ? '感情が近い人を集めました' : 'まず数件、記録してみると精度が上がります'}
+            </p>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
               {suggestions.map((s) => {
                 const followed = followedIds.has(s.id);
                 return (
                   <div key={s.id} style={{
-                    flexShrink: 0, width: 140, background: '#fff', borderRadius: 12,
+                    flexShrink: 0, width: 160, background: '#fff', borderRadius: 12,
                     padding: '12px 10px', border: '1px solid #eee', textAlign: 'center',
                   }}>
                     <a href={`/profile/${s.username}`} style={{ textDecoration: 'none', color: '#333' }}>
                       <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {s.display_name ?? s.username}
                       </p>
-                      <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>@{s.username} ・ {s.followersCount}人</p>
+                      <p style={{ margin: '0 0 6px', fontSize: 11, color: '#999' }}>@{s.username} ・ {s.followersCount}人</p>
+                      {s.sharedEmotion && (
+                        <p style={{ margin: '0 0 4px', fontSize: 11, color: '#FF6B9D', fontWeight: 700 }}>💗 {s.sharedEmotion}が近い</p>
+                      )}
+                      {s.sampleTitle && (
+                        <p style={{
+                          margin: '0 0 8px', fontSize: 11, color: '#888',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{s.sampleTitle}</p>
+                      )}
                     </a>
                     <button onClick={() => followSuggested(s.id)} disabled={followed} style={{
-                      width: '100%', padding: '6px 0', borderRadius: 8, border: 'none', fontSize: 12,
+                      width: '100%', padding: '6px 0', borderRadius: 8, border: 'none', fontSize: 12, marginTop: 4,
                       background: followed ? '#eee' : '#38ADA9', color: followed ? '#999' : '#fff',
                       fontWeight: 700, cursor: followed ? 'default' : 'pointer',
                     }}>{followed ? 'フォロー中 ✓' : 'フォローする'}</button>
