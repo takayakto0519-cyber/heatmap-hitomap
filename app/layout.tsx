@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/react';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
 // 本番では Vercel の環境変数に NEXT_PUBLIC_SITE_URL（実際の公開ドメイン）を設定すること。
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <ServiceWorkerRegister />
         {children}
+        <Analytics />
       </body>
     </html>
   );
