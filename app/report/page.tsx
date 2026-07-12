@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Trace, ListTracesResponse } from '@/lib/types';
-import { EMOTIONS, getEmotion } from '@/lib/emotions';
+import { EMOTIONS, getEmotion, summarizeValence } from '@/lib/emotions';
 import TraceCard from '@/components/report/TraceCard';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
@@ -76,6 +76,9 @@ export default function ReportPage() {
     count: traces.filter((t) => t.emotion_key === e.key).length,
   })).filter((e) => e.count > 0);
 
+  // 自治体向けの粗いサマリー：好意的／否定的／中立の内訳
+  const valence = summarizeValence(visible.map((t) => t.emotion_key));
+
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: 16 }}>
       {/* ヘッダー */}
@@ -90,6 +93,14 @@ export default function ReportPage() {
               </span>
             )}
           </p>
+          {valence.total > 0 && (
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#999' }}>
+              自治体向けサマリー：
+              <span style={{ color: '#639922', fontWeight: 700, marginLeft: 4 }}>😊 好意的 {Math.round((valence.positive / valence.total) * 100)}%</span>
+              <span style={{ marginLeft: 10, color: '#888' }}>😐 中立 {Math.round((valence.neutral / valence.total) * 100)}%</span>
+              <span style={{ marginLeft: 10, color: '#E24B4A', fontWeight: 700 }}>😟 否定的 {Math.round((valence.negative / valence.total) * 100)}%</span>
+            </p>
+          )}
         </div>
         <Link href="/post"
           style={{

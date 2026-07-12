@@ -244,6 +244,33 @@ export interface ListSponsorsResponse {
   error?: string;
 }
 
+// ------------------------------------------------------------
+// 痕跡へのコメント
+// ------------------------------------------------------------
+
+export interface TraceComment {
+  id: string;
+  created_at: string;
+  trace_id: string;
+  user_id: string;
+  body: string;
+  username: string | null;       // 投稿者のプロフィールから解決（表示用）
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface ListCommentsResponse {
+  ok: boolean;
+  comments: TraceComment[];
+  error?: string;
+}
+
+export interface CreateCommentResponse {
+  ok: boolean;
+  comment?: TraceComment;
+  error?: string;
+}
+
 /**
  * Googleフォームの回答行 → TraceInput への正規化マップ。
  * （Apps Script や中継サーバーで列名→キーを対応させる際の指針）

@@ -9,8 +9,24 @@ export async function GET() {
   if (!userData.user) {
     return NextResponse.json({ ok: true, user: null, profile: null });
   }
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles').select('*').eq('id', userData.user.id).maybeSingle();
+
+  // メール確認必須の設定では、signUp直後はセッションが無くプロフィールを作れない。
+  // 希望していたユーザー名はuser_metadataに載せてあるので、確認後の初回ログイン時にここで作成する。
+  const pendingUsername = userData.user.user_metadata?.username;
+  if (!profile && typeof pendingUsername === 'string' && pendingUsername.trim()) {
+    const { data: created, error } = await supabase
+      .from('profiles')
+      .insert({ id: userData.user.id, username: pendingUsername.trim() })
+      .select().single();
+    if (!error) {
+      profile = created;
+      notifyDiscord(`👤 新しいアカウントが登録されました\n@${created.username}`);
+    }
+    // 重複等で作成に失敗した場合もprofile:nullのまま返す（呼び出し側でユーザー名再設定を促す）
+  }
+
   return NextResponse.json({ ok: true, user: { id: userData.user.id, email: userData.user.email }, profile });
 }
 

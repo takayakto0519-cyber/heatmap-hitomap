@@ -1,6 +1,7 @@
 // GET /api/admin/export?format=csv|geojson — 全国公開済みデータの一括書き出し（データライセンス販売の前提機能）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { getEmotion } from '@/lib/emotions';
 import type { Trace } from '@/lib/types';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -11,6 +12,14 @@ const CSV_COLUMNS: (keyof Trace)[] = [
   'archive_type', 'era_label', 'trace_type', 'is_past_memory', 'memory_date',
 ];
 
+// 自治体向け提出フォーマット用：粗い好悪ラベル（valence: 1=好意的 / -1=否定的 / 0=中立）
+function valenceLabel(t: Trace): string {
+  const v = getEmotion(t.emotion_key)?.valence;
+  if (v === 1) return 'positive';
+  if (v === -1) return 'negative';
+  return 'neutral';
+}
+
 function csvEscape(v: unknown): string {
   if (v === null || v === undefined) return '';
   const s = String(v);
@@ -19,8 +28,8 @@ function csvEscape(v: unknown): string {
 }
 
 function toCsv(traces: Trace[]): string {
-  const header = CSV_COLUMNS.join(',');
-  const rows = traces.map((t) => CSV_COLUMNS.map((c) => csvEscape(t[c])).join(','));
+  const header = [...CSV_COLUMNS, 'valence'].join(',');
+  const rows = traces.map((t) => [...CSV_COLUMNS.map((c) => csvEscape(t[c])), valenceLabel(t)].join(','));
   return [header, ...rows].join('\n');
 }
 
@@ -36,6 +45,7 @@ function toGeoJson(traces: Trace[]) {
         region: t.region, emotion_key: t.emotion_key, intensity: t.intensity,
         category: t.category, archive_type: t.archive_type, era_label: t.era_label,
         trace_type: t.trace_type, is_past_memory: t.is_past_memory, memory_date: t.memory_date,
+        valence: valenceLabel(t),
       },
     })),
   };

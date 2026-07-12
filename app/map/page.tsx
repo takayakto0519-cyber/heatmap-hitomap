@@ -160,8 +160,9 @@ function MapApp() {
     setDetourError('');
     setDetourCandidates([]);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(detourQuery)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
-      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { display_name: string; lat: string; lon: string }[];
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(detourQuery)}`).then(r => r.json());
+      if (!res.ok) throw new Error(res.error);
+      const results = res.candidates as { display_name: string; lat: string; lon: string }[];
       if (results.length === 0) setDetourError('見つかりませんでした');
       setDetourCandidates(results);
     } catch {
@@ -268,12 +269,40 @@ function MapApp() {
   const [currentProfile, setCurrentProfile] = useState<{ username: string; display_name: string | null; avatar_url: string | null } | null>(null);
   const [postVisibility, setPostVisibility] = useState<'private' | 'followers' | 'pending_review'>('private');
 
+  // ログイン済みだがプロフィール未作成の場合に、その場でユーザー名を設定してもらう
+  const [usernameSetupOpen, setUsernameSetupOpen] = useState(false);
+  const [usernameSetupValue, setUsernameSetupValue] = useState('');
+  const [usernameSetupError, setUsernameSetupError] = useState('');
+  const [usernameSetupBusy, setUsernameSetupBusy] = useState(false);
+
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => {
       setCurrentUser(d.user ?? null);
       setCurrentProfile(d.profile ?? null);
     }).catch(() => {});
   }, []);
+
+  async function submitUsernameSetup() {
+    if (!usernameSetupValue.trim()) { setUsernameSetupError('ユーザー名を入力してください'); return; }
+    setUsernameSetupBusy(true);
+    setUsernameSetupError('');
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usernameSetupValue.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCurrentProfile(data.profile);
+        setUsernameSetupOpen(false);
+      } else {
+        setUsernameSetupError(data.error ?? 'ユーザー名の設定に失敗しました');
+      }
+    } finally {
+      setUsernameSetupBusy(false);
+    }
+  }
 
   // すれ違い通知：ログイン中のみ、未読件数をベルアイコンに出す
   interface AppNotification {
@@ -344,8 +373,9 @@ function MapApp() {
     setRegionError('');
     setRegionCandidates([]);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(regionQuery)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
-      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { display_name: string; lat: string; lon: string; boundingbox: string[] }[];
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(regionQuery)}`).then(r => r.json());
+      if (!res.ok) throw new Error(res.error);
+      const results = res.candidates as { display_name: string; lat: string; lon: string; boundingbox: string[] }[];
       if (results.length === 0) setRegionError('見つかりませんでした');
       setRegionCandidates(results);
     } catch {
@@ -385,8 +415,9 @@ function MapApp() {
     if (!regionParam) return;
     (async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(regionParam)}&format=json&limit=1&accept-language=ja&countrycodes=jp`;
-        const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { boundingbox: string[] }[];
+        const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(regionParam)}&limit=1`).then(r => r.json());
+        if (!res.ok) return;
+        const results = res.candidates as { boundingbox: string[] }[];
         if (results[0]) {
           const [south, north, west, east] = results[0].boundingbox.map(Number);
           setMapFitBounds([[south, west], [north, east]]);
@@ -583,8 +614,9 @@ function MapApp() {
     const q = addressQuery.trim(); if (!q) return;
     setAddressSearching(true); setAddressError(''); setAddressCandidates([]);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=ja&countrycodes=jp`;
-      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as { display_name: string; lat: string; lon: string }[];
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+      if (!res.ok) throw new Error(res.error);
+      const results = res.candidates as { display_name: string; lat: string; lon: string }[];
       if (results.length === 0) { setAddressError('住所が見つかりませんでした'); }
       else if (results.length === 1) { setLat(parseFloat(results[0].lat)); setLng(parseFloat(results[0].lon)); setAddressQuery(results[0].display_name.split(',')[0]); }
       else { setAddressCandidates(results); }
@@ -880,6 +912,40 @@ function MapApp() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
       <Onboarding />
 
+      {usernameSetupOpen && (
+        <>
+          <div onClick={() => setUsernameSetupOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000 }} />
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1001,
+            background: '#fff', borderRadius: '20px 20px 0 0',
+            padding: '18px 16px calc(18px + env(safe-area-inset-bottom))',
+            boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
+          }}>
+            <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 16 }}>👤 マイページを作成</p>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#999' }}>
+              ユーザー名を設定すると、マイページ（プロフィール編集・アイコン設定）が使えるようになります。
+            </p>
+            <input
+              value={usernameSetupValue}
+              onChange={(e) => { setUsernameSetupValue(e.target.value); setUsernameSetupError(''); }}
+              placeholder="ユーザー名（半角英数字推奨）"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '11px 12px', fontSize: 15,
+                border: `1.5px solid ${usernameSetupError ? '#E55039' : '#ddd'}`, borderRadius: 10, marginBottom: 8,
+              }}
+            />
+            {usernameSetupError && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#E55039' }}>{usernameSetupError}</p>}
+            <button onClick={submitUsernameSetup} disabled={usernameSetupBusy} style={{
+              width: '100%', padding: '13px', borderRadius: 10, border: 'none',
+              background: usernameSetupBusy ? '#ddd' : '#FF6B9D', color: '#fff',
+              fontWeight: 700, fontSize: 15, cursor: usernameSetupBusy ? 'default' : 'pointer',
+            }}>
+              {usernameSetupBusy ? '設定中…' : '設定する'}
+            </button>
+          </div>
+        </>
+      )}
+
       {/* ── ヘッダー ── */}
       <header style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
         {regionParam && (
@@ -906,7 +972,14 @@ function MapApp() {
                   {currentProfile.display_name ?? currentProfile.username}
                 </a>
               ) : (
-                <span style={{ fontSize: 11, color: '#999' }}>👤 マイページ</span>
+                <button
+                  onClick={() => { setUsernameSetupOpen(true); setUsernameSetupValue(''); setUsernameSetupError(''); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5, color: '#999', fontSize: 11,
+                    fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  }}>
+                  👤 マイページ（ユーザー名未設定）
+                </button>
               )}
               <button onClick={async () => {
                 const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
@@ -1014,7 +1087,8 @@ function MapApp() {
         </div>
 
         {/* 絞り込み・発見の開閉トグル：位置／感情レイヤー／時間／種別 の操作をすべてここに集約し、常時表示のボタン数を減らす */}
-        {(tab === 'map' || (tab === 'list' && (hasArchive || emotionCounts.length > 0))) && (() => {
+        {/* 一覧タブでも常に表示する（「近くのみ」を解除する手段がここにしかないため。無いと0件のまま抜け出せなくなる） */}
+        {(tab === 'map' || tab === 'list') && (() => {
           const isActive = Boolean(
             filterArchive || filterEmotion || nearbyOnly || detourMode || showRegionSearch ||
             intensityLayer !== 'all' || timeSliderOn
@@ -1032,8 +1106,8 @@ function MapApp() {
           );
         })()}
 
-        {/* 位置・発見ツール（マップのみ）：近く／地域／寄り道／眠る痕跡 */}
-        {filtersOpen && tab === 'map' && (
+        {/* 位置・発見ツール：近く／地域／寄り道／眠る痕跡（一覧タブでも「近く」を解除できるよう表示する） */}
+        {filtersOpen && (tab === 'map' || tab === 'list') && (
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
             <button onClick={() => {
               if (!nearbyOnly && !userPos) {
@@ -1290,6 +1364,18 @@ function MapApp() {
           >
             ✍️ 書きかけの記録が{unfinishedOwn.length}件あります・続きを書く
           </button>
+        )}
+
+        {/* ピン設置モード中の案内：ボタンのラベル変化だけでは気づかれにくいため、はっきり案内を出す */}
+        {tab === 'map' && pinDropMode && (
+          <div style={{
+            position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+            background: '#FF6B9D', color: '#fff', padding: '8px 16px',
+            borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 500,
+            whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}>
+            👆 地図をタップして場所を指定してください
+          </div>
         )}
 
         {/* エラーバナー */}

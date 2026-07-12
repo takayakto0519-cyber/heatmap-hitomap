@@ -30,8 +30,9 @@ export default function TopPage() {
     setError('');
     setCandidates([]);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5&accept-language=ja&countrycodes=jp`;
-      const results = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as Candidate[];
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(query)}`).then(r => r.json());
+      if (!res.ok) { setError(res.error ?? '検索に失敗しました'); return; }
+      const results = res.candidates as Candidate[];
       if (results.length === 0) setError('見つかりませんでした');
       setCandidates(results);
     } catch {
@@ -52,9 +53,9 @@ export default function TopPage() {
     navigator.geolocation.getCurrentPosition(
       async (p) => {
         try {
-          const url = `https://nominatim.openstreetmap.org/reverse?lat=${p.coords.latitude}&lon=${p.coords.longitude}&format=json&addressdetails=1&accept-language=ja`;
-          const data = await fetch(url, { headers: { 'Accept-Language': 'ja' } }).then(r => r.json()) as Candidate;
-          goToRegion(regionNameFromAddress(data));
+          const res = await fetch(`/api/geocode/reverse?lat=${p.coords.latitude}&lon=${p.coords.longitude}`).then(r => r.json());
+          if (!res.ok) throw new Error(res.error);
+          goToRegion(regionNameFromAddress(res.result as Candidate));
         } catch {
           setError('現在地から自治体を特定できませんでした');
           setLocating(false);

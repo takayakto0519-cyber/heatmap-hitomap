@@ -60,7 +60,12 @@ export default function RegionPage() {
       <header style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
         <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
         <h1 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 800 }}>🏘 {regionName}</h1>
-        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>{loading ? '読み込み中…' : `${traces.length}件の記録`}</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>{loading ? '読み込み中…' : `${traces.length}件の記録`}</p>
+          <a href={`/region/${encodeURIComponent(regionName)}/print`} style={{ fontSize: 11, color: '#8E44AD', textDecoration: 'none', fontWeight: 700 }}>
+            🖨 掲示用ギャラリー
+          </a>
+        </div>
       </header>
 
       {sponsor && (

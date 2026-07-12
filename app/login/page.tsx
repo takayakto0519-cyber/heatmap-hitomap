@@ -62,17 +62,25 @@ export default function LoginPage() {
           setBusy(false);
           return;
         }
-        const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+        // メール確認が必須の設定では、signUp直後はまだセッションが無く（＝ログイン状態ではなく）、
+        // ここで/api/profileを呼んでも401で弾かれてユーザー名が保存されないまま消えてしまう。
+        // そのため、希望のユーザー名はuser_metadataに載せておき、メール確認後の初回ログイン時に
+        // プロフィールが無ければそこから自動作成する（/api/profileのGET側で処理）。
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { username: username.trim() } },
+        });
         if (signUpError) throw signUpError;
-        if (data.user) {
-          await fetch('/api/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username.trim() }),
-          });
-        }
         if (data.session) {
           // メール確認が不要な設定の場合、signUp直後にセッションが発行される。その場合は確認メール待ちにせずそのまま入る。
+          if (data.user) {
+            await fetch('/api/profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: username.trim() }),
+            });
+          }
           router.push('/map');
           router.refresh();
           return;

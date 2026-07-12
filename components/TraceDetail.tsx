@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import type { Trace } from '@/lib/types';
+import type { Trace, TraceComment } from '@/lib/types';
 import { getEmotion } from '@/lib/emotions';
 import { getCategory, CATEGORIES } from '@/lib/categories';
 import { getTraceType } from '@/lib/traceTypes';
@@ -78,6 +78,12 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [nearbyTraces, setNearbyTraces] = useState<Trace[]>([]);
   const [revisits, setRevisits] = useState<Trace[]>([]);
   const [parentTrace, setParentTrace] = useState<Trace | null>(null);
+  const [comments, setComments] = useState<TraceComment[]>([]);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [commentInput, setCommentInput] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState('');
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!trace.user_id) { setAuthorUsername(null); setAuthorAvatarUrl(null); return; }
@@ -110,7 +116,47 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
       const res = await fetch(`/api/traces?revisit_of=${trace.id}`).then((r) => r.json()).catch(() => null);
       if (res?.ok) setRevisits(res.traces ?? []);
     })();
+    (async () => {
+      const res = await fetch(`/api/comments?trace_id=${trace.id}`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) setComments(res.comments ?? []);
+      setCommentsLoaded(true);
+    })();
+    (async () => {
+      const res = await fetch('/api/profile').then((r) => r.json()).catch(() => null);
+      setMyUserId(res?.user?.id ?? null);
+    })();
   }, [trace.id]);
+
+  async function submitComment() {
+    const body = commentInput.trim();
+    if (!body) return;
+    setCommentSubmitting(true);
+    setCommentError('');
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trace_id: trace.id, body }),
+      });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      const data = await res.json();
+      if (data.ok) {
+        setComments((prev) => [...prev, data.comment]);
+        setCommentInput('');
+      } else {
+        setCommentError(data.error ?? 'コメントの投稿に失敗しました');
+      }
+    } finally {
+      setCommentSubmitting(false);
+    }
+  }
+
+  async function deleteComment(id: string) {
+    const prev = comments;
+    setComments((cs) => cs.filter((c) => c.id !== id));
+    const res = await fetch(`/api/comments/${id}`, { method: 'DELETE' }).then((r) => r.json()).catch(() => null);
+    if (!res?.ok) setComments(prev);
+  }
 
   // この痕跡自体が「その後」の記録である場合、元の痕跡を取得しておく
   useEffect(() => {
@@ -824,6 +870,71 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
 
             {!editing && !archiveType && trace.emotion_key && trace.region && (
               <ResonanceTowns traceId={trace.id} />
+            )}
+
+            {/* コメント */}
+            {!editing && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+                <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#444' }}>
+                  💬 コメント{comments.length > 0 ? `（${comments.length}）` : ''}
+                </p>
+                {commentsLoaded && comments.length === 0 && (
+                  <p style={{ margin: '0 0 12px', fontSize: 12, color: '#ccc' }}>まだコメントはありません</p>
+                )}
+                {comments.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                    {comments.map((c) => (
+                      <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        {c.avatar_url ? (
+                          <img src={c.avatar_url} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }} />
+                        ) : (
+                          <div style={{
+                            width: 26, height: 26, borderRadius: '50%', background: '#f0f0f0', flexShrink: 0, marginTop: 2,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                          }}>👤</div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>
+                              {c.username ? `@${c.display_name ?? c.username}` : '名無し'}
+                            </span>
+                            <span style={{ fontSize: 10, color: '#ccc' }}>{new Date(c.created_at).toLocaleString('ja-JP')}</span>
+                            {c.user_id === myUserId && (
+                              <button onClick={() => deleteComment(c.id)} style={{
+                                background: 'none', border: 'none', color: '#ccc', fontSize: 10, cursor: 'pointer', padding: 0,
+                              }}>削除</button>
+                            )}
+                          </div>
+                          <p style={{ margin: '2px 0 0', fontSize: 13, color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.body}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <textarea
+                    value={commentInput}
+                    onChange={(e) => { setCommentInput(e.target.value); setCommentError(''); }}
+                    placeholder="コメントを書く（500文字まで）"
+                    rows={2}
+                    maxLength={500}
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    onClick={submitComment}
+                    disabled={commentSubmitting || !commentInput.trim()}
+                    style={{
+                      alignSelf: 'flex-end', padding: '10px 16px', borderRadius: 10, border: 'none',
+                      background: commentSubmitting || !commentInput.trim() ? '#ddd' : '#FF6B9D',
+                      color: '#fff', fontWeight: 700, fontSize: 13,
+                      cursor: commentSubmitting || !commentInput.trim() ? 'default' : 'pointer', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    投稿
+                  </button>
+                </div>
+                {commentError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#E55039' }}>{commentError}</p>}
+              </div>
             )}
 
             {!editing && (
