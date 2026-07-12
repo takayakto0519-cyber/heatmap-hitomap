@@ -233,7 +233,7 @@ function MapApp() {
       .then(d => { if (d.ok) setCurrentQuest(d.quest); })
       .catch(() => {});
   }, []);
-  const [emotionKey, setEmotionKey] = useState<string | null>(null);
+  const [emotionKeys, setEmotionKeys] = useState<string[]>([]);
   const [intensity, setIntensity] = useState(3);
   // 投稿タイプ：null = 痕跡 / chimei | denshou | bunken | koe = アーカイブ
   const [archiveTypeKey, setArchiveTypeKey] = useState<string | null>(null);
@@ -642,7 +642,7 @@ function MapApp() {
     const { lat: postedLat, lng: postedLng } = postedPosRef.current;
     setTitle(''); setWhy(''); setInterpretation(''); setSelfReflection('');
     setPhotos([]); setVideo(null); setVideoError(''); setLat(null); setLng(null);
-    setEmotionKey(null); setIntensity(3); setWantRevisit(false); setWantToShare(false);
+    setEmotionKeys([]); setIntensity(3); setWantRevisit(false); setWantToShare(false);
     setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
     setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
     setArchiveTypeKey(null); setYomi(''); setAltNames(''); setEraLabel(''); setSourceRef(''); setVoiceRelation(null);
@@ -703,7 +703,8 @@ function MapApp() {
           interpretation: interpretation.trim() || null,
           self_reflection: selfReflection.trim() || null,
           want_revisit: wantRevisit, want_to_share: wantToShare,
-          emotion_key: archiveTypeKey ? null : emotionKey,
+          emotion_key: archiveTypeKey ? null : (emotionKeys[0] ?? null),
+          emotion_keys: archiveTypeKey ? null : (emotionKeys.length > 0 ? emotionKeys : null),
           intensity: archiveTypeKey ? null : intensity,
           category: archiveTypeKey ? null : categoryKey,
           trace_type: archiveTypeKey ? null : traceTypeKey,
@@ -731,8 +732,8 @@ function MapApp() {
           setMyTraceIds(updated);
           localStorage.setItem('hitomap_my_traces', JSON.stringify(updated));
         }
-        if (emotionKey) {
-          const updated = [...myEmotions, emotionKey];
+        if (emotionKeys.length > 0) {
+          const updated = [...myEmotions, ...emotionKeys];
           setMyEmotions(updated);
           localStorage.setItem('hitomap_my_emotions', JSON.stringify(updated));
         }
@@ -1396,7 +1397,8 @@ function MapApp() {
 
         {/* ─── 投稿フォーム ─── */}
         {tab === 'post' && (
-          <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 140px', background: '#f8f8f8' }}>
+          // 下部固定の公開範囲ボタン＋記録するボタン＋ボトムナビの高さ分、確実に見えるよう余白を確保
+          <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 230px', background: '#f8f8f8' }}>
 
             {/* 送信完了 */}
             {submitDone && (
@@ -1515,7 +1517,7 @@ function MapApp() {
 
                 {/* STEP 1: 写真（最大4枚） */}
                 <div style={{ background: '#fff', borderRadius: 14, marginBottom: 12, padding: photos.length > 0 ? 10 : 0, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple
+                  <input ref={fileRef} type="file" accept="image/*" multiple
                     style={{ display: 'none' }} onChange={handlePhoto} />
                   {photos.length > 0 ? (
                     <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
@@ -1547,14 +1549,14 @@ function MapApp() {
                       alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}>
                       <span style={{ fontSize: 36 }}>📷</span>
-                      <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る（最大{MAX_PHOTOS}枚）</span>
+                      <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る・選ぶ（最大{MAX_PHOTOS}枚）</span>
                     </button>
                   )}
                 </div>
 
                 {/* 短い動画（任意・1本まで）：言い伝え・語り部の記録に効果的 */}
                 <div style={{ background: '#fff', borderRadius: 14, marginBottom: 12, padding: video ? 10 : 0, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <input ref={videoRef} type="file" accept="video/*" capture="environment"
+                  <input ref={videoRef} type="file" accept="video/*"
                     style={{ display: 'none' }} onChange={handleVideo} />
                   {video ? (
                     <div style={{ position: 'relative' }}>
@@ -1572,7 +1574,7 @@ function MapApp() {
                       alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}>
                       <span style={{ fontSize: 26 }}>🎥</span>
-                      <span style={{ fontSize: 13, color: '#bbb' }}>短い動画を撮る（任意・最大{MAX_VIDEO_MB}MB）</span>
+                      <span style={{ fontSize: 13, color: '#bbb' }}>短い動画を撮る・選ぶ（任意・最大{MAX_VIDEO_MB}MB）</span>
                     </button>
                   )}
                   {videoError && <p style={{ margin: '6px 10px 0', fontSize: 11, color: '#E55039' }}>{videoError}</p>}
@@ -1684,9 +1686,9 @@ function MapApp() {
                 {!selectedArchiveType && (
                   <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                     <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
-                      なにを感じた？
+                      なにを感じた？（複数選べます）
                     </label>
-                    <EmotionPicker value={emotionKey} onChange={setEmotionKey} />
+                    <EmotionPicker value={emotionKeys} onChange={setEmotionKeys} />
                   </div>
                 )}
 
@@ -2113,7 +2115,11 @@ function MapApp() {
           borderTop: '1px solid #eee', zIndex: 200,
         }}>
           {currentUser && (
-            <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+            <div style={{ marginBottom: 8 }}>
+              <p style={{ margin: '0 0 5px', fontSize: 11, color: '#999', fontWeight: 700 }}>
+                🔓 だれに見せる？
+              </p>
+              <div style={{ display: 'flex', gap: 5 }}>
               {([
                 { key: 'private', label: '🔒 非公開' },
                 { key: 'followers', label: '👥 フォロワー限定' },
@@ -2127,6 +2133,7 @@ function MapApp() {
                   fontWeight: postVisibility === v.key ? 700 : 400,
                 }}>{v.label}</button>
               ))}
+              </div>
             </div>
           )}
           {submitError && (
