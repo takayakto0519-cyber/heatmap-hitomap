@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 // GET /api/admin/traces?status=pending_review — 審査待ち一覧（合言葉必須）
 // GET /api/admin/traces?status=all&q=検索語&limit=100 — 投稿管理タブ用の全件検索

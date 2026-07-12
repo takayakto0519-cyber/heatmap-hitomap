@@ -1,14 +1,9 @@
 // GET /api/admin/sponsors — スポンサー枠の全件一覧（非公開分も含む。合言葉必須）
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 import type { Sponsor } from '@/lib/types';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) {

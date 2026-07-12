@@ -3,15 +3,10 @@
 // 表示のみ。決済・課金処理はアプリ外（手動の協賛契約）で行う。
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 import type { Sponsor } from '@/lib/types';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 // GET /api/sponsors?placement=region&region=大阪府浪速区 または ?placement=detour
 export async function GET(req: NextRequest) {

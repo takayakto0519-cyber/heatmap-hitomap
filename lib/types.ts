@@ -24,7 +24,8 @@ export interface Trace {
   want_to_share: boolean;         // 誰かに話したいか
 
   // ヒートマップに使う感情データ
-  emotion_key: string | null;     // 感情タグ（lib/emotions.ts の key）
+  emotion_key: string | null;     // 感情タグ（lib/emotions.ts の key）。複数選択時は先頭の1つ（ヒートマップ色・共鳴・クエスト判定の代表値）
+  emotion_keys: string[] | null;  // 複数選択された感情タグ（emotion_keys[0] === emotion_key）
   intensity: number | null;       // 強度 1〜5（ヒートマップの熱量）
 
   category: string | null;        // 何に心が動いたか（建物・植物・道具など）
@@ -57,6 +58,8 @@ export interface Trace {
   region: string | null;          // 逆ジオコーディングで自動保存される自治体名（例：「大阪府浪速区」）
 
   team: string | null;            // リレー型イベント参加時のチーム名（自由記述）
+
+  revisit_of: string | null;      // 「その後」の記録：この痕跡がどの痕跡の後日談かを示す元の trace の id
 }
 
 /**
@@ -81,6 +84,7 @@ export interface TraceInput {
   want_to_share?: boolean;
 
   emotion_key?: string | null;
+  emotion_keys?: string[] | null;
   intensity?: number | null;
 
   category?: string | null;
@@ -104,6 +108,8 @@ export interface TraceInput {
   team?: string;                   // リレー型イベント参加時のチーム名（指定するとvisibilityは強制的にpublic）
 
   visibility?: string;             // private | followers | pending_review | public（未指定・未ログインは public 固定）
+
+  revisit_of?: string | null;      // 「その後」の記録として投稿する場合、元の trace の id
 }
 
 // ------------------------------------------------------------

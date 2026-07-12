@@ -2,20 +2,26 @@
 import { EMOTIONS } from '@/lib/emotions';
 
 interface Props {
-  value: string | null;
-  onChange: (key: string) => void;
+  value: string[];
+  onChange: (keys: string[]) => void;
 }
 
+// 複数選択可：同じ場所で複数の感情が同時に動くこともあるため、タップごとにON/OFFをトグルする
 export default function EmotionPicker({ value, onChange }: Props) {
+  function toggle(key: string) {
+    onChange(value.includes(key) ? value.filter((k) => k !== key) : [...value, key]);
+  }
+
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       {EMOTIONS.map((e) => {
-        const selected = value === e.key;
+        const selected = value.includes(e.key);
         return (
           <button
             key={e.key}
             type="button"
-            onClick={() => onChange(e.key)}
+            onClick={() => toggle(e.key)}
+            aria-pressed={selected}
             style={{
               display: 'flex',
               alignItems: 'center',

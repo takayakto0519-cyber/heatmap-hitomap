@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Trace } from '@/lib/types';
 import { getCurrentUserId } from '@/lib/supabase/requestClient';
+import { notifyDiscordError } from '@/lib/discord';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -118,11 +119,20 @@ export async function PATCH(
     for (const key of allowed) {
       if (key in body) updates[key] = body[key] ?? null;
     }
+    // emotion_keys は未マイグレーション環境（列未追加）でも既存の編集が壊れないよう、指定時のみ送る。
+    // 空配列(=全解除)も有効な更新として扱う（旧実装は空配列がfalsyになり無視されるバグがあった）
+    if ('emotion_keys' in body) {
+      updates.emotion_keys = (body.emotion_keys && body.emotion_keys.length > 0) ? body.emotion_keys : null;
+    }
     const { data, error } = await supabase
       .from('traces').update(updates).eq('id', id).select().single();
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) {
+      notifyDiscordError('PATCH /api/traces/[id]', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, trace: data as Trace });
   } catch (e) {
+    notifyDiscordError('PATCH /api/traces/[id]', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 400 });
   }
 }
@@ -152,9 +162,13 @@ export async function DELETE(
       .from('traces')
       .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: deletedBy })
       .eq('id', id);
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) {
+      notifyDiscordError('DELETE /api/traces/[id]', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
+    notifyDiscordError('DELETE /api/traces/[id]', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 400 });
   }
 }

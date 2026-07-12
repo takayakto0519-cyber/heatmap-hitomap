@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 // PATCH /api/admin/reports/[id] — 通報の処理（却下 / 投稿を削除の二択、合言葉必須）
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {

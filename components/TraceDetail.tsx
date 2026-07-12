@@ -50,7 +50,9 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [editRevisit, setEditRevisit] = useState(trace.want_revisit);
   const [editShare, setEditShare] = useState(trace.want_to_share);
   const [editTranscript, setEditTranscript] = useState(trace.audio_transcript ?? '');
-  const [editEmotion, setEditEmotion] = useState(trace.emotion_key);
+  const [editEmotions, setEditEmotions] = useState<string[]>(
+    trace.emotion_keys ?? (trace.emotion_key ? [trace.emotion_key] : [])
+  );
   const [editIntensity, setEditIntensity] = useState(trace.intensity ?? 3);
   const [editCategory, setEditCategory] = useState(trace.category);
   const [editPhotoUrl, setEditPhotoUrl] = useState(trace.photo_url);
@@ -74,6 +76,8 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [showReportModal, setShowReportModal] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [nearbyTraces, setNearbyTraces] = useState<Trace[]>([]);
+  const [revisits, setRevisits] = useState<Trace[]>([]);
+  const [parentTrace, setParentTrace] = useState<Trace | null>(null);
 
   useEffect(() => {
     if (!trace.user_id) { setAuthorUsername(null); setAuthorAvatarUrl(null); return; }
@@ -102,7 +106,20 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
       const res = await fetch(`/api/traces/${trace.id}/nearby`).then((r) => r.json()).catch(() => null);
       if (res?.ok) setNearbyTraces(res.traces ?? []);
     })();
+    (async () => {
+      const res = await fetch(`/api/traces?revisit_of=${trace.id}`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) setRevisits(res.traces ?? []);
+    })();
   }, [trace.id]);
+
+  // この痕跡自体が「その後」の記録である場合、元の痕跡を取得しておく
+  useEffect(() => {
+    if (!trace.revisit_of) { setParentTrace(null); return; }
+    (async () => {
+      const res = await fetch(`/api/traces/${trace.revisit_of}`).then((r) => r.json()).catch(() => null);
+      if (res?.ok) setParentTrace(res.trace);
+    })();
+  }, [trace.revisit_of]);
 
   async function toggleVersions() {
     const opening = !versionsOpen;
@@ -151,7 +168,11 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   }
 
   const archiveType = getArchiveType(trace.archive_type);
-  const emotion = archiveType ? null : getEmotion(trace.emotion_key);
+  const emotionList = archiveType
+    ? []
+    : (trace.emotion_keys ?? (trace.emotion_key ? [trace.emotion_key] : []))
+        .map(getEmotion)
+        .filter((e): e is NonNullable<typeof e> => e !== null);
   const category = archiveType ? null : getCategory(trace.category);
   const traceType = archiveType ? null : getTraceType(trace.trace_type);
   const voiceRelation = getVoiceRelation(trace.voice_relation);
@@ -212,7 +233,8 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
           want_revisit: editRevisit,
           want_to_share: editShare,
           audio_transcript: editTranscript.trim() || null,
-          emotion_key: editEmotion,
+          emotion_key: editEmotions[0] ?? null,
+          emotion_keys: editEmotions.length > 0 ? editEmotions : null,
           intensity: editIntensity,
           category: editCategory,
           photo_url: editPhotoUrl,
@@ -259,7 +281,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
     setEditRevisit(trace.want_revisit);
     setEditShare(trace.want_to_share);
     setEditTranscript(trace.audio_transcript ?? '');
-    setEditEmotion(trace.emotion_key);
+    setEditEmotions(trace.emotion_keys ?? (trace.emotion_key ? [trace.emotion_key] : []));
     setEditIntensity(trace.intensity ?? 3);
     setEditCategory(trace.category);
     setEditPhotoUrl(trace.photo_url);
@@ -270,7 +292,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   }
 
   async function handleShare() {
-    const text = `${emotion ? emotion.emoji + ' ' + emotion.label + '：' : ''}${trace.title}`;
+    const text = `${emotionList.length > 0 ? emotionList.map(e => e.emoji).join('') + ' ' + emotionList.map(e => e.label).join('・') + '：' : ''}${trace.title}`;
     const shareUrl = `${window.location.origin}/t/${trace.id}`;
     if (navigator.share) {
       await navigator.share({ title: 'ヒトマップの痕跡', text, url: shareUrl }).catch(() => {});
@@ -434,13 +456,13 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                   fontSize: 13, fontWeight: 700,
                 }}>🕰 過去の記憶{trace.memory_date ? `（${trace.memory_date}）` : ''}</span>
               )}
-              {emotion && (
-                <span style={{
+              {emotionList.map(emotion => (
+                <span key={emotion.key} style={{
                   padding: '4px 10px', borderRadius: 20,
                   background: emotion.color + '22', color: emotion.color,
                   fontSize: 13, fontWeight: 700,
                 }}>{emotion.emoji} {emotion.label}</span>
-              )}
+              ))}
               {category && (
                 <span style={{
                   padding: '4px 10px', borderRadius: 20,
@@ -476,8 +498,8 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
             {editing && !archiveType && (
               <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>どんな感情？</label>
-                  <EmotionPicker value={editEmotion} onChange={setEditEmotion} />
+                  <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>どんな感情？（複数選べます）</label>
+                  <EmotionPicker value={editEmotions} onChange={setEditEmotions} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>強さ</label>
@@ -731,6 +753,72 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* この痕跡自体が「その後」の記録である場合、元の痕跡へのリンクを出す */}
+            {!editing && parentTrace && (
+              <button
+                onClick={() => onNavigateTo?.(parentTrace)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', marginTop: 16,
+                  padding: '10px 12px', borderRadius: 10, border: '1px solid #F4ECFB',
+                  background: '#FBF6FF', cursor: onNavigateTo ? 'pointer' : 'default',
+                }}
+              >
+                <span style={{ fontSize: 12, color: '#8E44AD', fontWeight: 700 }}>
+                  🔁 「{parentTrace.title}」のその後の記録です →
+                </span>
+              </button>
+            )}
+
+            {/* 痕跡の「その後」：また来た時に、同じ場所がどう変化したかを積み重ねていく */}
+            {!editing && !archiveType && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#444' }}>
+                    📆 その後の変化{revisits.length > 0 ? `（${revisits.length}）` : ''}
+                  </p>
+                  <a
+                    href={`/post?revisit_of=${trace.id}&lat=${trace.latitude}&lng=${trace.longitude}&revisit_of_title=${encodeURIComponent(trace.title)}`}
+                    style={{
+                      fontSize: 12, fontWeight: 700, color: '#8E44AD',
+                      background: '#F4ECFB', padding: '5px 12px', borderRadius: 20, textDecoration: 'none',
+                    }}
+                  >
+                    🔁 その後を記録する
+                  </a>
+                </div>
+                {revisits.length > 0 && (
+                  <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                    {revisits.map((rv) => {
+                      const rvEmotion = getEmotion(rv.emotion_key);
+                      return (
+                        <button
+                          key={rv.id}
+                          onClick={() => onNavigateTo?.(rv)}
+                          style={{
+                            flexShrink: 0, width: 130, textAlign: 'left', cursor: onNavigateTo ? 'pointer' : 'default',
+                            border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', background: '#fff', padding: 0,
+                          }}
+                        >
+                          {rv.photo_url ? (
+                            <img src={rv.photo_url} alt={rv.title} style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                          ) : (
+                            <div style={{
+                              width: '100%', height: 80, background: (rvEmotion?.color ?? '#ddd') + '22',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+                            }}>{rvEmotion?.emoji ?? '📍'}</div>
+                          )}
+                          <div style={{ padding: '6px 8px' }}>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rv.title}</p>
+                            <p style={{ margin: '2px 0 0', fontSize: 10, color: '#aaa' }}>{new Date(rv.created_at).toLocaleDateString('ja-JP')}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

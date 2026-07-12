@@ -12,7 +12,7 @@ import type {
 } from '@/lib/types';
 import { SAMPLE_TRACES } from '@/lib/sampleTraces';
 import { getCurrentUserId } from '@/lib/supabase/requestClient';
-import { notifyDiscord } from '@/lib/discord';
+import { notifyDiscord, notifyDiscordError } from '@/lib/discord';
 import { haversine } from '@/lib/geo';
 
 const CROSSED_PATHS_RADIUS_M = 50;
@@ -92,6 +92,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         { status: 400 }
       );
     }
+    if (
+      Number.isNaN(body.latitude) || Number.isNaN(body.longitude) ||
+      body.latitude < -90 || body.latitude > 90 ||
+      body.longitude < -180 || body.longitude > 180
+    ) {
+      return NextResponse.json(
+        { ok: false, error: '緯度・経度の値が不正です' },
+        { status: 400 }
+      );
+    }
 
     if (!SUPABASE_READY) {
       return NextResponse.json(
@@ -152,13 +162,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         team,
         user_id: userId,
         visibility,
-        // video_url は未マイグレーション環境（video_urlカラム未追加）でも既存投稿が壊れないよう、指定時のみ送る
+        // video_url / emotion_keys / revisit_of は未マイグレーション環境でも既存投稿が壊れないよう、指定時のみ送る
         ...(body.video_url ? { video_url: body.video_url } : {}),
+        ...(body.emotion_keys && body.emotion_keys.length > 0 ? { emotion_keys: body.emotion_keys } : {}),
+        ...(body.revisit_of ? { revisit_of: body.revisit_of } : {}),
       })
       .select()
       .single();
 
     if (error) {
+      notifyDiscordError('POST /api/traces', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
@@ -174,6 +187,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 
     return NextResponse.json({ ok: true, trace: data as Trace }, { status: 201 });
   } catch (e) {
+    notifyDiscordError('POST /api/traces', e);
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : 'unknown error' },
       { status: 400 }
@@ -185,6 +199,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
   const sessionCode = req.nextUrl.searchParams.get('session_code');
   const region = req.nextUrl.searchParams.get('region');
   const userIdFilter = req.nextUrl.searchParams.get('user_id');
+  const revisitOf = req.nextUrl.searchParams.get('revisit_of');
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
 
   // Supabase未設定時はサンプルを返す（ブラウザでの動作確認用）
@@ -223,10 +238,12 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
   if (sessionCode) query = query.eq('session_code', sessionCode);
   if (region) query = query.eq('region', region);
   if (userIdFilter) query = query.eq('user_id', userIdFilter);
+  if (revisitOf) query = query.eq('revisit_of', revisitOf);
 
   const { data, error } = await query;
 
   if (error) {
+    notifyDiscordError('GET /api/traces', error);
     return NextResponse.json({ ok: false, traces: [], error: error.message }, { status: 500 });
   }
 

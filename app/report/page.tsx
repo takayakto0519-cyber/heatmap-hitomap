@@ -14,14 +14,48 @@ const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
 
 type MapMode = 'pin' | 'heat';
 
+// フィルター状態をURLクエリと同期する（リロードしても絞り込みが消えないように）
+function readFiltersFromUrl() {
+  if (typeof window === 'undefined') return { session: '', emotion: null as string | null, mode: 'pin' as MapMode };
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get('mode');
+  return {
+    session: params.get('session') ?? '',
+    emotion: params.get('emotion'),
+    mode: mode === 'heat' ? 'heat' as MapMode : 'pin' as MapMode,
+  };
+}
+
 export default function ReportPage() {
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState('');
   const [mapMode, setMapMode] = useState<MapMode>('pin');
   const [filterEmotion, setFilterEmotion] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // 初回マウント時：URLクエリから絞り込み状態を復元
+  useEffect(() => {
+    const initial = readFiltersFromUrl();
+    setSession(initial.session);
+    setFilterEmotion(initial.emotion);
+    setMapMode(initial.mode);
+    setHydrated(true);
+  }, []);
+
+  // 絞り込みが変わるたびにURLへ反映（履歴は積まずreplace）
+  useEffect(() => {
+    if (!hydrated) return;
+    const params = new URLSearchParams();
+    if (session) params.set('session', session);
+    if (filterEmotion) params.set('emotion', filterEmotion);
+    if (mapMode !== 'pin') params.set('mode', mapMode);
+    const qs = params.toString();
+    window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+  }, [session, filterEmotion, mapMode, hydrated]);
 
   useEffect(() => {
+    if (!hydrated) return;
     const url = session
       ? `/api/traces?session_code=${encodeURIComponent(session)}`
       : '/api/traces';
@@ -30,7 +64,7 @@ export default function ReportPage() {
       .then((r) => r.json() as Promise<ListTracesResponse>)
       .then((d) => setTraces(d.ok ? d.traces : []))
       .finally(() => setLoading(false));
-  }, [session]);
+  }, [session, hydrated]);
 
   const visible = filterEmotion
     ? traces.filter((t) => t.emotion_key === filterEmotion)

@@ -9,3 +9,19 @@ export function notifyDiscord(content: string): void {
     body: JSON.stringify({ content }),
   }).catch(() => {});
 }
+
+// サーバーエラー専用の通知。パソコンを開いていなくても障害に気づけるようにする。
+// 同じエラーでDiscordが埋め尽くされないよう、直近と同じ内容は短時間は再送しない。
+const recentErrorSignatures = new Map<string, number>();
+const ERROR_DEDUPE_MS = 5 * 60 * 1000; // 同一エラーは5分間は再通知しない
+
+export function notifyDiscordError(context: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  const signature = `${context}:${message}`;
+  const now = Date.now();
+  const last = recentErrorSignatures.get(signature);
+  if (last && now - last < ERROR_DEDUPE_MS) return;
+  recentErrorSignatures.set(signature, now);
+
+  notifyDiscord(`🚨 エラー発生（${context}）\n\`\`\`${message.slice(0, 500)}\`\`\``);
+}

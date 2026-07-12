@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import EmotionPicker from '@/components/form/EmotionPicker';
 import IntensityPicker from '@/components/form/IntensityPicker';
+import FaceEmotionSuggest from '@/components/form/FaceEmotionSuggest';
 import type { CreateTraceResponse } from '@/lib/types';
 
 const LocationPickerMap = dynamic(
@@ -70,13 +71,17 @@ export default function PostPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  // 写真は最大4枚まで（バックエンドのphoto_urlsの上限に合わせる）
+  const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const MAX_PHOTOS = 4;
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
-  const [emotionKey, setEmotionKey] = useState<string | null>(null);
+  // GPS取得に失敗した場合、地図を「仮の中心」で表示して手動でピンを動かしてもらう。
+  // その仮の位置のまま送信されてしまわないよう、ピンを動かすまでは送信を禁止する。
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [emotionKeys, setEmotionKeys] = useState<string[]>([]);
   const [intensity, setIntensity] = useState(3);
   const [title, setTitle] = useState('');
   const [why, setWhy] = useState('');
@@ -94,15 +99,34 @@ export default function PostPage() {
   const [restoredNotice, setRestoredNotice] = useState(false);
   const [quickSaveMsg, setQuickSaveMsg] = useState('');
 
-  // 初回マウント時：未完了の位置記録一覧と、書きかけの下書きを復元
+  // 「その後」の記録：TraceDetailの「その後を記録する」から遷移してきた場合、
+  // 元の痕跡のidと位置をクエリパラメータで受け取る
+  const [revisitOf, setRevisitOf] = useState<string | null>(null);
+  const [revisitOfTitle, setRevisitOfTitle] = useState<string | null>(null);
+
+  // 初回マウント時：URLクエリ（その後の記録）・未完了の位置記録一覧・書きかけの下書きを復元
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const revisitId = params.get('revisit_of');
+    if (revisitId) {
+      setRevisitOf(revisitId);
+      setRevisitOfTitle(params.get('revisit_of_title'));
+      const qLat = Number(params.get('lat'));
+      const qLng = Number(params.get('lng'));
+      if (Number.isFinite(qLat) && Number.isFinite(qLng)) {
+        setLat(qLat);
+        setLng(qLng);
+        setLocationConfirmed(true);
+      }
+    }
     setLocationDrafts(loadLocationDrafts());
     try {
       const raw = localStorage.getItem(FORM_AUTOSAVE_KEY);
       if (raw) {
         const d = JSON.parse(raw) as Record<string, unknown>;
-        if (d.lat && d.lng) { setLat(d.lat as number); setLng(d.lng as number); }
-        if (d.emotionKey) setEmotionKey(d.emotionKey as string);
+        if (d.lat && d.lng) { setLat(d.lat as number); setLng(d.lng as number); setLocationConfirmed(true); }
+        if (Array.isArray(d.emotionKeys)) setEmotionKeys(d.emotionKeys as string[]);
+        else if (d.emotionKey) setEmotionKeys([d.emotionKey as string]);
         if (typeof d.intensity === 'number') setIntensity(d.intensity);
         if (d.title) setTitle(d.title as string);
         if (d.why) setWhy(d.why as string);
@@ -125,13 +149,13 @@ export default function PostPage() {
     if (!hasContent) return;
     try {
       localStorage.setItem(FORM_AUTOSAVE_KEY, JSON.stringify({
-        lat, lng, emotionKey, intensity, title, why, interpretation,
+        lat, lng, emotionKeys, intensity, title, why, interpretation,
         selfReflection, wantRevisit, wantToShare, nickname, activeDraftId,
       }));
     } catch {
       // 保存できなくても投稿自体は継続できる
     }
-  }, [lat, lng, emotionKey, intensity, title, why, interpretation, selfReflection, wantRevisit, wantToShare, nickname, activeDraftId]);
+  }, [lat, lng, emotionKeys, intensity, title, why, interpretation, selfReflection, wantRevisit, wantToShare, nickname, activeDraftId]);
 
   function clearAutosave() {
     try { localStorage.removeItem(FORM_AUTOSAVE_KEY); } catch { /* 無視 */ }
@@ -164,6 +188,7 @@ export default function PostPage() {
   function resumeDraft(draft: LocationDraft) {
     setLat(draft.lat);
     setLng(draft.lng);
+    setLocationConfirmed(true);
     setActiveDraftId(draft.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -175,12 +200,20 @@ export default function PostPage() {
   }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files ?? []).slice(0, MAX_PHOTOS - photos.length);
+    if (files.length === 0) return;
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotos((prev) => prev.length >= MAX_PHOTOS ? prev : [...prev, { file, preview: ev.target?.result as string }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   function detectGPS() {
@@ -188,48 +221,66 @@ export default function PostPage() {
     setGpsLoading(true);
     setGpsError('');
     navigator.geolocation.getCurrentPosition(
-      (pos) => { setLat(pos.coords.latitude); setLng(pos.coords.longitude); setGpsLoading(false); },
-      () => {
-        setGpsError('位置情報の取得に失敗しました。地図でピンを置いてください');
+      (pos) => {
+        setLat(pos.coords.latitude);
+        setLng(pos.coords.longitude);
+        setLocationConfirmed(true);
         setGpsLoading(false);
+      },
+      () => {
+        setGpsError('位置情報の取得に失敗しました。地図をタップして正確な位置に合わせてください');
+        setGpsLoading(false);
+        setLocationConfirmed(false);
+        // 地図を表示するための仮の中心地点（実際の投稿位置ではない。ピンを動かすまで送信不可にする）
         if (!lat) { setLat(35.6812); setLng(139.7671); }
       },
       { timeout: 10000 }
     );
   }
 
-  async function resolvePhotoUrl(): Promise<string | null> {
-    if (!photoFile) return null;
+  function moveLocationPin(la: number, ln: number) {
+    setLat(la);
+    setLng(ln);
+    setLocationConfirmed(true);
+  }
 
-    // Supabase Storage が使える場合はアップロード
+  async function resolvePhotoUrls(): Promise<string[]> {
+    if (photos.length === 0) return [];
+
+    // Supabase Storage が使える場合は順番にアップロード
     if (SUPABASE_READY) {
-      setUploadProgress('写真をアップロード中…');
       const { uploadTracePhoto } = await import('@/lib/supabase/upload');
-      const url = await uploadTracePhoto(photoFile);
+      const urls: string[] = [];
+      for (let i = 0; i < photos.length; i++) {
+        setUploadProgress(`写真をアップロード中…（${i + 1}/${photos.length}）`);
+        urls.push(await uploadTracePhoto(photos[i].file));
+      }
       setUploadProgress('');
-      return url;
+      return urls;
     }
 
     // ローカル確認モード: Base64 DataURL をそのまま使う（Supabase接続後は上のパスを通る）
-    return photoPreview;
+    return photos.map((p) => p.preview);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setSubmitError('タイトルを入力してください'); return; }
     if (!lat || !lng) { setSubmitError('位置情報を取得してください'); return; }
+    if (!locationConfirmed) { setSubmitError('地図をタップして、実際の場所にピンを合わせてください'); return; }
 
     setSubmitting(true);
     setSubmitError('');
 
     try {
-      const photoUrl = await resolvePhotoUrl();
+      const photoUrls = await resolvePhotoUrls();
 
       const res = await fetch('/api/traces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          photo_url: photoUrl,
+          photo_url: photoUrls[0] ?? null,
+          photo_urls: photoUrls.length > 0 ? photoUrls : null,
           latitude: lat,
           longitude: lng,
           title: title.trim(),
@@ -238,9 +289,11 @@ export default function PostPage() {
           self_reflection: selfReflection.trim() || null,
           want_revisit: wantRevisit,
           want_to_share: wantToShare,
-          emotion_key: emotionKey,
+          emotion_key: emotionKeys[0] ?? null,
+          emotion_keys: emotionKeys.length > 0 ? emotionKeys : null,
           intensity,
           nickname: nickname.trim() || null,
+          revisit_of: revisitOf,
         }),
       });
 
@@ -259,7 +312,7 @@ export default function PostPage() {
     }
   }
 
-  const canSubmit = Boolean(title.trim() && lat && lng && !submitting);
+  const canSubmit = Boolean(title.trim() && lat && lng && locationConfirmed && !submitting);
   const statusText = uploadProgress || (submitting ? '記録中…' : '記録する →');
 
   return (
@@ -272,8 +325,17 @@ export default function PostPage() {
             style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 }}>
             ←
           </button>
-          <h1 style={{ margin: 0, fontSize: 20 }}>痕跡を記録する</h1>
+          <h1 style={{ margin: 0, fontSize: 20 }}>{revisitOf ? 'その後を記録する' : '痕跡を記録する'}</h1>
         </div>
+
+        {revisitOf && (
+          <p style={{
+            fontSize: 12, color: '#8E44AD', background: '#F4ECFB',
+            borderRadius: 8, padding: '8px 12px', margin: '0 0 16px', lineHeight: 1.6,
+          }}>
+            🔁 「{revisitOfTitle ?? '元の痕跡'}」のその後の変化として記録します
+          </p>
+        )}
 
         {restoredNotice && (
           <p style={{
@@ -345,36 +407,40 @@ export default function PostPage() {
         )}
 
         <form id="trace-form" onSubmit={handleSubmit}>
-          {/* ① 写真 */}
+          {/* ① 写真（最大4枚） */}
           <section style={sectionStyle}>
-            <label style={labelStyle}>📷 写真</label>
-            <input ref={fileRef} type="file" accept="image/*" capture="environment"
+            <label style={labelStyle}>📷 写真（最大{MAX_PHOTOS}枚）</label>
+            <input ref={fileRef} type="file" accept="image/*" multiple
               style={{ display: 'none' }} onChange={handlePhoto} />
-            {photoPreview ? (
-              <div style={{ position: 'relative' }}>
-                <img src={photoPreview} alt="preview"
-                  style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 12 }} />
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  style={{
-                    position: 'absolute', bottom: 10, right: 10,
-                    background: 'rgba(0,0,0,0.55)', color: '#fff',
-                    border: 'none', borderRadius: 8, padding: '6px 12px',
-                    fontSize: 13, cursor: 'pointer',
-                  }}>
-                  撮り直す
-                </button>
+            {photos.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: photos.length < MAX_PHOTOS ? 8 : 0 }}>
+                {photos.map((p, i) => (
+                  <div key={i} style={{ position: 'relative' }}>
+                    <img src={p.preview} alt={`写真 ${i + 1}`}
+                      style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 10, display: 'block' }} />
+                    <button type="button" onClick={() => removePhoto(i)}
+                      style={{
+                        position: 'absolute', top: 6, right: 6,
+                        width: 24, height: 24, borderRadius: 12,
+                        background: 'rgba(0,0,0,0.55)', color: '#fff',
+                        border: 'none', fontSize: 14, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                      }}>×</button>
+                  </div>
+                ))}
               </div>
-            ) : (
+            )}
+            {photos.length < MAX_PHOTOS && (
               <button type="button" onClick={() => fileRef.current?.click()}
                 style={{
-                  width: '100%', height: 150, borderRadius: 12,
+                  width: '100%', height: photos.length > 0 ? 60 : 150, borderRadius: 12,
                   border: '2px dashed #ccc', background: '#fafafa',
-                  cursor: 'pointer', fontSize: 34,
+                  cursor: 'pointer', fontSize: photos.length > 0 ? 20 : 34,
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}>
                 <span>📷</span>
-                <span style={{ fontSize: 14, color: '#aaa' }}>タップして写真を撮る</span>
+                {photos.length === 0 && <span style={{ fontSize: 14, color: '#aaa' }}>タップして写真を撮る・選ぶ</span>}
               </button>
             )}
           </section>
@@ -396,6 +462,11 @@ export default function PostPage() {
             {gpsError && <p style={{ color: '#E55039', fontSize: 13, margin: '0 0 10px' }}>{gpsError}</p>}
             {lat && lng && (
               <>
+                {!locationConfirmed && (
+                  <p style={{ color: '#E55039', fontSize: 13, margin: '0 0 8px', fontWeight: 700 }}>
+                    ⚠️ まだ正確な位置ではありません。地図をタップして実際の場所にピンを合わせてください
+                  </p>
+                )}
                 <p style={{ ...hintStyle, marginBottom: 8, color: '#555' }}>
                   緯度 {lat.toFixed(5)} / 経度 {lng.toFixed(5)}
                   <button type="button" onClick={detectGPS}
@@ -403,8 +474,7 @@ export default function PostPage() {
                     再取得
                   </button>
                 </p>
-                <LocationPickerMap lat={lat} lng={lng}
-                  onChange={(la, ln) => { setLat(la); setLng(ln); }} />
+                <LocationPickerMap lat={lat} lng={lng} onChange={moveLocationPin} />
                 <p style={hintStyle}>地図をタップしてピンを微調整できます</p>
               </>
             )}
@@ -412,8 +482,12 @@ export default function PostPage() {
 
           {/* ③ 感情タグ */}
           <section style={sectionStyle}>
-            <label style={labelStyle}>✨ なにを感じた？</label>
-            <EmotionPicker value={emotionKey} onChange={setEmotionKey} />
+            <label style={labelStyle}>✨ なにを感じた？（複数選べます）</label>
+            <EmotionPicker value={emotionKeys} onChange={setEmotionKeys} />
+            <FaceEmotionSuggest
+              selectedKeys={emotionKeys}
+              onAdd={(key) => setEmotionKeys((prev) => prev.includes(key) ? prev : [...prev, key])}
+            />
           </section>
 
           {/* ④ 強度 */}

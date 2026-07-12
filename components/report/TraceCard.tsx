@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { Trace } from '@/lib/types';
 import { getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
@@ -22,7 +23,11 @@ interface Props {
 
 export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, avatarUrl, isOwn, onEdit, onDelete }: Props) {
   const archiveType = getArchiveType(t.archive_type);
-  const emotion = archiveType ? null : getEmotion(t.emotion_key);
+  const emotionList = archiveType
+    ? []
+    : (t.emotion_keys ?? (t.emotion_key ? [t.emotion_key] : []))
+        .map(getEmotion)
+        .filter((e): e is NonNullable<typeof e> => e !== null);
   const category = archiveType ? null : getCategory(t.category);
   const voiceRelation = getVoiceRelation(t.voice_relation);
   const distance = userPos
@@ -44,12 +49,13 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
     >
       {/* 写真 */}
       {t.photo_url ? (
-        <div style={{ position: 'relative' }}>
-          <img
+        <div style={{ position: 'relative', height: 160 }}>
+          <Image
             src={t.photo_url}
             alt={t.title}
-            loading="lazy"
-            style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }}
+            fill
+            sizes="(max-width: 600px) 100vw, 260px"
+            style={{ objectFit: 'cover' }}
           />
           {/* 距離バッジ */}
           {distance !== null && (
@@ -91,15 +97,15 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
               {archiveType.emoji} {archiveType.label}
             </span>
           )}
-          {emotion && (
-            <span style={{
+          {emotionList.map(emotion => (
+            <span key={emotion.key} style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               padding: '3px 8px', borderRadius: 20,
               background: emotion.color + '22', color: emotion.color, fontSize: 12, fontWeight: 700,
             }}>
               {emotion.emoji} {emotion.label}
             </span>
-          )}
+          ))}
           {category && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,

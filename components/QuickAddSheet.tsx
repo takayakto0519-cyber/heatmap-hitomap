@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import type { Trace } from '@/lib/types';
 import EmotionPicker from './form/EmotionPicker';
+import FaceEmotionSuggest from './form/FaceEmotionSuggest';
 
 interface Props {
   trace: Trace;
@@ -13,7 +14,9 @@ interface Props {
 // クイック記録の直後に出す、最小限の追記シート。
 // 選ぶ・撮るの1タップごとに即保存する（「保存する」ボタンを挟まない＝迷わせない）。
 export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
-  const [emotion, setEmotion] = useState(trace.emotion_key);
+  const [emotions, setEmotions] = useState<string[]>(
+    trace.emotion_keys ?? (trace.emotion_key ? [trace.emotion_key] : [])
+  );
   const [photoUrl, setPhotoUrl] = useState(trace.photo_url);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -33,9 +36,9 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
     }
   }
 
-  async function selectEmotion(key: string) {
-    setEmotion(key);
-    await patch({ emotion_key: key, intensity: trace.intensity ?? 3 });
+  async function selectEmotions(keys: string[]) {
+    setEmotions(keys);
+    await patch({ emotion_key: keys[0] ?? null, emotion_keys: keys.length > 0 ? keys : null, intensity: trace.intensity ?? 3 });
   }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -70,19 +73,23 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
           今なら1タップで感情や写真を足せます。あとからでも大丈夫です。
         </p>
 
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: '#aaa', fontWeight: 700 }}>どんな感情？</p>
-        <EmotionPicker value={emotion} onChange={selectEmotion} />
+        <p style={{ margin: '0 0 8px', fontSize: 12, color: '#aaa', fontWeight: 700 }}>どんな感情？（複数選べます）</p>
+        <EmotionPicker value={emotions} onChange={selectEmotions} />
+        <FaceEmotionSuggest
+          selectedKeys={emotions}
+          onAdd={(key) => selectEmotions(emotions.includes(key) ? emotions : [...emotions, key])}
+        />
 
         <div style={{ marginTop: 16 }}>
           {photoUrl && (
             <img src={photoUrl} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10, marginBottom: 8, display: 'block' }} />
           )}
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
+          <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
           <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} style={{
             width: '100%', padding: '11px 0', borderRadius: 10, border: '1.5px solid #ddd',
             background: '#fafafa', color: '#555', fontWeight: 700, fontSize: 14,
             cursor: uploading ? 'wait' : 'pointer',
-          }}>{uploading ? 'アップロード中…' : photoUrl ? '📷 写真を撮り直す' : '📷 写真を撮る'}</button>
+          }}>{uploading ? 'アップロード中…' : photoUrl ? '📷 写真を撮り直す・選び直す' : '📷 写真を撮る・選ぶ'}</button>
           {photoError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#E55039' }}>{photoError}</p>}
         </div>
 

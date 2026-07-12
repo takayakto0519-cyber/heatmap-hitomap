@@ -1,14 +1,9 @@
 // GET /api/admin/export?format=csv|geojson — 全国公開済みデータの一括書き出し（データライセンス販売の前提機能）
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 import type { Trace } from '@/lib/types';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 const CSV_COLUMNS: (keyof Trace)[] = [
   'id', 'created_at', 'title', 'why', 'interpretation', 'self_reflection',

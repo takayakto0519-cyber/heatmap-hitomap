@@ -1,13 +1,8 @@
 // PATCH/DELETE /api/admin/event-plans/[id] — イベント計画の更新・削除（合言葉必須）
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 const ALLOWED_FIELDS = ['title', 'memo', 'status', 'event_date'];
 

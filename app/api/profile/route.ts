@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRequestClient } from '@/lib/supabase/requestClient';
+import { notifyDiscord, notifyDiscordError } from '@/lib/discord';
 
 // GET /api/profile — 自分のプロフィール取得（未ログインなら user:null）
 export async function GET() {
@@ -29,9 +30,11 @@ export async function POST(req: NextRequest) {
     .insert({ id: userData.user.id, username: body.username.trim(), display_name: body.display_name ?? null, bio: body.bio ?? null })
     .select().single();
   if (error) {
+    if (error.code !== '23505') notifyDiscordError('POST /api/profile', error);
     const msg = error.code === '23505' ? 'そのユーザー名は既に使われています' : error.message;
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });
   }
+  notifyDiscord(`👤 新しいアカウントが登録されました\n@${data.username}`);
   return NextResponse.json({ ok: true, profile: data });
 }
 

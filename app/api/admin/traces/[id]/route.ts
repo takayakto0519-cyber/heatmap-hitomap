@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 async function getServerClient() {
   const { supabaseServer } = await import('@/lib/supabase/server');
   return supabaseServer;
-}
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
 }
 
 // DELETE /api/admin/traces/[id] — 運営による強制ソフト削除（合言葉必須）

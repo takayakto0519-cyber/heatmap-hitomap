@@ -1,15 +1,10 @@
 // PATCH /api/admin/sponsors/[id] — スポンサー枠の編集・有効/無効切替（合言葉必須）
 // DELETE /api/admin/sponsors/[id] — スポンサー枠の削除（合言葉必須）
 import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 import type { Sponsor } from '@/lib/types';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-function checkAdmin(req: NextRequest): boolean {
-  const provided = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD;
-  return Boolean(expected) && provided === expected;
-}
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) {
