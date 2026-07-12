@@ -1,6 +1,7 @@
 // GET /api/admin/stats — 管理ダッシュボードの概要数値（合言葉必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { summarizeValence } from '@/lib/emotions';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -33,6 +34,11 @@ export async function GET(req: NextRequest) {
     supabaseServer.from('trace_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ]);
 
+  // 自治体向けサマリー（好意的/否定的の内訳）：全国公開済みの投稿のみを対象にする（exportと同じ範囲）
+  const { data: publicEmotions } = await supabaseServer
+    .from('traces').select('emotion_key').eq('is_deleted', false).eq('visibility', 'public');
+  const valence = summarizeValence((publicEmotions ?? []).map((t) => t.emotion_key));
+
   return NextResponse.json({
     ok: true,
     stats: {
@@ -43,6 +49,7 @@ export async function GET(req: NextRequest) {
       routeCount: routeCount ?? 0,
       activeSponsors: activeSponsors ?? 0,
       pendingReports: pendingReports ?? 0,
+      valence,
     },
   });
 }

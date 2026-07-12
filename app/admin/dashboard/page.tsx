@@ -11,7 +11,7 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events';
+type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events';
 
 const inputStyle: React.CSSProperties = {
   padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd',
@@ -26,6 +26,7 @@ interface Stats {
   routeCount: number;
   activeSponsors: number;
   pendingReports: number;
+  valence: { positive: number; negative: number; neutral: number; total: number };
 }
 
 interface Report {
@@ -186,6 +187,7 @@ export default function AdminDashboardPage() {
             ['review', '承認待ち', badgeCounts?.pendingReview ?? 0],
             ['traces', '投稿管理', 0],
             ['reports', '通報', badgeCounts?.pendingReports ?? 0],
+            ['comments', 'コメント', 0],
             ['users', '登録ユーザー', 0],
             ['sponsors', 'スポンサー', 0],
             ['routes', 'ルート', 0],
@@ -217,6 +219,7 @@ export default function AdminDashboardPage() {
         {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
         {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
         {tab === 'reports' && <ReportsTab authHeaders={authHeaders} />}
+        {tab === 'comments' && <CommentsTab authHeaders={authHeaders} />}
         {tab === 'users' && <UsersTab authHeaders={authHeaders} />}
         {tab === 'sponsors' && <SponsorsTab authHeaders={authHeaders} />}
         {tab === 'routes' && <RoutesTab authHeaders={authHeaders} />}
@@ -292,6 +295,29 @@ function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           </Card>
         ))}
       </div>
+
+      {stats.valence.total > 0 && (
+        <Card style={{ marginTop: 16 }}>
+          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>😊 自治体向けサマリー（好悪の内訳）</p>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>
+            全国公開済み投稿{stats.valence.total}件のうち、感情タグから機械的に判定した粗い内訳です。竹中工務店の「ソーシャルヒートマップ」等、自治体向け提案の際にそのまま使えます。
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#F3F9EA' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#639922' }}>{Math.round((stats.valence.positive / stats.valence.total) * 100)}%</div>
+              <div style={{ fontSize: 11, color: '#639922' }}>😊 好意的</div>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#F5F5F5' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#888' }}>{Math.round((stats.valence.neutral / stats.valence.total) * 100)}%</div>
+              <div style={{ fontSize: 11, color: '#888' }}>😐 中立</div>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#FCEBEB' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#E24B4A' }}>{Math.round((stats.valence.negative / stats.valence.total) * 100)}%</div>
+              <div style={{ fontSize: 11, color: '#E24B4A' }}>😟 否定的</div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card style={{ marginTop: 16 }}>
         <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>📤 データ書き出し</p>
@@ -545,6 +571,76 @@ function ReportsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                     background: '#E55039', color: '#fff', fontWeight: 700, cursor: 'pointer',
                   }}>投稿を削除</button>
                 </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── コメント管理 ──────────────────────────
+interface AdminComment {
+  id: string;
+  created_at: string;
+  trace_id: string;
+  body: string;
+  is_deleted: boolean;
+  trace_title: string | null;
+  trace_deleted: boolean;
+  username: string | null;
+}
+
+function CommentsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [comments, setComments] = useState<AdminComment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch('/api/admin/comments', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setComments(d.comments); else setError(d.error ?? '取得に失敗しました'); })
+      .catch(() => setError('通信エラー'))
+      .finally(() => setLoading(false));
+  }, [authHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function remove(id: string) {
+    if (!confirm('このコメントを削除しますか？')) return;
+    const res = await fetch(`/api/admin/comments/${id}`, { method: 'DELETE', headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) setComments(prev => prev.map(c => c.id === id ? { ...c, is_deleted: true } : c));
+    else setError(data.error ?? '削除に失敗しました');
+  }
+
+  return (
+    <div>
+      {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+      {loading ? <p style={{ color: '#999' }}>読み込み中…</p> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {comments.length === 0 && <p style={{ color: '#aaa' }}>まだコメントはありません。</p>}
+          {comments.map(c => (
+            <Card key={c.id} style={c.is_deleted ? { opacity: 0.5 } : undefined}>
+              <p style={{ margin: '0 0 4px', fontSize: 12, color: '#999' }}>
+                <a href={`/t/${c.trace_id}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>
+                  {c.trace_title ?? '（投稿が見つかりません）'}
+                </a>
+                {c.trace_deleted && <span style={{ color: '#aaa' }}> ・ 投稿は削除済み</span>}
+                {' '}・ {c.username ? `@${c.username}` : 'ユーザー不明'}
+              </p>
+              <p style={{ margin: '0 0 6px', fontSize: 14, color: '#333', whiteSpace: 'pre-wrap' }}>{c.body}</p>
+              <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>
+                {new Date(c.created_at).toLocaleString('ja-JP')}
+                {c.is_deleted && ' ・ 削除済み'}
+              </p>
+              {!c.is_deleted && (
+                <button onClick={() => remove(c.id)} style={{
+                  marginTop: 8, padding: '6px 14px', borderRadius: 8, border: '1px solid #ddd',
+                  background: '#fff', color: '#E55039', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                }}>削除</button>
               )}
             </Card>
           ))}
