@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase/server';
 import { getEmotion } from '@/lib/emotions';
+import { notifyDiscordError } from '@/lib/discord';
 import type { Trace } from '@/lib/types';
 
 interface Props {
@@ -9,7 +10,9 @@ interface Props {
 }
 
 async function getPublicTrace(id: string): Promise<Trace | null> {
-  const { data, error } = await supabaseServer.from('traces').select('*').eq('id', id).single();
+  // .single()は0件/複数件で例外を返すため、単純な「無ければ見せない」判定には.maybeSingle()の方が安全
+  const { data, error } = await supabaseServer.from('traces').select('*').eq('id', id).maybeSingle();
+  if (error) notifyDiscordError('GET /t/[id]', error);
   if (error || !data || data.is_deleted || data.visibility !== 'public') return null;
   return data as Trace;
 }
