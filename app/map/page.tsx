@@ -17,6 +17,7 @@ import TraceDetail from '@/components/TraceDetail';
 import QuickAddSheet from '@/components/QuickAddSheet';
 import StatsPanel from '@/components/list/StatsPanel';
 import Onboarding from '@/components/Onboarding';
+import BottomNav from '@/components/BottomNav';
 import type { Quest } from '@/lib/quests';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
@@ -34,6 +35,21 @@ type MapMode = 'pin' | 'heat';
 type SortOrder = 'new' | 'old';
 const NEARBY_RADIUS = 500;
 const DEFAULT_CENTER: [number, number] = [35.681236, 139.767125];
+
+// 昔の思い出は「正確な日付」までは思い出せないことが多い（特にご年配の方）。
+// 年＋季節のだいたいの記憶から、DB保存用のISO日付に変換する。
+const MEMORY_YEARS = Array.from({ length: new Date().getFullYear() - 1925 + 1 }, (_, i) => new Date().getFullYear() - i);
+const MEMORY_SEASONS: { key: string; label: string; month: string }[] = [
+  { key: '', label: 'わからない', month: '01' },
+  { key: 'spring', label: '春ごろ', month: '03' },
+  { key: 'summer', label: '夏ごろ', month: '06' },
+  { key: 'autumn', label: '秋ごろ', month: '09' },
+  { key: 'winter', label: '冬ごろ', month: '12' },
+];
+function memoryDateFromYearSeason(year: string, season: string): string {
+  const month = MEMORY_SEASONS.find((s) => s.key === season)?.month ?? '01';
+  return `${year}-${month}-01`;
+}
 
 const mapLoadingStyle: React.CSSProperties = {
   height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -60,7 +76,10 @@ function MapApp() {
   const regionParam = searchParams.get('region');
 
   // ── タブ・マップ ──────────────────────────
-  const [tab, setTab] = useState<Tab>('map');
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab');
+    return t === 'post' || t === 'list' ? t : 'map';
+  });
   const [mapMode, setMapMode] = useState<MapMode>('pin');
   // 感情レイヤー：「薄い日常」（intensity 1-2）と「深い想い」（intensity 4-5）を層として切り替える
   const [intensityLayer, setIntensityLayer] = useState<'all' | 'light' | 'deep'>('all');
@@ -254,7 +273,8 @@ function MapApp() {
   const [team, setTeam] = useState('');
   const [traceTypeKey, setTraceTypeKey] = useState<string | null>(null);
   const [isPastMemory, setIsPastMemory] = useState(false);
-  const [memoryDate, setMemoryDate] = useState('');
+  const [memoryYear, setMemoryYear] = useState('');
+  const [memorySeason, setMemorySeason] = useState('');
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -676,7 +696,7 @@ function MapApp() {
     setPhotos([]); setVideo(null); setVideoError(''); setLat(null); setLng(null);
     setEmotionKeys([]); setIntensity(3); setWantRevisit(false); setWantToShare(false);
     setNickname(''); setCategoryKey(null); setTraceTypeKey(null);
-    setIsPastMemory(false); setMemoryDate(''); setCustomTags([]); setTagInput('');
+    setIsPastMemory(false); setMemoryYear(''); setMemorySeason(''); setCustomTags([]); setTagInput('');
     setArchiveTypeKey(null); setYomi(''); setAltNames(''); setEraLabel(''); setSourceRef(''); setVoiceRelation(null);
     setAudioBlob(null); setAudioTranscript('');
     setAddressQuery(''); setAddressCandidates([]); setAddressError(''); setShowAddressSearch(false);
@@ -749,7 +769,7 @@ function MapApp() {
           audio_url: audioUrl,
           audio_transcript: audioTranscript.trim() || null,
           is_past_memory: isPastMemory,
-          memory_date: isPastMemory && memoryDate ? memoryDate : null,
+          memory_date: isPastMemory && memoryYear ? memoryDateFromYearSeason(memoryYear, memorySeason) : null,
           custom_tags: customTags.length > 0 ? customTags : null,
           session_code: sessionCode.trim() || null,
           nickname: nickname.trim() || null,
@@ -1946,19 +1966,37 @@ function MapApp() {
                       </div>
                     </section>
 
-                    {/* 過去の記憶 */}
+                    {/* 過去の記憶：正確な日付を思い出せなくても、だいたいの年でOKにする（ご年配の方の思い出も記録しやすいように） */}
                     <section>
                       <button type="button" onClick={() => setIsPastMemory(v => !v)} style={{
-                        width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
+                        width: '100%', padding: '16px', borderRadius: 10, cursor: 'pointer',
                         border: `2px solid ${isPastMemory ? '#F6B93B' : '#ddd'}`,
                         background: isPastMemory ? '#FFFBF0' : '#fff',
-                        color: isPastMemory ? '#856404' : '#aaa', fontWeight: isPastMemory ? 700 : 400, fontSize: 14,
+                        color: isPastMemory ? '#856404' : '#888', fontWeight: isPastMemory ? 700 : 400, fontSize: 16,
                       }}>
-                        {isPastMemory ? '🕰 過去の記憶として登録する' : '📍 今の記録として登録する'}
+                        {isPastMemory ? '🕰 昔の思い出として登録する' : '📍 今の記録として登録する'}
                       </button>
                       {isPastMemory && (
-                        <input type="date" value={memoryDate} onChange={e => setMemoryDate(e.target.value)}
-                          style={{ ...inputStyle, marginTop: 8, fontSize: 14 }} />
+                        <div style={{ marginTop: 10 }}>
+                          <p style={{ fontSize: 13, color: '#999', margin: '0 0 8px' }}>
+                            何十年も前の思い出でも大丈夫です。だいたいの年でけっこうです。
+                          </p>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <select value={memoryYear} onChange={e => setMemoryYear(e.target.value)}
+                              style={{ ...inputStyle, fontSize: 16, flex: 1.4 }}>
+                              <option value="">年を選ぶ</option>
+                              {MEMORY_YEARS.map((y) => (
+                                <option key={y} value={y}>{y}年</option>
+                              ))}
+                            </select>
+                            <select value={memorySeason} onChange={e => setMemorySeason(e.target.value)}
+                              style={{ ...inputStyle, fontSize: 16, flex: 1 }}>
+                              {MEMORY_SEASONS.map((s) => (
+                                <option key={s.key} value={s.key}>{s.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       )}
                     </section>
 
@@ -2293,49 +2331,7 @@ function MapApp() {
       )}
 
       {/* ── ボトムナビ ── */}
-      <nav style={{
-        display: 'flex', borderTop: '1px solid #eee',
-        background: '#fff', flexShrink: 0, zIndex: 300,
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}>
-        {([
-          { id: 'map', icon: '🗺', label: 'マップ' },
-          { id: 'post', icon: '✚', label: '記録する' },
-          { id: 'list', icon: '📋', label: '一覧' },
-        ] as { id: Tab; icon: string; label: string }[]).map(({ id, icon, label }) => (
-          <button key={id} onClick={() => setTab(id)} style={{
-            flex: 1, padding: '10px 4px 8px',
-            background: 'none', border: 'none', cursor: 'pointer',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-            color: tab === id ? '#FF6B9D' : '#999', fontWeight: tab === id ? 700 : 400,
-            borderTop: `2.5px solid ${tab === id ? '#FF6B9D' : 'transparent'}`,
-            transition: 'color 0.15s',
-          }}>
-            <span style={{ fontSize: id === 'post' ? 22 : 20 }}>{icon}</span>
-            <span style={{ fontSize: 11 }}>{label}</span>
-          </button>
-        ))}
-        <button onClick={() => router.push('/routes')} style={{
-          flex: 1, padding: '10px 4px 8px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-          color: '#999', fontWeight: 400,
-          borderTop: '2.5px solid transparent',
-        }}>
-          <span style={{ fontSize: 20 }}>🥾</span>
-          <span style={{ fontSize: 11 }}>ルート</span>
-        </button>
-        <button onClick={() => router.push('/following')} style={{
-          flex: 1, padding: '10px 4px 8px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-          color: '#999', fontWeight: 400,
-          borderTop: '2.5px solid transparent',
-        }}>
-          <span style={{ fontSize: 20 }}>👥</span>
-          <span style={{ fontSize: 11 }}>つながり</span>
-        </button>
-      </nav>
+      <BottomNav active={tab} onTabChange={setTab} />
 
       {/* ── モーダル ── */}
       {selectedTrace && (

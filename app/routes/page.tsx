@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Route, ListRoutesResponse } from '@/lib/types';
+import BottomNav from '@/components/BottomNav';
 
 export default function RoutesListPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -23,14 +24,14 @@ export default function RoutesListPage() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#fafafa' }}>
+    <div style={{ minHeight: '100dvh', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
       <header style={{ padding: '16px 20px', background: '#fff', borderBottom: '1px solid #eee' }}>
         <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
         <h1 style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#8E44AD' }}>🥾 おすすめルート</h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>みんなが歩いて見つけた、運営おすすめの散歩道</p>
       </header>
 
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 16px 60px' }}>
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 16px 60px', flex: 1, width: '100%', boxSizing: 'border-box' }}>
         {loading && <p style={{ color: '#999', textAlign: 'center', marginTop: 40 }}>読み込み中…</p>}
         {error && <p style={{ color: '#E74C3C', textAlign: 'center', marginTop: 40 }}>{error}</p>}
         {!loading && !error && routes.length === 0 && (
@@ -70,6 +71,7 @@ export default function RoutesListPage() {
           ))}
         </div>
       </div>
+      <BottomNav active="routes" />
     </div>
   );
 }

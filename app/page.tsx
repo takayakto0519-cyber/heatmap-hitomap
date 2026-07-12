@@ -125,6 +125,7 @@ export default function TopPage() {
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 24 }}>
+          <a href="/school" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>学校でのご利用</a>
           <a href="/terms" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>利用規約</a>
           <a href="/privacy" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>プライバシーポリシー</a>
         </div>

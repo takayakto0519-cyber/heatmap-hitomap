@@ -33,6 +33,14 @@ export default function ReportPage() {
   const [mapMode, setMapMode] = useState<MapMode>('pin');
   const [filterEmotion, setFilterEmotion] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [mobilityMsg, setMobilityMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/mobility/context')
+      .then((r) => r.json())
+      .then((d) => { if (d.ok && !d.configured) setMobilityMsg(d.message); })
+      .catch(() => {});
+  }, []);
 
   // 初回マウント時：URLクエリから絞り込み状態を復元
   useEffect(() => {
@@ -99,6 +107,11 @@ export default function ReportPage() {
               <span style={{ color: '#639922', fontWeight: 700, marginLeft: 4 }}>😊 好意的 {Math.round((valence.positive / valence.total) * 100)}%</span>
               <span style={{ marginLeft: 10, color: '#888' }}>😐 中立 {Math.round((valence.neutral / valence.total) * 100)}%</span>
               <span style={{ marginLeft: 10, color: '#E24B4A', fontWeight: 700 }}>😟 否定的 {Math.round((valence.negative / valence.total) * 100)}%</span>
+            </p>
+          )}
+          {mobilityMsg && (
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#bbb' }}>
+              🚶 人流データとの比較：{mobilityMsg}
             </p>
           )}
         </div>

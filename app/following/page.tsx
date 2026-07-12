@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import type { Trace } from '@/lib/types';
+import BottomNav from '@/components/BottomNav';
 
 interface FeedProfile {
   id: string;
@@ -65,8 +66,8 @@ export default function FollowingFeedPage() {
   }
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#fafafa' }}>
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '16px 16px 40px' }}>
+    <div style={{ minHeight: '100dvh', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '16px 16px 40px', flex: 1, width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <button onClick={() => router.push('/map')}
             style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 }}>
@@ -183,6 +184,7 @@ export default function FollowingFeedPage() {
           onDelete={(id) => setTraces((prev) => prev.filter((t) => t.id !== id))}
         />
       )}
+      <BottomNav active="following" />
     </div>
   );
 }
