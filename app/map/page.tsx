@@ -332,6 +332,7 @@ function MapApp() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [dmUnreadCount, setDmUnreadCount] = useState(0);
 
   const fetchNotifications = useCallback(() => {
     fetch('/api/notifications').then(r => r.json()).then(d => {
@@ -342,6 +343,9 @@ function MapApp() {
   useEffect(() => {
     if (!currentUser) return;
     fetchNotifications();
+    fetch('/api/messages').then(r => r.json()).then(d => {
+      if (d.ok) setDmUnreadCount((d.conversations ?? []).reduce((sum: number, c: { unreadCount: number }) => sum + c.unreadCount, 0));
+    }).catch(() => {});
   }, [currentUser, fetchNotifications]);
 
   async function openNotifPanel() {
@@ -1012,6 +1016,22 @@ function MapApp() {
             </div>
           ) : (
             <a href="/login" style={{ color: '#38ADA9', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>ログイン / 新規登録</a>
+          )}
+
+          {currentUser && (
+            <button onClick={() => router.push('/messages')} title="メッセージ" style={{
+              position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 18, padding: '2px 6px',
+            }}>
+              💬
+              {dmUnreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -2, right: 0, minWidth: 14, height: 14, borderRadius: 7,
+                  background: '#E55039', color: '#fff', fontSize: 9, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                }}>{dmUnreadCount > 9 ? '9+' : dmUnreadCount}</span>
+              )}
+            </button>
           )}
 
           {currentUser && (

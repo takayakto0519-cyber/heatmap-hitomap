@@ -73,7 +73,10 @@ export default function FollowingFeedPage() {
             style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 }}>
             ←
           </button>
-          <h1 style={{ margin: 0, fontSize: 20 }}>👥 つながり</h1>
+          <h1 style={{ margin: 0, fontSize: 20, flex: 1 }}>👥 つながり</h1>
+          <button onClick={() => router.push('/messages')} title="メッセージ" style={{
+            background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4,
+          }}>💬</button>
         </div>
 
         {loading && <p style={{ color: '#999', fontSize: 14, textAlign: 'center', padding: 40 }}>読み込み中…</p>}

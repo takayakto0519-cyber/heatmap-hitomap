@@ -15,10 +15,14 @@ export async function GET(req: NextRequest) {
 
   const myId = await getCurrentUserId();
   let isFollowing = false;
+  let isMutual = false;
   if (myId) {
-    const { data } = await supabase
-      .from('follows').select('follower_id').eq('follower_id', myId).eq('followee_id', targetId).maybeSingle();
-    isFollowing = Boolean(data);
+    const [{ data: mine }, { data: theirs }] = await Promise.all([
+      supabase.from('follows').select('follower_id').eq('follower_id', myId).eq('followee_id', targetId).maybeSingle(),
+      supabase.from('follows').select('follower_id').eq('follower_id', targetId).eq('followee_id', myId).maybeSingle(),
+    ]);
+    isFollowing = Boolean(mine);
+    isMutual = Boolean(mine) && Boolean(theirs);
   }
 
   return NextResponse.json({
@@ -26,6 +30,7 @@ export async function GET(req: NextRequest) {
     followingCount: following?.length ?? 0,
     followersCount: followers?.length ?? 0,
     isFollowing,
+    isMutual,
   });
 }
 

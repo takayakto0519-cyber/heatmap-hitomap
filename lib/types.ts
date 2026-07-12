@@ -271,6 +271,49 @@ export interface CreateCommentResponse {
   error?: string;
 }
 
+// ------------------------------------------------------------
+// フォロワー間チャット（相互フォローの相手とのみ送受信可）
+// ------------------------------------------------------------
+
+export interface DirectMessage {
+  id: string;
+  created_at: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  read_at: string | null;
+}
+
+export interface DmConversation {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  lastMessage: string;
+  lastMessageAt: string;
+  lastSenderId: string;
+  unreadCount: number;
+}
+
+export interface ListConversationsResponse {
+  ok: boolean;
+  conversations: DmConversation[];
+  error?: string;
+}
+
+export interface ListMessagesResponse {
+  ok: boolean;
+  messages: DirectMessage[];
+  isMutual: boolean;
+  error?: string;
+}
+
+export interface SendMessageResponse {
+  ok: boolean;
+  message?: DirectMessage;
+  error?: string;
+}
+
 /**
  * Googleフォームの回答行 → TraceInput への正規化マップ。
  * （Apps Script や中継サーバーで列名→キーを対応させる際の指針）

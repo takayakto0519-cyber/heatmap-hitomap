@@ -54,6 +54,7 @@ export default function ProfilePage() {
   const [followingCount, setFollowingCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isMutual, setIsMutual] = useState(false);
   const [isMe, setIsMe] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export default function ProfilePage() {
         setFollowingCount(followRes.followingCount ?? 0);
         setFollowersCount(followRes.followersCount ?? 0);
         setIsFollowing(followRes.isFollowing ?? false);
+        setIsMutual(followRes.isMutual ?? false);
 
         const tracesRes = await fetch(`/api/traces?user_id=${rows.id}&limit=500`).then(r => r.json()).catch(() => null);
         if (tracesRes?.ok) setMyTraces(tracesRes.traces ?? []);
@@ -120,6 +122,12 @@ export default function ProfilePage() {
     if (data.ok) {
       setIsFollowing(!isFollowing);
       setFollowersCount(c => c + (isFollowing ? -1 : 1));
+      if (isFollowing) {
+        setIsMutual(false);
+      } else {
+        const followRes = await fetch(`/api/follows?user_id=${profile.id}`).then(r => r.json()).catch(() => null);
+        if (followRes?.ok) setIsMutual(followRes.isMutual ?? false);
+      }
     } else if (res.status === 401) {
       window.location.href = '/login';
     }
@@ -259,11 +267,20 @@ export default function ProfilePage() {
           );
         })()}
         {!isMe && (
-          <button onClick={toggleFollow} style={{
-            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-            background: isFollowing ? '#eee' : '#38ADA9',
-            color: isFollowing ? '#666' : '#fff', fontWeight: 700, cursor: 'pointer',
-          }}>{isFollowing ? 'フォロー中 ✓' : 'フォローする'}</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={toggleFollow} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+              background: isFollowing ? '#eee' : '#38ADA9',
+              color: isFollowing ? '#666' : '#fff', fontWeight: 700, cursor: 'pointer',
+            }}>{isFollowing ? 'フォロー中 ✓' : 'フォローする'}</button>
+            {isMutual && (
+              <a href={`/messages/${profile.username}`} style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px solid #FF6B9D',
+                background: '#fff', color: '#FF6B9D', fontWeight: 700, cursor: 'pointer',
+                textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
+              }}>💬 メッセージ</a>
+            )}
+          </div>
         )}
         {isMe && !editing && (
           <button onClick={startEdit} style={{
