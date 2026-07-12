@@ -39,6 +39,16 @@ interface Report {
   trace: { id: string; title: string; photo_url: string | null; is_deleted: boolean } | null;
 }
 
+interface AdminUserRecentTrace {
+  id: string;
+  title: string;
+  photo_url: string | null;
+  emotion_key: string | null;
+  visibility: string;
+  why: string | null;
+  created_at: string;
+}
+
 interface AdminUser {
   id: string;
   username: string;
@@ -50,7 +60,15 @@ interface AdminUser {
   lastPostedAt: string | null;
   followerCount: number;
   followingCount: number;
+  recentTraces: AdminUserRecentTrace[];
 }
+
+const VISIBILITY_LABELS: Record<string, { label: string; color: string }> = {
+  public: { label: '🌏 全国公開', color: '#38ADA9' },
+  followers: { label: '👥 フォロワー限定', color: '#4A69BD' },
+  private: { label: '🔒 非公開', color: '#999' },
+  pending_review: { label: '⏳ 審査待ち', color: '#E5A139' },
+};
 
 // 投稿の「誰が」を表示するため、user_id→プロフィールの対応表を1回だけ取得して使い回す
 function useAuthorMap(authHeaders: () => HeadersInit) {
@@ -178,10 +196,13 @@ export default function AdminDashboardPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: '#f5f5f5' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 60px' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>🛠 運営ダッシュボード</h1>
-
-        <nav style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 10, background: '#f5f5f5',
+        paddingTop: 20, paddingBottom: 12, borderBottom: '1px solid #e8e8e8',
+      }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px' }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>🛠 運営ダッシュボード</h1>
+          <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {([
             ['overview', '概要', 0],
             ['review', '承認待ち', badgeCounts?.pendingReview ?? 0],
@@ -213,8 +234,11 @@ export default function AdminDashboardPage() {
               </button>
             );
           })}
-        </nav>
+          </nav>
+        </div>
+      </div>
 
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 60px' }}>
         {tab === 'overview' && <OverviewTab authHeaders={authHeaders} />}
         {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
         {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
@@ -1683,6 +1707,9 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'traces' | 'recent' | 'new'>('traces');
+  const [q, setQ] = useState('');
 
   useEffect(() => {
     fetch('/api/admin/profiles', { headers: authHeaders() })
@@ -1693,46 +1720,127 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function toggle(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
+
+  const filtered = users.filter(u => {
+    if (!q.trim()) return true;
+    const needle = q.trim().toLowerCase();
+    return u.username.toLowerCase().includes(needle) || (u.display_name ?? '').toLowerCase().includes(needle);
+  });
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'traces') return b.traceCount - a.traceCount;
+    if (sortBy === 'new') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    // 'recent'：最終投稿が新しい人を先に（未投稿は最後）
+    if (!a.lastPostedAt) return 1;
+    if (!b.lastPostedAt) return -1;
+    return new Date(b.lastPostedAt).getTime() - new Date(a.lastPostedAt).getTime();
+  });
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
-        アカウント登録済みのユーザー {users.length}人（ヒトマップ本体の投稿・フォローと連携した実データです）
-      </p>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+        <p style={{ fontSize: 12, color: '#999', margin: 0 }}>
+          登録ユーザー {users.length}人（投稿・フォローと連携した実データ）
+        </p>
+        <div style={{ flex: 1 }} />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="ユーザー名で検索"
+          style={{ ...inputStyle, width: 160 }} />
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} style={inputStyle}>
+          <option value="traces">投稿数順</option>
+          <option value="recent">最終投稿が新しい順</option>
+          <option value="new">登録が新しい順</option>
+        </select>
+      </div>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
-      {users.length === 0 && <p style={{ color: '#aaa' }}>登録ユーザーはまだいません。</p>}
+      {sorted.length === 0 && <p style={{ color: '#aaa' }}>該当するユーザーはいません。</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {users.map(u => (
-          <Card key={u.id}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              {u.avatar_url ? (
-                <img src={u.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-              ) : (
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', background: '#f0f0f0', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                }}>👤</div>
+        {sorted.map(u => {
+          const isOpen = expanded.has(u.id);
+          return (
+            <Card key={u.id}>
+              <button onClick={() => toggle(u.id)} style={{
+                display: 'flex', gap: 10, alignItems: 'center', width: '100%',
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left',
+              }}>
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%', background: '#f0f0f0', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                  }}>👤</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>
+                    {u.display_name ?? u.username}
+                    <a href={`/profile/${u.username}`} target="_blank" rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      style={{ marginLeft: 6, fontSize: 11, color: '#38ADA9', fontWeight: 400 }}>
+                      @{u.username} ↗
+                    </a>
+                  </p>
+                  {u.bio && <p style={{ margin: '2px 0', fontSize: 12, color: '#666' }}>{u.bio}</p>}
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aaa' }}>
+                    📍{u.traceCount}件の投稿 ・ 👥フォロワー{u.followerCount} ・ フォロー中{u.followingCount}
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: '#ccc' }}>
+                    登録: {new Date(u.created_at).toLocaleDateString('ja-JP')}
+                    {u.lastPostedAt && ` ・ 最終投稿: ${new Date(u.lastPostedAt).toLocaleDateString('ja-JP')}`}
+                  </p>
+                </div>
+                {u.traceCount > 0 && (
+                  <span style={{ fontSize: 18, color: '#ccc', flexShrink: 0 }}>{isOpen ? '▴' : '▾'}</span>
+                )}
+              </button>
+
+              {isOpen && u.recentTraces.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <p style={{ margin: 0, fontSize: 11, color: '#aaa', fontWeight: 700 }}>
+                    直近の投稿（最大{u.recentTraces.length}件{u.traceCount > u.recentTraces.length ? `・全${u.traceCount}件中` : ''}）
+                  </p>
+                  {u.recentTraces.map(t => {
+                    const emotion = getEmotion(t.emotion_key);
+                    const vis = VISIBILITY_LABELS[t.visibility];
+                    return (
+                      <div key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        {t.photo_url ? (
+                          <img src={t.photo_url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                        ) : (
+                          <div style={{
+                            width: 40, height: 40, borderRadius: 6, background: (emotion?.color ?? '#eee') + '22', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                          }}>{emotion?.emoji ?? '📍'}</div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {t.title}
+                          </p>
+                          {t.why && (
+                            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {t.why}
+                            </p>
+                          )}
+                          <p style={{ margin: '2px 0 0', fontSize: 10, color: '#bbb' }}>
+                            {new Date(t.created_at).toLocaleDateString('ja-JP')}
+                            {vis && <span style={{ marginLeft: 6, color: vis.color, fontWeight: 700 }}>{vis.label}</span>}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>
-                  {u.display_name ?? u.username}
-                  <a href={`/profile/${u.username}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, fontSize: 11, color: '#38ADA9', fontWeight: 400 }}>
-                    @{u.username} ↗
-                  </a>
-                </p>
-                {u.bio && <p style={{ margin: '2px 0', fontSize: 12, color: '#666' }}>{u.bio}</p>}
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aaa' }}>
-                  📍{u.traceCount}件の投稿 ・ 👥フォロワー{u.followerCount} ・ フォロー中{u.followingCount}
-                </p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#ccc' }}>
-                  登録: {new Date(u.created_at).toLocaleDateString('ja-JP')}
-                  {u.lastPostedAt && ` ・ 最終投稿: ${new Date(u.lastPostedAt).toLocaleDateString('ja-JP')}`}
-                </p>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

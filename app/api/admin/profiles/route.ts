@@ -12,20 +12,31 @@ export async function GET(req: NextRequest) {
 
   const [{ data: profiles, error: profileError }, { data: traces, error: traceError }, { data: follows }] = await Promise.all([
     supabaseServer.from('profiles').select('id, username, display_name, bio, avatar_url, created_at'),
-    supabaseServer.from('traces').select('user_id, created_at').eq('is_deleted', false).not('user_id', 'is', null),
+    supabaseServer.from('traces')
+      .select('id, user_id, title, photo_url, emotion_key, visibility, why, created_at')
+      .eq('is_deleted', false).not('user_id', 'is', null)
+      .order('created_at', { ascending: false }),
     supabaseServer.from('follows').select('follower_id, followee_id'),
   ]);
 
   if (profileError) return NextResponse.json({ ok: false, error: profileError.message }, { status: 500 });
   if (traceError) return NextResponse.json({ ok: false, error: traceError.message }, { status: 500 });
 
-  const traceStats = new Map<string, { count: number; lastPostedAt: string }>();
-  for (const t of (traces ?? []) as { user_id: string; created_at: string }[]) {
+  // ユーザーごとの投稿統計 と 直近の投稿内容（管理画面でその場に投稿内容が見えるよう、最大8件まで保持）
+  const RECENT_TRACES_PER_USER = 8;
+  interface RecentTrace {
+    id: string; title: string; photo_url: string | null; emotion_key: string | null;
+    visibility: string; why: string | null; created_at: string;
+  }
+  const traceStats = new Map<string, { count: number; lastPostedAt: string; recent: RecentTrace[] }>();
+  for (const t of (traces ?? []) as (RecentTrace & { user_id: string })[]) {
     const cur = traceStats.get(t.user_id);
-    if (!cur) traceStats.set(t.user_id, { count: 1, lastPostedAt: t.created_at });
-    else {
+    if (!cur) {
+      traceStats.set(t.user_id, { count: 1, lastPostedAt: t.created_at, recent: [{ ...t }] });
+    } else {
       cur.count += 1;
       if (t.created_at > cur.lastPostedAt) cur.lastPostedAt = t.created_at;
+      if (cur.recent.length < RECENT_TRACES_PER_USER) cur.recent.push({ ...t });
     }
   }
 
@@ -47,6 +58,7 @@ export async function GET(req: NextRequest) {
     lastPostedAt: traceStats.get(p.id)?.lastPostedAt ?? null,
     followerCount: followerCounts.get(p.id) ?? 0,
     followingCount: followingCounts.get(p.id) ?? 0,
+    recentTraces: traceStats.get(p.id)?.recent ?? [],
   })).sort((a, b) => b.traceCount - a.traceCount);
 
   return NextResponse.json({ ok: true, users });
