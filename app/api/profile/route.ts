@@ -12,13 +12,20 @@ export async function GET() {
   let { data: profile } = await supabase
     .from('profiles').select('*').eq('id', userData.user.id).maybeSingle();
 
-  // メール確認必須の設定では、signUp直後はセッションが無くプロフィールを作れない。
-  // 希望していたユーザー名はuser_metadataに載せてあるので、確認後の初回ログイン時にここで作成する。
-  const pendingUsername = userData.user.user_metadata?.username;
-  if (!profile && typeof pendingUsername === 'string' && pendingUsername.trim()) {
+  if (!profile) {
+    // メール確認必須の設定では、signUp直後はセッションが無くプロフィールを作れない。
+    // 希望していたユーザー名はuser_metadataに載せてあるので、確認後の初回ログイン時にここで作成する。
+    const pendingUsername = userData.user.user_metadata?.username;
+    // Googleログイン等、user_metadataにusernameが無い場合は仮のユーザー名を自動発行する。
+    // これが無いとプロフィール行自体が永遠に作られず、マイページが「登録されていません」のまま
+    // 動かなくなってしまう（本人はいつでも/profileページから改名できる）。
+    const usernameToUse =
+      typeof pendingUsername === 'string' && pendingUsername.trim()
+        ? pendingUsername.trim()
+        : `user${userData.user.id.replace(/-/g, '').slice(0, 8)}`;
     const { data: created, error } = await supabase
       .from('profiles')
-      .insert({ id: userData.user.id, username: pendingUsername.trim() })
+      .insert({ id: userData.user.id, username: usernameToUse })
       .select().single();
     if (!error) {
       profile = created;
@@ -38,12 +45,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'ログインが必要です' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({})) as { username?: string; display_name?: string; bio?: string };
-  if (!body.username || !body.username.trim()) {
+  const username = body.username?.normalize('NFC').trim();
+  if (!username) {
     return NextResponse.json({ ok: false, error: 'ユーザー名は必須です' }, { status: 400 });
+  }
+  // /profile/[username] のURLに直接使われるため、スラッシュ等URLを壊す文字は禁止する。
+  if (!/^[\p{L}\p{N}_-]{1,30}$/u.test(username)) {
+    return NextResponse.json({ ok: false, error: 'ユーザー名に使えるのは文字・数字・「_」「-」のみです（30文字まで）' }, { status: 400 });
   }
   const { data, error } = await supabase
     .from('profiles')
-    .insert({ id: userData.user.id, username: body.username.trim(), display_name: body.display_name ?? null, bio: body.bio ?? null })
+    .insert({ id: userData.user.id, username, display_name: body.display_name ?? null, bio: body.bio ?? null })
     .select().single();
   if (error) {
     if (error.code !== '23505') notifyDiscordError('POST /api/profile', error);

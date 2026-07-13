@@ -77,8 +77,11 @@ export default function ProfilePage() {
           import('@/lib/supabase/authClient'),
         ]);
         const supabase = createAuthBrowserClient();
+        let normalizedUsername = String(username);
+        try { normalizedUsername = decodeURIComponent(normalizedUsername); } catch { /* already decoded */ }
+        normalizedUsername = normalizedUsername.normalize('NFC').trim();
         const { data: rows, error: profileError } = await supabase
-          .from('profiles').select('*').eq('username', username).maybeSingle();
+          .from('profiles').select('*').eq('username', normalizedUsername).maybeSingle();
         if (profileError || !rows) {
           setError('ユーザーが見つかりません');
           setLoading(false);

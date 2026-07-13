@@ -48,7 +48,7 @@ export default function HomePage() {
 
           <a href="/start" style={{
             display: 'block', width: '100%', boxSizing: 'border-box', padding: '15px', borderRadius: 12,
-            background: 'linear-gradient(135deg, #FF6B9D, #FF9068)', textAlign: 'center',
+            background: '#222', textAlign: 'center',
             color: '#fff', fontWeight: 800, fontSize: 16, textDecoration: 'none', marginBottom: 14,
           }}>はじめる</a>
 
@@ -67,6 +67,18 @@ export default function HomePage() {
               ログインしなくても匿名のまま利用を始められます。
             </p>
           </section>
+
+          <a href="/business" style={{
+            display: 'block', marginTop: 14, padding: '16px 18px', borderRadius: 14,
+            background: '#fff', border: '1px solid #eee', textDecoration: 'none',
+          }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#222', marginBottom: 4 }}>
+              法人・行政の方へ →
+            </span>
+            <span style={{ display: 'block', fontSize: 12, color: '#888', lineHeight: 1.7 }}>
+              痕跡から組織の生き様を伝える、採用・組織ブランディング支援を行っています。
+            </span>
+          </a>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 24 }}>
             <a href="/school" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>学校でのご利用</a>
