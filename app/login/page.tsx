@@ -38,7 +38,7 @@ export default function LoginPage() {
     const supabase = createAuthBrowserClient();
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       });
       if (resetError) throw resetError;
       setMessage('パスワード再設定用のメールを送りました（届かない場合は下記の問い合わせ先までご連絡ください）。');
@@ -69,7 +69,10 @@ export default function LoginPage() {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { username: username.trim() } },
+          options: {
+            data: { username: username.trim() },
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/map`,
+          },
         });
         if (signUpError) throw signUpError;
         if (data.session) {
