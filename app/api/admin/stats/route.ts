@@ -1,4 +1,4 @@
-// GET /api/admin/stats — 管理ダッシュボードの概要数値（合言葉必須）
+// GET /api/admin/stats — 管理ダッシュボードの概要数値（パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 import { summarizeValence } from '@/lib/emotions';
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
 
   const { supabaseServer } = await import('@/lib/supabase/server');

@@ -3,13 +3,13 @@ import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-// GET /api/admin/reports?status=pending — 通報一覧（合言葉必須）。対象トレースの基本情報も付けて返す。
+// GET /api/admin/reports?status=pending — 通報一覧（パスワード必須）。対象トレースの基本情報も付けて返す。
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const status = req.nextUrl.searchParams.get('status') ?? 'pending';
 

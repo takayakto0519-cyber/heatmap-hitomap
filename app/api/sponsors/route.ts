@@ -26,13 +26,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, sponsors: (data ?? []) as Sponsor[] });
 }
 
-// POST /api/sponsors — スポンサー枠の手動登録（合言葉必須。決済処理は行わない）
+// POST /api/sponsors — スポンサー枠の手動登録（パスワード必須。決済処理は行わない）
 export async function POST(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({})) as Partial<Sponsor>;
   if (!body.placement || !body.name) {

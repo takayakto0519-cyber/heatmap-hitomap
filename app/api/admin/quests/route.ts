@@ -3,13 +3,13 @@ import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-// GET /api/admin/quests — クエスト一覧（合言葉必須）
+// GET /api/admin/quests — クエスト一覧（パスワード必須）
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { supabaseServer } = await import('@/lib/supabase/server');
   const { data, error } = await supabaseServer.from('quests').select('*').order('created_at', { ascending: false });
@@ -26,13 +26,13 @@ interface CreateQuestBody {
   is_active?: boolean;
 }
 
-// POST /api/admin/quests — クエストを新規作成（合言葉必須）
+// POST /api/admin/quests — クエストを新規作成（パスワード必須）
 export async function POST(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({})) as CreateQuestBody;
   if (!body.emoji?.trim() || !body.title?.trim() || !body.hint?.trim()) {

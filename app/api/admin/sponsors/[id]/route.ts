@@ -1,5 +1,5 @@
-// PATCH /api/admin/sponsors/[id] — スポンサー枠の編集・有効/無効切替（合言葉必須）
-// DELETE /api/admin/sponsors/[id] — スポンサー枠の削除（合言葉必須）
+// PATCH /api/admin/sponsors/[id] — スポンサー枠の編集・有効/無効切替（パスワード必須）
+// DELETE /api/admin/sponsors/[id] — スポンサー枠の削除（パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 import type { Sponsor } from '@/lib/types';
@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { id } = context.params;
   const body = await req.json().catch(() => ({})) as Partial<Sponsor>;
@@ -32,7 +32,7 @@ export async function DELETE(req: NextRequest, context: { params: { id: string }
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { id } = context.params;
   const { supabaseServer } = await import('@/lib/supabase/server');

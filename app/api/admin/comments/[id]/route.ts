@@ -9,7 +9,7 @@ export async function DELETE(
   context: { params: { id: string } }
 ) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
-  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { id } = context.params;
   const { supabaseServer } = await import('@/lib/supabase/server');

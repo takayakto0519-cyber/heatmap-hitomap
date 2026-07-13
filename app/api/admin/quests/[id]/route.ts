@@ -12,13 +12,13 @@ interface UpdateQuestBody {
   is_active?: boolean;
 }
 
-// PATCH /api/admin/quests/[id] — 編集・アクティブ切り替え（合言葉必須）
+// PATCH /api/admin/quests/[id] — 編集・アクティブ切り替え（パスワード必須）
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { id } = context.params;
   const body = await req.json().catch(() => ({})) as UpdateQuestBody;
@@ -43,13 +43,13 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
   return NextResponse.json({ ok: true, quest: data });
 }
 
-// DELETE /api/admin/quests/[id]（合言葉必須）
+// DELETE /api/admin/quests/[id]（パスワード必須）
 export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { id } = context.params;
   const { supabaseServer } = await import('@/lib/supabase/server');

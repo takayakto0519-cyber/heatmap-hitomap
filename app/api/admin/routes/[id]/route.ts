@@ -36,13 +36,13 @@ const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
   'event_fee', 'event_meeting_info', 'event_photo_urls',
 ];
 
-// PATCH /api/admin/routes/[id] — 協賛・イベント公開情報の設定（手動、決済は伴わない。合言葉必須）
+// PATCH /api/admin/routes/[id] — 協賛・イベント公開情報の設定（手動、決済は伴わない。パスワード必須）
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { id } = context.params;
   const body = await req.json().catch(() => ({})) as RouteAdminUpdateBody;

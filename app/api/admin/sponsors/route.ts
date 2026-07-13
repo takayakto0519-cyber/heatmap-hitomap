@@ -1,4 +1,4 @@
-// GET /api/admin/sponsors — スポンサー枠の全件一覧（非公開分も含む。合言葉必須）
+// GET /api/admin/sponsors — スポンサー枠の全件一覧（非公開分も含む。パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 import type { Sponsor } from '@/lib/types';
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, sponsors: [], error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, sponsors: [], error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, sponsors: [], error: 'パスワードが違います' }, { status: 401 });
   }
   const { supabaseServer } = await import('@/lib/supabase/server');
   const { data, error } = await supabaseServer

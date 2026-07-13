@@ -1,4 +1,4 @@
-// PATCH/DELETE /api/admin/event-plans/[id] — イベント計画の更新・削除（合言葉必須）
+// PATCH/DELETE /api/admin/event-plans/[id] — イベント計画の更新・削除（パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
@@ -8,7 +8,7 @@ const ALLOWED_FIELDS = ['title', 'memo', 'status', 'event_date'];
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
-  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { id } = context.params;
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
 
 export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
-  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { id } = context.params;
   const { supabaseServer } = await import('@/lib/supabase/server');

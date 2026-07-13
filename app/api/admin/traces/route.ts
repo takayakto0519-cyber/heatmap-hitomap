@@ -3,14 +3,14 @@ import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-// GET /api/admin/traces?status=pending_review — 審査待ち一覧（合言葉必須）
+// GET /api/admin/traces?status=pending_review — 審査待ち一覧（パスワード必須）
 // GET /api/admin/traces?status=all&q=検索語&limit=100 — 投稿管理タブ用の全件検索
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const status = req.nextUrl.searchParams.get('status') ?? 'pending_review';
   const q = req.nextUrl.searchParams.get('q');

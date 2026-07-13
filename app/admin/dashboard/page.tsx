@@ -163,7 +163,7 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch('/api/admin/stats', { headers: { 'x-admin-password': pw } });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? '合言葉が違います');
+      if (!data.ok) throw new Error(data.error ?? 'パスワードが違います');
       setUnlocked(true);
     } catch (e) {
       setUnlockError(e instanceof Error ? e.message : '認証に失敗しました');
@@ -179,10 +179,10 @@ export default function AdminDashboardPage() {
           onSubmit={e => { e.preventDefault(); tryUnlock(password); }}
           style={{ background: '#fff', padding: 24, borderRadius: 16, width: '100%', maxWidth: 320, boxSizing: 'border-box', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}
         >
-          <h1 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>運営ダッシュボード（合言葉）</h1>
+          <h1 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>運営ダッシュボード（パスワード）</h1>
           <input
             type="password" value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="合言葉" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
+            placeholder="パスワード" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
           />
           {unlockError && <p style={{ color: '#E74C3C', fontSize: 12, margin: '0 0 8px' }}>{unlockError}</p>}
           <button type="submit" disabled={unlocking} style={{

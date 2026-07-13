@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   }
   if (!checkAdmin(req)) {
-    return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   const { id } = context.params;
   const body = await req.json().catch(() => ({})) as { action?: 'approve' | 'reject' };

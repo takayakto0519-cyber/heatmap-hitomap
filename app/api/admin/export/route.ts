@@ -53,7 +53,7 @@ function toGeoJson(traces: Trace[]) {
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
-  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const format = req.nextUrl.searchParams.get('format') === 'geojson' ? 'geojson' : 'csv';
   const region = req.nextUrl.searchParams.get('region');

@@ -1,4 +1,4 @@
-// GET /api/admin/profiles — 登録ユーザー一覧（投稿数・最終投稿日つき、合言葉必須）
+// GET /api/admin/profiles — 登録ユーザー一覧（投稿数・最終投稿日つき、パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
@@ -6,7 +6,7 @@ const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
-  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: '合言葉が違います' }, { status: 401 });
+  if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
 
