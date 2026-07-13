@@ -1710,6 +1710,8 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'traces' | 'recent' | 'new'>('traces');
   const [q, setQ] = useState('');
+  const [fullTraces, setFullTraces] = useState<Record<string, AdminUser['recentTraces']>>({});
+  const [loadingFull, setLoadingFull] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch('/api/admin/profiles', { headers: authHeaders() })
@@ -1726,6 +1728,17 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  }
+
+  async function loadAllTraces(userId: string) {
+    setLoadingFull(prev => new Set(prev).add(userId));
+    try {
+      const res = await fetch(`/api/admin/traces?status=all&user_id=${userId}&limit=1000`, { headers: authHeaders() })
+        .then(r => r.json());
+      if (res.ok) setFullTraces(prev => ({ ...prev, [userId]: res.traces }));
+    } finally {
+      setLoadingFull(prev => { const next = new Set(prev); next.delete(userId); return next; });
+    }
   }
 
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
@@ -1803,10 +1816,20 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
 
               {isOpen && u.recentTraces.length > 0 && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <p style={{ margin: 0, fontSize: 11, color: '#aaa', fontWeight: 700 }}>
-                    直近の投稿（最大{u.recentTraces.length}件{u.traceCount > u.recentTraces.length ? `・全${u.traceCount}件中` : ''}）
-                  </p>
-                  {u.recentTraces.map(t => {
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <p style={{ margin: 0, fontSize: 11, color: '#aaa', fontWeight: 700 }}>
+                      {fullTraces[u.id]
+                        ? `全投稿（${fullTraces[u.id].length}件・非公開/審査待ち含む）`
+                        : `直近の投稿（最大${u.recentTraces.length}件${u.traceCount > u.recentTraces.length ? `・全${u.traceCount}件中` : ''}）`}
+                    </p>
+                    {!fullTraces[u.id] && u.traceCount > u.recentTraces.length && (
+                      <button onClick={() => loadAllTraces(u.id)} disabled={loadingFull.has(u.id)} style={{
+                        background: 'none', border: 'none', color: '#38ADA9', fontSize: 11, fontWeight: 700,
+                        cursor: loadingFull.has(u.id) ? 'wait' : 'pointer', padding: 0,
+                      }}>{loadingFull.has(u.id) ? '読み込み中…' : `全${u.traceCount}件を見る（非公開含む）`}</button>
+                    )}
+                  </div>
+                  {(fullTraces[u.id] ?? u.recentTraces).map(t => {
                     const emotion = getEmotion(t.emotion_key);
                     const vis = VISIBILITY_LABELS[t.visibility];
                     return (

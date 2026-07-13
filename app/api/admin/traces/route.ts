@@ -5,6 +5,7 @@ const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 // GET /api/admin/traces?status=pending_review — 審査待ち一覧（パスワード必須）
 // GET /api/admin/traces?status=all&q=検索語&limit=100 — 投稿管理タブ用の全件検索
+// GET /api/admin/traces?user_id=xxx&status=all — 特定ユーザーの全投稿（非公開・審査待ち含む）
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -14,12 +15,14 @@ export async function GET(req: NextRequest) {
   }
   const status = req.nextUrl.searchParams.get('status') ?? 'pending_review';
   const q = req.nextUrl.searchParams.get('q');
+  const userId = req.nextUrl.searchParams.get('user_id');
   const includeDeleted = req.nextUrl.searchParams.get('include_deleted') === 'true';
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
 
   const { supabaseServer } = await import('@/lib/supabase/server');
   let query = supabaseServer.from('traces').select('*');
   if (status !== 'all') query = query.eq('visibility', status);
+  if (userId) query = query.eq('user_id', userId);
   if (!includeDeleted) query = query.eq('is_deleted', false);
   if (q) query = query.ilike('title', `%${q}%`);
   query = query.order('created_at', { ascending: false }).limit(limit);

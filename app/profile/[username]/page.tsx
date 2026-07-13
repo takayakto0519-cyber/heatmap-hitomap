@@ -12,9 +12,15 @@ const TraceMap = dynamic(() => import('@/components/map/TraceMap'), { ssr: false
 // 踏破バッジ：投稿した町（region）のユニーク数で段階を決める
 const BADGE_TIERS = [
   { min: 1, emoji: '🥉', label: '最初の一歩' },
+  { min: 3, emoji: '🌱', label: '芽生え' },
   { min: 5, emoji: '🥈', label: '歩く人' },
+  { min: 10, emoji: '🔦', label: '探し人' },
   { min: 15, emoji: '🥇', label: '旅する人' },
+  { min: 25, emoji: '🧭', label: '道しるべ' },
   { min: 30, emoji: '👑', label: '痕跡の探求者' },
+  { min: 50, emoji: '🏔', label: '町の語り部' },
+  { min: 75, emoji: '🌍', label: 'まちあるきの達人' },
+  { min: 100, emoji: '⭐', label: '伝説の記録者' },
 ] as const;
 
 function currentBadge(regionCount: number) {
