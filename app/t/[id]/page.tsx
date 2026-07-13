@@ -39,14 +39,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hitomap.com';
+
 export default async function TracePermalinkPage({ params }: Props) {
   const trace = await getPublicTrace(params.id);
   if (!trace) notFound();
 
   const emotion = getEmotion(trace.emotion_key);
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: trace.title,
+    description: trace.why ?? trace.interpretation ?? 'ヒトマップに記録された痕跡',
+    url: `${SITE_URL}/t/${trace.id}`,
+    ...(trace.photo_url ? { image: trace.photo_url } : {}),
+    ...(trace.created_at ? { dateCreated: trace.created_at } : {}),
+    isPartOf: { '@type': 'WebSite', name: 'ヒトマップ', url: SITE_URL },
+  };
 
   return (
     <div style={{ minHeight: '100dvh', background: '#fafafa' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {trace.photo_url && (
         (trace.photo_urls && trace.photo_urls.length > 1) ? (
           <div style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
