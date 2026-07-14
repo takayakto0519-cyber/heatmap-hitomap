@@ -2255,6 +2255,9 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [enrichLoading, setEnrichLoading] = useState<Record<string, boolean>>({});
   const [enrichDraft, setEnrichDraft] = useState<Record<string, string>>({});
   const [enrichError, setEnrichError] = useState<Record<string, string>>({});
+  const [proposalLoading, setProposalLoading] = useState<Record<string, boolean>>({});
+  const [proposalDraft, setProposalDraft] = useState<Record<string, string>>({});
+  const [proposalError, setProposalError] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -2335,6 +2338,37 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     updateLead(id, { memo: merged });
     setEnrichDraft(prev => { const next = { ...prev }; delete next[id]; return next; });
     setEnrichOpen(prev => ({ ...prev, [id]: false }));
+  }
+
+  // 提案書ドラフトを生成する（証拠パック=memoが元になる）。保存はせず、ダウンロードして会長が06_実行待機_Approvalに置く運用
+  async function runDraftProposal(id: string) {
+    setProposalLoading(prev => ({ ...prev, [id]: true }));
+    setProposalError(prev => ({ ...prev, [id]: '' }));
+    try {
+      const res = await fetch(`/api/admin/client-leads/${id}/draft-proposal`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (data.ok) setProposalDraft(prev => ({ ...prev, [id]: data.draft }));
+      else setProposalError(prev => ({ ...prev, [id]: data.error ?? '生成に失敗しました' }));
+    } catch {
+      setProposalError(prev => ({ ...prev, [id]: '通信エラー' }));
+    } finally {
+      setProposalLoading(prev => ({ ...prev, [id]: false }));
+    }
+  }
+
+  function downloadProposal(id: string, orgName: string) {
+    const draft = proposalDraft[id];
+    if (!draft) return;
+    const blob = new Blob([draft], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    a.href = url;
+    a.download = `提案書ドラフト_${orgName}_${stamp}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const visibleLeads = leads.filter(l => filter === 'all' || l.client_type === filter);
@@ -2479,6 +2513,38 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                         }}>この内容を証拠パックに反映する</button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                <button type="button" onClick={() => runDraftProposal(l.id)} disabled={proposalLoading[l.id] || !l.memo?.trim()} title={!l.memo?.trim() ? '先に証拠パック（メモ）を作ってください' : undefined} style={{
+                  marginTop: 8, marginLeft: 8, padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 700,
+                  border: '1.5px solid #38ADA9', background: proposalLoading[l.id] ? '#ddd' : '#E8F8F7',
+                  color: proposalLoading[l.id] ? '#888' : '#38ADA9',
+                  cursor: (proposalLoading[l.id] || !l.memo?.trim()) ? 'default' : 'pointer',
+                  opacity: !l.memo?.trim() ? 0.5 : 1,
+                }}>{proposalLoading[l.id] ? '生成中…' : '📄 提案書ドラフトを生成（Claude Sonnet使用）'}</button>
+
+                {proposalError[l.id] && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E55039' }}>{proposalError[l.id]}</p>}
+
+                {proposalDraft[l.id] && (
+                  <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: '#E8F8F7', border: '1px solid #D5F0EE' }}>
+                    <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#38ADA9' }}>
+                      生成された提案書ドラフト（会長が確認・編集してから使ってください。外部送信前は必ず06_実行待機_Approvalで保管）
+                    </p>
+                    <pre style={{
+                      margin: '0 0 6px', fontSize: 12, color: '#333', background: '#fff', padding: 10, borderRadius: 8,
+                      whiteSpace: 'pre-wrap', maxHeight: 320, overflowY: 'auto', fontFamily: 'inherit',
+                    }}>{proposalDraft[l.id]}</pre>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={() => downloadProposal(l.id, l.org_name)} style={{
+                        padding: '6px 12px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700,
+                        background: '#38ADA9', color: '#fff', cursor: 'pointer',
+                      }}>⬇ ダウンロード（.md）</button>
+                      <button type="button" onClick={() => setProposalDraft(prev => { const next = { ...prev }; delete next[l.id]; return next; })} style={{
+                        padding: '6px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 12,
+                        background: '#fff', color: '#888', cursor: 'pointer',
+                      }}>閉じる</button>
+                    </div>
                   </div>
                 )}
               </Card>

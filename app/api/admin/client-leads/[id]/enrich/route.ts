@@ -2,6 +2,7 @@
 // ここではDBに保存しない。会長が確認・編集してから通常のPATCHで保存する（1件ずつ、人がレビューする姿勢を崩さない）。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { getRegionalEvidence, formatEvidenceForPrompt } from '@/lib/leadEvidence';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'; // 1件ずつの手動生成のため速度・コスト優先
@@ -38,13 +39,8 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
     .from('client_leads').select('org_name, client_type, memo').eq('id', id).single();
   if (leadError || !lead) return NextResponse.json({ ok: false, error: '案件が見つかりません' }, { status: 404 });
 
-  // 地域名を団体名から素朴に拾い、既存の痕跡データ件数を"証"として添える（無ければ0件のまま正直に使う）
-  const { count: traceCount } = await supabaseServer
-    .from('traces')
-    .select('id', { count: 'exact', head: true })
-    .eq('is_deleted', false)
-    .eq('visibility', 'public')
-    .ilike('region', `%${lead.org_name.replace(/[市区町村県]$/u, '')}%`);
+  // 地域名を団体名から素朴に拾い、既存の痕跡データ（件数・感情の内訳）を"証"として添える（無ければ0件のまま正直に使う）
+  const evidence = await getRegionalEvidence(supabaseServer, lead.org_name);
 
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
@@ -57,17 +53,18 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
         role: 'user',
         content: [
           `団体名: ${lead.org_name}（種別: ${lead.client_type === 'school' ? '学校' : '法人・自治体'}）`,
-          `ヒトマップの既存データ: 全国公開済みの痕跡投稿が約${traceCount ?? 0}件（団体名から推定した地域名で検索）`,
+          formatEvidenceForPrompt(evidence),
           lead.memo ? `既存の証拠パック（あれば更新の参考に）: ${lead.memo}` : null,
           `参考情報（貼り付けテキスト）:\n${sourceText.slice(0, 6000)}`,
         ].filter(Boolean).join('\n\n'),
       }],
     });
-    const block = message.content[0];
-    const draft = block.type === 'text' ? block.text.trim() : '';
+    // モデルによってはthinkingブロックを先に返すことがあるため、text型のブロックを探す
+    const textBlock = message.content.find((b) => b.type === 'text');
+    const draft = textBlock && textBlock.type === 'text' ? textBlock.text.trim() : '';
     if (!draft) return NextResponse.json({ ok: false, error: 'AIからの応答が空でした' }, { status: 500 });
 
-    return NextResponse.json({ ok: true, draft, traceCount: traceCount ?? 0 });
+    return NextResponse.json({ ok: true, draft, traceCount: evidence.traceCount, model: message.model });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'AI呼び出しに失敗しました' }, { status: 500 });
   }
