@@ -35,7 +35,7 @@ const jsonLd = {
 
 export default function HomePage() {
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.kinari }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <CorpHeader />
 
@@ -45,61 +45,86 @@ export default function HomePage() {
         <ServiceFlow />
 
         <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
-          <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-            <a
-              href="/business"
+          <div style={{ maxWidth: 960, margin: '0 auto' }}>
+            <p
               style={{
-                flex: '1 1 280px',
-                display: 'block',
-                padding: '24px 26px',
-                border: `1px solid ${corpColor.line}`,
-                textDecoration: 'none',
+                margin: '0 0 28px',
+                fontSize: 12,
+                letterSpacing: '0.2em',
+                color: corpColor.moss,
+                fontFamily: corpFont.body,
+                fontWeight: 700,
               }}
             >
-              <span
-                style={{
-                  display: 'block',
-                  fontFamily: corpFont.mincho,
-                  fontSize: 17,
-                  fontWeight: 600,
-                  color: corpColor.sumi,
-                  marginBottom: 8,
-                }}
-              >
-                法人・行政の方へ →
-              </span>
-              <span style={{ display: 'block', fontSize: 13, color: corpColor.sumiSoft, lineHeight: 1.8, fontFamily: corpFont.body }}>
-                痕跡から組織の生き様を伝える、解読型の採用・組織ブランディング支援。
-              </span>
-            </a>
+              事業の三本柱
+            </p>
 
-            <a
-              href="/school"
-              style={{
-                flex: '1 1 280px',
-                display: 'block',
-                padding: '24px 26px',
-                border: `1px solid ${corpColor.line}`,
-                textDecoration: 'none',
-                marginTop: 20, // 非対称に一段ずらす
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  fontFamily: corpFont.mincho,
-                  fontSize: 17,
-                  fontWeight: 600,
-                  color: corpColor.sumi,
-                  marginBottom: 8,
-                }}
-              >
-                学校の方へ →
-              </span>
-              <span style={{ display: 'block', fontSize: 13, color: corpColor.sumiSoft, lineHeight: 1.8, fontFamily: corpFont.body }}>
-                クラス単位の実験回コードで、地域理解教育に使う。
-              </span>
-            </a>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+              {[
+                {
+                  href: '/service',
+                  title: 'ヒトマップ（Webサービス） →',
+                  body: 'まちの痕跡と感情を記録する、稼働中の主軸サービス。',
+                  offset: 0,
+                },
+                {
+                  href: '/business',
+                  title: '法人・行政の方へ →',
+                  body: '痕跡から組織の生き様を伝える、解読型の採用・組織ブランディング支援。',
+                  offset: 20,
+                },
+                {
+                  href: '/school',
+                  title: '学校の方へ →',
+                  body: 'クラス単位の実験回コードで、地域理解教育に使う。',
+                  offset: 0,
+                },
+              ].map((card) => (
+                <a
+                  key={card.href}
+                  href={card.href}
+                  style={{
+                    flex: '1 1 260px',
+                    display: 'block',
+                    padding: '24px 26px',
+                    border: `1px solid ${corpColor.line}`,
+                    textDecoration: 'none',
+                    marginTop: card.offset, // 非対称に一段ずらす
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      color: corpColor.moss,
+                      border: `1px solid ${corpColor.moss}`,
+                      padding: '2px 8px',
+                      marginBottom: 12,
+                      fontFamily: corpFont.body,
+                    }}
+                  >
+                    稼働中
+                  </span>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontFamily: corpFont.mincho,
+                      fontSize: 17,
+                      fontWeight: 600,
+                      color: corpColor.ink,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {card.title}
+                  </span>
+                  <span style={{ display: 'block', fontSize: 13, color: corpColor.inkSoft, lineHeight: 1.8, fontFamily: corpFont.body }}>
+                    {card.body}
+                  </span>
+                </a>
+              ))}
+            </div>
           </div>
         </section>
 

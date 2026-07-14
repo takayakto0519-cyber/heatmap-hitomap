@@ -1,22 +1,22 @@
 import { corpColor, corpFont } from './tokens';
 
 const STEPS = [
-  { n: '壱', title: '記録する', body: 'まちで見つけた痕跡と、そのとき動いた感情を、写真と言葉で地図に残す。' },
-  { n: '弐', title: 'ヒートマップになる', body: '記録が積み重なると、地域ごとの感情の濃淡がヒートマップとして浮かび上がる。' },
-  { n: '参', title: 'つながる', body: '似た感情を記録した人とは、フォローやメッセージでつながることができる。' },
-  { n: '四', title: '歩く', body: '誰かが歩いた足跡を、また別の誰かが自分の足で辿る。' },
+  { n: '壱', title: '痕跡を記録する', body: 'まちで見つけたモノ・場所と、そこで動いた感情を残す。' },
+  { n: '弐', title: '感情がヒートマップになる', body: '記録が積み重なり、まちごとの感情の地図が育つ。' },
+  { n: '参', title: '似た感情の人とつながる', body: '同じものに心を動かされた人をフォローし、メッセージを送れる。' },
+  { n: '四', title: '実際に会いに行く', body: '誰かが歩いた足跡を、自分の足で辿れる。' },
 ];
 
 export default function ServiceFlow() {
   return (
-    <section style={{ background: corpColor.kinari, padding: '72px 24px' }}>
+    <section style={{ background: corpColor.ground, padding: '72px 24px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <p
           style={{
             margin: '0 0 40px',
             fontSize: 12,
             letterSpacing: '0.2em',
-            color: corpColor.tsuchi,
+            color: corpColor.moss,
             fontFamily: corpFont.body,
             fontWeight: 700,
           }}
@@ -44,8 +44,8 @@ export default function ServiceFlow() {
                   width: 52,
                   height: 52,
                   borderRadius: '50%',
-                  border: `1.5px solid ${corpColor.shu}`,
-                  color: corpColor.shu,
+                  border: `1.5px solid ${corpColor.moss}`,
+                  color: corpColor.moss,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -62,7 +62,7 @@ export default function ServiceFlow() {
                     margin: '4px 0 8px',
                     fontFamily: corpFont.mincho,
                     fontSize: 19,
-                    color: corpColor.sumi,
+                    color: corpColor.ink,
                     fontWeight: 600,
                   }}
                 >
@@ -73,7 +73,7 @@ export default function ServiceFlow() {
                     margin: 0,
                     fontSize: 14,
                     lineHeight: 1.9,
-                    color: corpColor.sumiSoft,
+                    color: corpColor.inkSoft,
                     fontFamily: corpFont.body,
                     maxWidth: 520,
                   }}

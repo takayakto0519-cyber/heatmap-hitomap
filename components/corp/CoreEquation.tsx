@@ -6,16 +6,18 @@ const MVV = [
   { label: 'VALUE', ja: '人を消費せず、関係を育てる。' },
 ];
 
+// ページ内で一番強く主張したい箇所（MVV）なので、地の墨色を反転させた帯で
+// 前後のセクションから視覚的に切り離し、ここだけボールドさを使う。
 export default function CoreEquation() {
   return (
-    <section style={{ background: corpColor.white, padding: '72px 24px' }}>
+    <section style={{ background: corpColor.ink, padding: '80px 24px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <p
           style={{
-            margin: '0 0 40px',
+            margin: '0 0 44px',
             fontSize: 12,
-            letterSpacing: '0.2em',
-            color: corpColor.tsuchi,
+            letterSpacing: '0.28em',
+            color: corpColor.moss,
             fontFamily: corpFont.body,
             fontWeight: 700,
           }}
@@ -31,21 +33,21 @@ export default function CoreEquation() {
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'baseline',
-                gap: '8px 28px',
-                padding: '22px 0',
-                borderTop: i === 0 ? `1px solid ${corpColor.line}` : 'none',
-                borderBottom: `1px solid ${corpColor.line}`,
-                marginLeft: i * 24, // 非対称：段ごとに右にずらす
+                gap: '10px 32px',
+                padding: '28px 0',
+                borderTop: i === 0 ? `1px solid rgba(251,250,246,0.16)` : 'none',
+                borderBottom: `1px solid rgba(251,250,246,0.16)`,
+                marginLeft: i * 28, // 非対称：段ごとに右にずらす
               }}
             >
               <span
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: '0.15em',
-                  color: corpColor.shu,
+                  letterSpacing: '0.18em',
+                  color: corpColor.moss,
                   fontFamily: corpFont.body,
-                  width: 88,
+                  width: 96,
                   flexShrink: 0,
                 }}
               >
@@ -55,10 +57,10 @@ export default function CoreEquation() {
                 style={{
                   margin: 0,
                   fontFamily: corpFont.mincho,
-                  fontSize: 'clamp(18px, 2.6vw, 24px)',
-                  color: corpColor.sumi,
+                  fontSize: 'clamp(22px, 3.4vw, 32px)',
+                  color: corpColor.white,
                   fontWeight: 600,
-                  lineHeight: 1.7,
+                  lineHeight: 1.6,
                 }}
               >
                 {item.ja}

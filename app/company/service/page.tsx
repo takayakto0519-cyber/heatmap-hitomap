@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function ServicePage() {
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.kinari }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <CorpHeader />
 
       <main style={{ flex: 1 }}>
@@ -22,7 +22,7 @@ export default function ServicePage() {
                 margin: '0 0 18px',
                 fontSize: 12,
                 letterSpacing: '0.2em',
-                color: corpColor.tsuchi,
+                color: corpColor.moss,
                 fontFamily: corpFont.body,
                 fontWeight: 700,
               }}
@@ -35,13 +35,13 @@ export default function ServicePage() {
                 fontFamily: corpFont.mincho,
                 fontSize: 'clamp(24px, 3.6vw, 32px)',
                 lineHeight: 1.8,
-                color: corpColor.sumi,
+                color: corpColor.ink,
                 fontWeight: 600,
               }}
             >
               地図は、あなたが見つけた痕跡でできている。
             </h1>
-            <p style={{ margin: 0, fontSize: 15, lineHeight: 2, color: corpColor.sumiSoft, fontFamily: corpFont.body, maxWidth: 560 }}>
+            <p style={{ margin: 0, fontSize: 15, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body, maxWidth: 560 }}>
               ヒトマップは、位置情報を分析するツールではありません。
               一人ひとりが町を歩いて見つけた「誰かが生きた証」を、写真と言葉で記録していくコミュニティサービスです。
               ログインしなくても、匿名のまま記録を始められます。
@@ -58,7 +58,7 @@ export default function ServicePage() {
               style={{
                 display: 'inline-block',
                 padding: '15px 32px',
-                background: corpColor.sumi,
+                background: corpColor.ink,
                 color: corpColor.white,
                 textDecoration: 'none',
                 fontWeight: 700,
@@ -75,7 +75,7 @@ export default function ServicePage() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 fontSize: 13,
-                color: corpColor.sumiSoft,
+                color: corpColor.inkSoft,
                 textDecoration: 'none',
                 fontWeight: 600,
                 fontFamily: corpFont.body,

@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 
 export default function WorksPage() {
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.kinari }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <CorpHeader />
 
       <main style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '96px 24px' }}>
-          <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.tsuchi, fontFamily: corpFont.body, fontWeight: 700 }}>
+          <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
             WORKS
           </p>
           <p
@@ -24,7 +24,7 @@ export default function WorksPage() {
               fontFamily: corpFont.mincho,
               fontSize: 'clamp(20px, 3vw, 26px)',
               lineHeight: 1.9,
-              color: corpColor.sumi,
+              color: corpColor.ink,
               fontWeight: 600,
             }}
           >

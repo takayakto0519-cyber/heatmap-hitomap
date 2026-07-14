@@ -6,32 +6,29 @@ import { corpColor, corpFont } from '@/components/corp/tokens';
 
 export const metadata: Metadata = {
   title: '運営',
-  description: 'ヒトマップの運営メンバー、加藤貴也・小田太志の紹介です。',
+  description: 'ヒトマップ代表・加藤貴也の紹介です。',
 };
 
-// 写真が届き次第、public/images/team/ にファイルを置き、photoSrc に指定してください（現在は未掲載）。
+// 小田太志の情報は本人確認後に追加する（現時点では加藤のみ掲載）。
 const MEMBERS = [
   {
     name: '加藤貴也',
-    role: '共同代表 / マーケティング',
+    role: '代表 / マーケティング',
+    quote: 'モノに残った痕跡から、その人の生きた証を読み解く。',
     bio: 'ヒトマップの思想設計とマーケティングを担当。「モノの痕跡から人を読む」という視点をもとに、サービスの世界観をつくっています。',
-  },
-  {
-    name: '小田太志',
-    role: '共同代表 / 営業・採用コンサル',
-    bio: '営業と採用コンサルティングを担当。企業・行政との連携や、組織ブランディング支援の実務を担っています。',
+    photoSrc: '/images/team/kato-takaya.jpg',
   },
 ];
 
 export default function TeamPage() {
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.kinari }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <CorpHeader />
 
       <main style={{ flex: 1 }}>
         <section style={{ padding: '64px 24px 40px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
-            <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.tsuchi, fontFamily: corpFont.body, fontWeight: 700 }}>
+            <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
               TEAM
             </p>
             <h1
@@ -40,11 +37,11 @@ export default function TeamPage() {
                 fontFamily: corpFont.mincho,
                 fontSize: 'clamp(22px, 3.2vw, 28px)',
                 lineHeight: 1.8,
-                color: corpColor.sumi,
+                color: corpColor.ink,
                 fontWeight: 600,
               }}
             >
-              2人の共同代表で運営しています。
+              代表 加藤貴也が運営しています。
             </h1>
           </div>
         </section>

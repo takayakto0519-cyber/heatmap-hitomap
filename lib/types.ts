@@ -229,6 +229,30 @@ export interface RouteCompletionsResponse {
   error?: string;
 }
 
+// ------------------------------------------------------------
+// 自治体向け集計API（Phase 1）：グリッド単位に集計し、しきい値未満のセルは
+// 抑制する。個別トレースの緯度経度・写真・自由記述は一切含めない。
+// ------------------------------------------------------------
+
+export interface RegionAggregateCell {
+  gridLat: number;   // グリッドの中心緯度（丸め済み。個別投稿の座標ではない）
+  gridLng: number;
+  count: number;
+  valence: { positive: number; negative: number; neutral: number };
+}
+
+export interface RegionAggregateResponse {
+  ok: boolean;
+  region: string;
+  generatedAt: string;
+  gridSizeDeg: number;
+  threshold: number;         // このしきい値未満の件数のセルは非表示（k-匿名性）
+  totalPublicTraces: number; // しきい値適用前の region 全体の件数（既存のリード証拠パックと同じ粒度）
+  suppressedCells: number;   // しきい値未満だったため非表示にしたセル数
+  cells: RegionAggregateCell[];
+  error?: string;
+}
+
 export interface Sponsor {
   id: string;
   placement: 'region' | 'detour';
