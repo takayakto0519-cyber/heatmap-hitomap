@@ -1,4 +1,9 @@
-import SiteHeader from '@/components/SiteHeader';
+import CorpHeader from '@/components/corp/CorpHeader';
+import CorpFooter from '@/components/corp/CorpFooter';
+import Hero from '@/components/corp/Hero';
+import CoreEquation from '@/components/corp/CoreEquation';
+import ServiceFlow from '@/components/corp/ServiceFlow';
+import { corpColor, corpFont } from '@/components/corp/tokens';
 import AdSlot from '@/components/AdSlot';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hitomap.com';
@@ -30,65 +35,80 @@ const jsonLd = {
 
 export default function HomePage() {
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fafafa' }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.kinari }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <SiteHeader />
+      <CorpHeader />
 
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px' }}>
-        <div style={{ width: '100%', maxWidth: 480 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 12px', textAlign: 'center' }}>
-            言葉は嘘をつける。<br />しかし、モノの痕跡は嘘をつかない。
-          </h1>
-          <p style={{ fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 1.8, margin: '0 0 28px' }}>
-            ヒトマップは、町を歩いて見つけた「誰かが生きた証」を記録し、
-            地図の上に積み重ねていくサービスです。
-            修理された椅子、色あせた看板——そこに積もった時間を、
-            あなたの手で残していきます。
-          </p>
+      <main style={{ flex: 1 }}>
+        <Hero />
+        <CoreEquation />
+        <ServiceFlow />
 
-          <a href="/start" style={{
-            display: 'block', width: '100%', boxSizing: 'border-box', padding: '15px', borderRadius: 12,
-            background: '#222', textAlign: 'center',
-            color: '#fff', fontWeight: 800, fontSize: 16, textDecoration: 'none', marginBottom: 14,
-          }}>はじめる</a>
-
-          <p style={{ textAlign: 'center', margin: 0 }}>
-            <a href="/login" style={{ fontSize: 13, color: '#38ADA9', fontWeight: 700, textDecoration: 'none' }}>
-              ログイン / 新規登録
+        <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
+          <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+            <a
+              href="/business"
+              style={{
+                flex: '1 1 280px',
+                display: 'block',
+                padding: '24px 26px',
+                border: `1px solid ${corpColor.line}`,
+                textDecoration: 'none',
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  fontFamily: corpFont.mincho,
+                  fontSize: 17,
+                  fontWeight: 600,
+                  color: corpColor.sumi,
+                  marginBottom: 8,
+                }}
+              >
+                法人・行政の方へ →
+              </span>
+              <span style={{ display: 'block', fontSize: 13, color: corpColor.sumiSoft, lineHeight: 1.8, fontFamily: corpFont.body }}>
+                痕跡から組織の生き様を伝える、解読型の採用・組織ブランディング支援。
+              </span>
             </a>
-          </p>
 
-          <section style={{ marginTop: 40, padding: 20, background: '#fff', borderRadius: 14, border: '1px solid #f0f0f0' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 8px' }}>ヒトマップとは</h2>
-            <p style={{ fontSize: 13, color: '#777', lineHeight: 1.8, margin: 0 }}>
-              地図データの分析ツール（いわゆる「ヒートマップ」ツール）ではありません。
-              位置情報の分析・解析を行うサービスではなく、
-              個人が町を歩いて記録した痕跡を、その人自身の言葉と写真で残すコミュニティサービスです。
-              ログインしなくても匿名のまま利用を始められます。
-            </p>
-          </section>
-
-          <a href="/business" style={{
-            display: 'block', marginTop: 14, padding: '16px 18px', borderRadius: 14,
-            background: '#fff', border: '1px solid #eee', textDecoration: 'none',
-          }}>
-            <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#222', marginBottom: 4 }}>
-              法人・行政の方へ →
-            </span>
-            <span style={{ display: 'block', fontSize: 12, color: '#888', lineHeight: 1.7 }}>
-              痕跡から組織の生き様を伝える、採用・組織ブランディング支援を行っています。
-            </span>
-          </a>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 24 }}>
-            <a href="/school" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>学校でのご利用</a>
-            <a href="/terms" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>利用規約</a>
-            <a href="/privacy" style={{ fontSize: 11, color: '#bbb', textDecoration: 'none' }}>プライバシーポリシー</a>
+            <a
+              href="/school"
+              style={{
+                flex: '1 1 280px',
+                display: 'block',
+                padding: '24px 26px',
+                border: `1px solid ${corpColor.line}`,
+                textDecoration: 'none',
+                marginTop: 20, // 非対称に一段ずらす
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  fontFamily: corpFont.mincho,
+                  fontSize: 17,
+                  fontWeight: 600,
+                  color: corpColor.sumi,
+                  marginBottom: 8,
+                }}
+              >
+                学校の方へ →
+              </span>
+              <span style={{ display: 'block', fontSize: 13, color: corpColor.sumiSoft, lineHeight: 1.8, fontFamily: corpFont.body }}>
+                クラス単位の実験回コードで、地域理解教育に使う。
+              </span>
+            </a>
           </div>
+        </section>
 
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px 40px' }}>
           <AdSlot />
         </div>
       </main>
+
+      <CorpFooter />
     </div>
   );
 }
