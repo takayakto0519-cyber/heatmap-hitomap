@@ -11,7 +11,34 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events';
+type Tab = 'overview' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads';
+
+// タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
+const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
+  overview: { label: 'ホーム', icon: '🏠', group: '', desc: '全体の状況をひと目で確認' },
+  review: { label: '承認待ち', icon: '✅', group: '投稿・安全', desc: '全国公開の申請を承認/却下' },
+  traces: { label: '投稿管理', icon: '📍', group: '投稿・安全', desc: '投稿を検索・削除・復元' },
+  reports: { label: '通報', icon: '🚨', group: '投稿・安全', desc: '寄せられた通報の対応' },
+  comments: { label: 'コメント', icon: '💬', group: '投稿・安全', desc: 'コメントの確認・削除' },
+  users: { label: '登録ユーザー', icon: '👤', group: 'コミュニティ', desc: '会員の投稿履歴を確認' },
+  sponsors: { label: 'スポンサー', icon: '🏷', group: 'コミュニティ', desc: '協賛枠の作成・管理' },
+  routes: { label: 'ルート', icon: '🧭', group: '体験づくり', desc: 'おすすめルート・relayの管理' },
+  quests: { label: 'クエスト', icon: '🎯', group: '体験づくり', desc: 'クエストの作成・管理' },
+  events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
+  leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
+};
+
+const TAB_GROUPS = ['投稿・安全', 'コミュニティ', '体験づくり', '学校・法人'];
+
+// ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
+const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
+  { label: 'サイトホーム', href: '/', icon: '🏡', desc: '一般ユーザーが見るトップページ' },
+  { label: '地図', href: '/map', icon: '🗺️', desc: '投稿の分布・ヒートマップ表示' },
+  { label: 'ルート一覧', href: '/routes', icon: '🧭', desc: '公開中のおすすめルート・relay' },
+  { label: '学校向け', href: '/school', icon: '🏫', desc: '学校・教育機関向けの紹介ページ' },
+  { label: '法人向け', href: '/business', icon: '🏢', desc: '法人・自治体向けの紹介ページ' },
+  { label: '投稿を始める', href: '/start', icon: '📸', desc: '新規投稿フローの確認' },
+];
 
 const inputStyle: React.CSSProperties = {
   padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd',
@@ -143,6 +170,8 @@ export default function AdminDashboardPage() {
   const [unlocking, setUnlocking] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
   const [badgeCounts, setBadgeCounts] = useState<{ pendingReview: number; pendingReports: number } | null>(null);
+  const [siteMenuOpen, setSiteMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const authHeaders = useCallback((): HeadersInit => {
     return { 'Content-Type': 'application/json', 'x-admin-password': password };
@@ -194,62 +223,125 @@ export default function AdminDashboardPage() {
     );
   }
 
-  return (
-    <div style={{ minHeight: '100dvh', background: '#f5f5f5' }}>
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 10, background: '#f5f5f5',
-        paddingTop: 20, paddingBottom: 12, borderBottom: '1px solid #e8e8e8',
-      }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px' }}>
-          <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>🛠 運営ダッシュボード</h1>
-          <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {([
-            ['overview', '概要', 0],
-            ['review', '承認待ち', badgeCounts?.pendingReview ?? 0],
-            ['traces', '投稿管理', 0],
-            ['reports', '通報', badgeCounts?.pendingReports ?? 0],
-            ['comments', 'コメント', 0],
-            ['users', '登録ユーザー', 0],
-            ['sponsors', 'スポンサー', 0],
-            ['routes', 'ルート', 0],
-            ['quests', 'クエスト', 0],
-            ['events', 'イベント計画', 0],
-          ] as [Tab, string, number][]).map(([id, label, count]) => {
-            const urgent = count > 0 && tab !== id;
-            return (
-              <button key={id} onClick={() => setTab(id)} style={{
-                padding: '9px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                background: tab === id ? '#38ADA9' : urgent ? '#FFF0EE' : '#fff',
-                color: tab === id ? '#fff' : urgent ? '#E55039' : '#666',
-                fontWeight: 700, fontSize: 13,
-                boxShadow: tab === id ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-              }}>
-                {label}
-                {count > 0 && (
-                  <span style={{
-                    marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11,
-                    background: tab === id ? 'rgba(255,255,255,0.3)' : '#E55039', color: '#fff',
-                  }}>{count}</span>
-                )}
-              </button>
-            );
-          })}
-          </nav>
-        </div>
-      </div>
+  const badgeFor = (id: Tab): number =>
+    id === 'review' ? (badgeCounts?.pendingReview ?? 0) : id === 'reports' ? (badgeCounts?.pendingReports ?? 0) : 0;
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 60px' }}>
-        {tab === 'overview' && <OverviewTab authHeaders={authHeaders} />}
-        {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
-        {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
-        {tab === 'reports' && <ReportsTab authHeaders={authHeaders} />}
-        {tab === 'comments' && <CommentsTab authHeaders={authHeaders} />}
-        {tab === 'users' && <UsersTab authHeaders={authHeaders} />}
-        {tab === 'sponsors' && <SponsorsTab authHeaders={authHeaders} />}
-        {tab === 'routes' && <RoutesTab authHeaders={authHeaders} />}
-        {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
-        {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
-      </div>
+  function goTab(id: Tab) {
+    setTab(id);
+    setNavOpen(false);
+  }
+
+  const navButtonStyle = (active: boolean, urgent: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+    padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
+    background: active ? 'rgba(255,255,255,0.16)' : 'transparent',
+    color: active ? '#fff' : urgent ? '#FFB4A8' : 'rgba(255,255,255,0.75)',
+    fontWeight: active ? 800 : 600, fontSize: 13,
+  });
+
+  return (
+    <div style={{ minHeight: '100dvh', background: '#f4f6f5', display: 'flex' }}>
+      <style>{`
+        .hm-sidebar { position: sticky; top: 0; height: 100dvh; transition: transform .2s ease; }
+        .hm-hamburger { display: none; }
+        .hm-overlay { display: none; }
+        @media (max-width: 880px) {
+          .hm-sidebar { position: fixed; top: 0; left: 0; bottom: 0; height: 100dvh; z-index: 40; transform: translateX(-100%); }
+          .hm-sidebar.open { transform: translateX(0); }
+          .hm-hamburger { display: flex; }
+          .hm-overlay.open { display: block; }
+          .hm-main { margin-left: 0 !important; }
+        }
+      `}</style>
+
+      {/* オーバーレイ（モバイルでサイドバーを開いた時に背景をタップして閉じる） */}
+      <div className={`hm-overlay${navOpen ? ' open' : ''}`} onClick={() => setNavOpen(false)} style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 30,
+      }} />
+
+      {/* サイドバー */}
+      <aside className={`hm-sidebar${navOpen ? ' open' : ''}`} style={{
+        width: 232, flexShrink: 0, background: '#1F2A2A', color: '#fff',
+        display: 'flex', flexDirection: 'column', overflowY: 'auto',
+      }}>
+        <div style={{ padding: '20px 16px 12px' }}>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={() => goTab('overview')}>🛠 運営ダッシュボード</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>ヒトマップ</p>
+        </div>
+
+        <nav style={{ flex: 1, padding: '4px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <button onClick={() => goTab('overview')} style={navButtonStyle(tab === 'overview', false)}>
+            {TAB_META.overview.icon} {TAB_META.overview.label}
+          </button>
+
+          {TAB_GROUPS.map(group => (
+            <div key={group} style={{ marginTop: 14 }}>
+              <p style={{ margin: '0 0 4px', padding: '0 14px', fontSize: 10, letterSpacing: 1, color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>{group.toUpperCase()}</p>
+              {(Object.keys(TAB_META) as Tab[]).filter(id => TAB_META[id].group === group).map(id => {
+                const count = badgeFor(id);
+                const urgent = count > 0 && tab !== id;
+                return (
+                  <button key={id} onClick={() => goTab(id)} title={TAB_META[id].desc} style={navButtonStyle(tab === id, urgent)}>
+                    <span>{TAB_META[id].icon}</span>
+                    <span style={{ flex: 1 }}>{TAB_META[id].label}</span>
+                    {count > 0 && (
+                      <span style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, background: '#E55039', color: '#fff', fontWeight: 700 }}>{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <button onClick={() => setSiteMenuOpen(v => !v)} style={navButtonStyle(siteMenuOpen, false)}>
+            🌐 <span style={{ flex: 1 }}>本体サイトを見る</span> {siteMenuOpen ? '▴' : '▾'}
+          </button>
+          {siteMenuOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+              {SITE_LINKS.map(link => (
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 8px 30px', borderRadius: 10,
+                  textDecoration: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12,
+                }}>
+                  <span>{link.icon}</span>{link.label} ↗
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* メインコンテンツ */}
+      <main className="hm-main" style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10, background: 'rgba(244,246,245,0.92)', backdropFilter: 'blur(6px)',
+          padding: '14px 20px', borderBottom: '1px solid #e5e8e7', display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <button className="hm-hamburger" onClick={() => setNavOpen(v => !v)} style={{
+            width: 34, height: 34, borderRadius: 8, border: '1px solid #ddd', background: '#fff',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16,
+          }}>☰</button>
+          <h1 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{TAB_META[tab].icon} {TAB_META[tab].label}</h1>
+          <span style={{ fontSize: 12, color: '#999' }}>{TAB_META[tab].desc}</span>
+        </div>
+
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 20px 60px' }}>
+          {tab === 'overview' && <OverviewTab authHeaders={authHeaders} setTab={setTab} badgeCounts={badgeCounts} />}
+          {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
+          {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
+          {tab === 'reports' && <ReportsTab authHeaders={authHeaders} />}
+          {tab === 'comments' && <CommentsTab authHeaders={authHeaders} />}
+          {tab === 'users' && <UsersTab authHeaders={authHeaders} />}
+          {tab === 'sponsors' && <SponsorsTab authHeaders={authHeaders} />}
+          {tab === 'routes' && <RoutesTab authHeaders={authHeaders} />}
+          {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
+          {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
+          {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
+        </div>
+      </main>
     </div>
   );
 }
@@ -263,8 +355,12 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-// ── 概要 ──────────────────────────────────
-function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+// ── ホーム（概要 + クイックアクセス） ──────
+function OverviewTab({ authHeaders, setTab, badgeCounts }: {
+  authHeaders: () => HeadersInit;
+  setTab: (t: Tab) => void;
+  badgeCounts: { pendingReview: number; pendingReports: number } | null;
+}) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'geojson' | null>(null);
@@ -318,6 +414,50 @@ function OverviewTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             <div style={{ fontSize: 12, color: urgent ? '#E55039' : '#888', marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
           </Card>
         ))}
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>⚡ クイックアクセス</p>
+        {TAB_GROUPS.map(group => (
+          <div key={group} style={{ marginBottom: 14 }}>
+            <p style={{ margin: '0 0 6px', fontSize: 12, color: '#999', fontWeight: 700 }}>{group}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+              {(Object.keys(TAB_META) as Tab[]).filter(id => TAB_META[id].group === group).map(id => {
+                const count = id === 'review' ? (badgeCounts?.pendingReview ?? 0) : id === 'reports' ? (badgeCounts?.pendingReports ?? 0) : 0;
+                return (
+                  <button key={id} onClick={() => setTab(id)} style={{
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
+                    border: count > 0 ? '1px solid #FFD9D0' : '1px solid #eee',
+                    background: count > 0 ? '#FFF5F3' : '#fff',
+                  }}>
+                    <div style={{ fontSize: 18 }}>{TAB_META[id].icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: count > 0 ? '#E55039' : '#222' }}>
+                      {TAB_META[id].label}
+                      {count > 0 && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11, background: '#E55039', color: '#fff' }}>{count}</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{TAB_META[id].desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 8 }}>
+        <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🌐 本体サイトを見る</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+          {SITE_LINKS.map(link => (
+            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" style={{
+              textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
+              border: '1px solid #eee', background: '#fff', textDecoration: 'none', color: 'inherit', display: 'block',
+            }}>
+              <div style={{ fontSize: 18 }}>{link.icon}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: '#222' }}>{link.label} ↗</div>
+              <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{link.desc}</div>
+            </a>
+          ))}
+        </div>
       </div>
 
       {stats.valence.total > 0 && (
@@ -2025,6 +2165,200 @@ function EventPlansTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── 学校・法人（縁のデータベース） ────────
+interface ClientLead {
+  id: string;
+  client_type: 'school' | 'business';
+  org_name: string;
+  contact_name: string | null;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  lead: { label: '候補', color: '#999' },
+  contacted: { label: '接触済み', color: '#4A90E2' },
+  negotiating: { label: '商談中', color: '#E5A139' },
+  contracted: { label: '契約中', color: '#27AE60' },
+  lost: { label: '見送り', color: '#E55039' },
+};
+
+function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [filter, setFilter] = useState<'all' | 'school' | 'business'>('all');
+  const [leads, setLeads] = useState<ClientLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ client_type: 'business', org_name: '', contact_name: '', email: '', phone: '' });
+  const [saving, setSaving] = useState(false);
+  const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch('/api/admin/client-leads', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          setLeads(d.leads);
+          setEditingMemo(Object.fromEntries((d.leads as ClientLead[]).map(l => [l.id, l.memo ?? ''])));
+        } else setError(d.error ?? '取得に失敗しました');
+      })
+      .catch(() => setError('通信エラー'))
+      .finally(() => setLoading(false));
+  }, [authHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function createLead(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.org_name.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/client-leads', {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setForm({ client_type: 'business', org_name: '', contact_name: '', email: '', phone: '' });
+        setShowCreate(false);
+        load();
+      } else setError(data.error ?? '作成に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateLead(id: string, patch: Record<string, unknown>) {
+    const res = await fetch(`/api/admin/client-leads/${id}`, {
+      method: 'PATCH', headers: authHeaders(), body: JSON.stringify(patch),
+    });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '更新に失敗しました');
+  }
+
+  async function removeLead(id: string) {
+    if (!confirm('この案件を削除しますか？')) return;
+    const res = await fetch(`/api/admin/client-leads/${id}`, { method: 'DELETE', headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
+  }
+
+  const visibleLeads = leads.filter(l => filter === 'all' || l.client_type === filter);
+  const counts = {
+    all: leads.length,
+    school: leads.filter(l => l.client_type === 'school').length,
+    business: leads.filter(l => l.client_type === 'business').length,
+  };
+
+  return (
+    <div>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: '#999' }}>
+        学校・法人からの問い合わせや契約状況をまとめる「縁のデータベース」です。<a href="/school" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>学校向けページ ↗</a>
+        {' '}・<a href="/business" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}> 法人向けページ ↗</a>
+      </p>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {([['all', `すべて（${counts.all}）`], ['school', `🏫 学校（${counts.school}）`], ['business', `🏢 法人（${counts.business}）`]] as [typeof filter, string][]).map(([id, label]) => (
+          <button key={id} onClick={() => setFilter(id)} style={{
+            padding: '7px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
+            background: filter === id ? '#38ADA9' : '#fff',
+            color: filter === id ? '#fff' : '#666', fontWeight: 700, fontSize: 12,
+            boxShadow: filter === id ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {showCreate ? (
+        <Card style={{ marginBottom: 14 }}>
+          <form onSubmit={createLead} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <select value={form.client_type} onChange={e => setForm(f => ({ ...f, client_type: e.target.value }))} style={inputStyle}>
+              <option value="business">🏢 法人</option>
+              <option value="school">🏫 学校</option>
+            </select>
+            <input placeholder="団体名 *" value={form.org_name} onChange={e => setForm(f => ({ ...f, org_name: e.target.value }))} style={inputStyle} required />
+            <input placeholder="担当者名" value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} style={inputStyle} />
+            <input placeholder="メールアドレス" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inputStyle} />
+            <input placeholder="電話番号" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} style={inputStyle} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={saving} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: 'pointer',
+              }}>{saving ? '作成中…' : '追加する'}</button>
+              <button type="button" onClick={() => setShowCreate(false)} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #ddd',
+                background: '#fff', color: '#888', cursor: 'pointer',
+              }}>キャンセル</button>
+            </div>
+          </form>
+        </Card>
+      ) : (
+        <button onClick={() => setShowCreate(true)} style={{
+          display: 'block', width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px dashed #38ADA9',
+          background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 14,
+        }}>＋ 学校・法人の案件を追加</button>
+      )}
+
+      {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+      {loading ? <p style={{ color: '#999' }}>読み込み中…</p> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {visibleLeads.length === 0 && <p style={{ color: '#aaa' }}>まだ案件がありません。</p>}
+          {visibleLeads.map(l => {
+            const statusInfo = LEAD_STATUS_LABELS[l.status] ?? LEAD_STATUS_LABELS.lead;
+            return (
+              <Card key={l.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div>
+                    <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 15 }}>
+                      {l.client_type === 'school' ? '🏫' : '🏢'} {l.org_name}
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
+                    </p>
+                    <p style={{ margin: 0, fontSize: 12, color: '#999' }}>
+                      {l.contact_name && `👤 ${l.contact_name}`}
+                      {l.email && ` ・ ✉ ${l.email}`}
+                      {l.phone && ` ・ 📞 ${l.phone}`}
+                      {!l.contact_name && !l.email && !l.phone && '連絡先未登録'}
+                    </p>
+                  </div>
+                  <button onClick={() => removeLead(l.id)} style={{
+                    padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                  }}>削除</button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+                  {Object.entries(LEAD_STATUS_LABELS).map(([key, info]) => (
+                    <button key={key} onClick={() => updateLead(l.id, { status: key })} style={{
+                      padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+                      border: `1.5px solid ${l.status === key ? info.color : '#ddd'}`,
+                      background: l.status === key ? info.color + '18' : '#fff',
+                      color: l.status === key ? info.color : '#999', fontWeight: l.status === key ? 700 : 400,
+                    }}>{info.label}</button>
+                  ))}
+                </div>
+
+                <textarea
+                  value={editingMemo[l.id] ?? ''}
+                  onChange={e => setEditingMemo(prev => ({ ...prev, [l.id]: e.target.value }))}
+                  onBlur={() => { if ((editingMemo[l.id] ?? '') !== (l.memo ?? '')) updateLead(l.id, { memo: editingMemo[l.id] || null }); }}
+                  placeholder="商談メモ・要望・次のアクションなど自由に"
+                  rows={3}
+                  style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+                <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                  最終更新: {new Date(l.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+                </p>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
