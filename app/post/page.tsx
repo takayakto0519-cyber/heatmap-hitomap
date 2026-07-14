@@ -410,6 +410,9 @@ export default function PostPage() {
           {/* ① 写真（最大4枚） */}
           <section style={sectionStyle}>
             <label style={labelStyle}>📷 写真（最大{MAX_PHOTOS}枚）</label>
+            <p style={{ margin: '-4px 0 8px', fontSize: 11, color: '#aaa', lineHeight: 1.5 }}>
+              表札・車のナンバープレート・人の顔がはっきり写っている場合は、避けるかぼかしてから投稿してください
+            </p>
             <input ref={fileRef} type="file" accept="image/*" multiple
               style={{ display: 'none' }} onChange={handlePhoto} />
             {photos.length > 0 && (

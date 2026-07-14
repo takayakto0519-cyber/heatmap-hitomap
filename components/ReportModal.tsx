@@ -11,6 +11,7 @@ const REASONS = [
   { key: 'inappropriate', label: '不適切な内容' },
   { key: 'spam', label: 'スパム・宣伝' },
   { key: 'personal_info', label: '個人情報が写っている' },
+  { key: 'private_property', label: '個人の自宅・敷地が特定できる' },
   { key: 'copyright', label: '著作権・肖像権の侵害' },
   { key: 'other', label: 'その他' },
 ] as const;

@@ -160,9 +160,13 @@ const REASON_LABELS: Record<string, string> = {
   inappropriate: '不適切な内容',
   spam: 'スパム・宣伝',
   personal_info: '個人情報が写っている',
+  private_property: '個人の自宅・敷地が特定できる',
   copyright: '著作権・肖像権の侵害',
   other: 'その他',
 };
+
+// 個人宅・敷地の特定は削除対応を急ぐべきなので、通報キューの先頭に出す
+const URGENT_REPORT_REASONS = new Set(['private_property']);
 
 export default function AdminDashboardPage() {
   const [password, setPassword] = useState('');
@@ -673,7 +677,15 @@ function ReportsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     setLoading(true);
     fetch(`/api/admin/reports?status=${status}`, { headers: authHeaders() })
       .then(r => r.json())
-      .then(d => { if (d.ok) setReports(d.reports); else setError(d.error ?? '取得に失敗しました'); })
+      .then(d => {
+        if (d.ok) {
+          // 個人宅・敷地の特定通報を先頭に出す（それ以外は元の並び＝新着順を維持）
+          const sorted = [...(d.reports as Report[])].sort((a, b) =>
+            Number(URGENT_REPORT_REASONS.has(b.reason)) - Number(URGENT_REPORT_REASONS.has(a.reason))
+          );
+          setReports(sorted);
+        } else setError(d.error ?? '取得に失敗しました');
+      })
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
   }, [authHeaders, status]);
@@ -705,8 +717,10 @@ function ReportsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       {loading ? <p style={{ color: '#999' }}>読み込み中…</p> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {reports.length === 0 && <p style={{ color: '#aaa' }}>該当する通報はありません。</p>}
-          {reports.map(r => (
-            <Card key={r.id}>
+          {reports.map(r => {
+            const urgent = URGENT_REPORT_REASONS.has(r.reason);
+            return (
+            <Card key={r.id} style={urgent ? { background: '#FFF5F3', boxShadow: '0 1px 4px rgba(229,80,57,0.2)', border: '1.5px solid #FFB4A8' } : undefined}>
               <div style={{ display: 'flex', gap: 10 }}>
                 {r.trace?.photo_url && (
                   <img src={r.trace.photo_url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
@@ -717,7 +731,7 @@ function ReportsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                     {r.trace?.is_deleted && <span style={{ color: '#aaa', fontWeight: 400 }}> ・ 削除済み</span>}
                   </p>
                   <p style={{ margin: '0 0 4px', fontSize: 12, color: '#E55039', fontWeight: 700 }}>
-                    {REASON_LABELS[r.reason] ?? r.reason}
+                    {urgent && '🚨 至急・'}{REASON_LABELS[r.reason] ?? r.reason}
                   </p>
                   {r.note && <p style={{ margin: '0 0 4px', fontSize: 12, color: '#555' }}>{r.note}</p>}
                   <p style={{ margin: 0, fontSize: 11, color: '#aaa' }}>
@@ -738,7 +752,8 @@ function ReportsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 </div>
               )}
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
