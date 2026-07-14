@@ -6,26 +6,9 @@ import dynamic from 'next/dynamic';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import type { Trace } from '@/lib/types';
+import { computeBadges } from '@/lib/badges';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), { ssr: false });
-
-// 踏破バッジ：投稿した町（region）のユニーク数で段階を決める
-const BADGE_TIERS = [
-  { min: 1, emoji: '🥉', label: '最初の一歩' },
-  { min: 3, emoji: '🌱', label: '芽生え' },
-  { min: 5, emoji: '🥈', label: '歩く人' },
-  { min: 10, emoji: '🔦', label: '探し人' },
-  { min: 15, emoji: '🥇', label: '旅する人' },
-  { min: 25, emoji: '🧭', label: '道しるべ' },
-  { min: 30, emoji: '👑', label: '痕跡の探求者' },
-  { min: 50, emoji: '🏔', label: '町の語り部' },
-  { min: 75, emoji: '🌍', label: 'まちあるきの達人' },
-  { min: 100, emoji: '⭐', label: '伝説の記録者' },
-] as const;
-
-function currentBadge(regionCount: number) {
-  return [...BADGE_TIERS].reverse().find((b) => regionCount >= b.min) ?? null;
-}
 
 interface Profile {
   id: string;
@@ -67,6 +50,7 @@ export default function ProfilePage() {
   const [bookmarks, setBookmarks] = useState<Trace[]>([]);
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null);
   const [myTraces, setMyTraces] = useState<Trace[]>([]);
+  const [routeCompletionCount, setRouteCompletionCount] = useState(0);
 
   const [editing, setEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -111,6 +95,9 @@ export default function ProfilePage() {
 
         const tracesRes = await fetch(`/api/traces?user_id=${rows.id}&limit=500`).then(r => r.json()).catch(() => null);
         if (tracesRes?.ok) setMyTraces(tracesRes.traces ?? []);
+
+        const routeRes = await fetch(`/api/routes/completions?user_id=${rows.id}`).then(r => r.json()).catch(() => null);
+        if (routeRes?.ok) setRouteCompletionCount(routeRes.count ?? 0);
       } catch (e) {
         setError(e instanceof Error ? e.message : '読み込みに失敗しました');
       } finally {
@@ -259,19 +246,22 @@ export default function ProfilePage() {
         </div>
 
         {(() => {
-          const regionCount = new Set(myTraces.map(t => t.region).filter(Boolean)).size;
-          const badge = currentBadge(regionCount);
-          if (!badge) return null;
+          const badges = computeBadges(myTraces, routeCompletionCount);
+          if (badges.length === 0) return null;
           return (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
-              background: '#FBF6FF', border: '1px solid #F3EAFB', borderRadius: 10, padding: '10px 14px',
-            }}>
-              <span style={{ fontSize: 26 }}>{badge.emoji}</span>
-              <div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#8E44AD' }}>{badge.label}</p>
-                <p style={{ margin: 0, fontSize: 11, color: '#999' }}>{regionCount}の町に痕跡を残した</p>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 16 }}>
+              {badges.map(badge => (
+                <div key={badge.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: '#FBF6FF', border: '1px solid #F3EAFB', borderRadius: 10, padding: '8px 10px',
+                }}>
+                  <span style={{ fontSize: 20 }}>{badge.emoji}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#8E44AD', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{badge.label}</p>
+                    <p style={{ margin: 0, fontSize: 10, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{badge.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           );
         })()}
@@ -307,6 +297,49 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {(() => {
+        const now = new Date();
+        const thisMonth = myTraces.filter(t => {
+          const d = new Date(t.created_at);
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        });
+        if (thisMonth.length === 0) return null;
+        const monthRegionCount = new Set(thisMonth.map(t => t.region).filter(Boolean)).size;
+        return (
+          <div style={{
+            marginTop: 20, background: '#fff', borderRadius: 14, padding: 16,
+            boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
+          }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px' }}>
+              📅 {now.getMonth() + 1}月の振り返り
+            </h2>
+            <p style={{ margin: 0, fontSize: 13, color: '#666' }}>
+              今月は<strong style={{ color: '#38ADA9' }}>{thisMonth.length}件</strong>の記録を残し、
+              <strong style={{ color: '#38ADA9' }}>{monthRegionCount}</strong>の町を歩いた
+            </p>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const now = new Date();
+        const onThisDay = myTraces.filter(t => {
+          const d = new Date(t.created_at);
+          return d.getFullYear() < now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+        });
+        if (onThisDay.length === 0) return null;
+        return (
+          <div style={{ marginTop: 20 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🕰 過去の今日</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {onThisDay.map(t => (
+                <TraceCard key={t.id} trace={t} onClick={() => setSelectedTrace(t)} />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {isMe && (
         <div style={{ marginTop: 20 }}>

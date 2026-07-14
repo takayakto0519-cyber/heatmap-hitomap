@@ -27,6 +27,17 @@ function getIsoWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+// ISO週年+週番号（例："2026-W03"）。年をまたぐ週でも一意になり、
+// 継続バッジ（週の連続記録）の判定に使える。
+export function getIsoWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const isoYear = d.getUTCFullYear();
+  const week = getIsoWeekNumber(date);
+  return `${isoYear}-W${String(week).padStart(2, '0')}`;
+}
+
 export function getCurrentQuest(date: Date = new Date()): Quest {
   const week = getIsoWeekNumber(date);
   return QUESTS[week % QUESTS.length];
