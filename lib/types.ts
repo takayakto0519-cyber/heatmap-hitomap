@@ -60,6 +60,8 @@ export interface Trace {
   team: string | null;            // リレー型イベント参加時のチーム名（自由記述）
 
   revisit_of: string | null;      // 「その後」の記録：この痕跡がどの痕跡の後日談かを示す元の trace の id
+
+  companion_tag: string | null;   // 誰と一緒に見つけたか（自由記述、任意）— 関係性データの最小記録
 }
 
 /**
@@ -110,6 +112,8 @@ export interface TraceInput {
   visibility?: string;             // private | followers | pending_review | public（未指定・未ログインは public 固定）
 
   revisit_of?: string | null;      // 「その後」の記録として投稿する場合、元の trace の id
+
+  companion_tag?: string | null;   // 誰と一緒に見つけたか（自由記述、任意）
 }
 
 // ------------------------------------------------------------
