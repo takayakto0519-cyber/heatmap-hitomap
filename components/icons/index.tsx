@@ -132,6 +132,37 @@ export function BookIcon(p: IconProps = {}) {
   </>, p);
 }
 
+export function SearchIcon(p: IconProps = {}) {
+  return base(<>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.5 15.5 L21 21" />
+  </>, p);
+}
+
+export function FlameIcon(p: IconProps = {}) {
+  // ヒートマップ（感情の熱）
+  return base(<>
+    <path d="M12 3 C12 7 7 9 7 14 A5 5 0 0 0 17 14 C17 10.5 13.5 9 12 3 Z" />
+    <path d="M12 21 A2.6 2.6 0 0 1 9.4 18.4 C9.4 16.6 11 15.8 12 14 C13 15.8 14.6 16.6 14.6 18.4 A2.6 2.6 0 0 1 12 21 Z" />
+  </>, p);
+}
+
+export function WalkIcon(p: IconProps = {}) {
+  // 寄り道（歩く人）
+  return base(<>
+    <circle cx="13" cy="4.5" r="2" />
+    <path d="M13 7 L10.5 13 L7.5 20.5 M10.5 13 L13.5 15.5 L14.5 20.5 M13 7 L16 9.5 L18.5 10.5 M13 7 L10 9 L8 8.5" />
+  </>, p);
+}
+
+export function CompassIcon(p: IconProps = {}) {
+  // 眠る痕跡を探す（羅針盤）
+  return base(<>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M15.5 8.5 L13.5 13.5 L8.5 15.5 L10.5 10.5 Z" />
+  </>, p);
+}
+
 /* ── ページCTA ── */
 
 export function EnvelopeIcon(p: IconProps = {}) {

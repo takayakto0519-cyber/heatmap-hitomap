@@ -19,6 +19,8 @@ import QuickAddSheet from '@/components/QuickAddSheet';
 import StatsPanel from '@/components/list/StatsPanel';
 import Onboarding from '@/components/Onboarding';
 import BottomNav from '@/components/BottomNav';
+import { PinIcon, FlameIcon, SearchIcon, WalkIcon, CompassIcon, TrailIcon, ClockIcon } from '@/components/icons';
+import { ARCHIVE_TYPE_ICONS } from '@/components/report/tagIcons';
 import type { Quest } from '@/lib/quests';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
@@ -1126,11 +1128,12 @@ function MapApp() {
                   if (m === 'heat' && filterArchive && filterArchive !== 'trace') setFilterArchive(null);
                 }} style={{
                   padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: 'none',
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
                   background: mapMode === m ? colors.surface : 'transparent',
                   color: mapMode === m ? colors.textPrimary : colors.textMuted, fontWeight: 700,
                   boxShadow: mapMode === m ? shadows.segment : 'none',
                   transition: 'background 0.15s ease, box-shadow 0.15s ease',
-                }}>{m === 'pin' ? '📍 ピン' : '🌡 ヒート'}</button>
+                }}>{m === 'pin' ? <><PinIcon size={13} /> ピン</> : <><FlameIcon size={13} /> ヒート</>}</button>
               ))}
             </div>
           )}
@@ -1142,14 +1145,17 @@ function MapApp() {
                 padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
                 border: '1.5px solid #ddd', background: '#fff', color: '#555',
               }}>
-                {sortOrder === 'new' ? '🕐 新しい順' : '🕰 古い順'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <ClockIcon size={12} /> {sortOrder === 'new' ? '新しい順' : '古い順'}
+                </span>
               </button>
               <button onClick={() => { setRouteMode(v => !v); setRouteSelection([]); }} style={{
                 padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
                 border: `1.5px solid ${routeMode ? '#8E44AD' : '#ddd'}`,
                 background: routeMode ? '#F3EAFB' : '#fff',
                 color: routeMode ? '#8E44AD' : '#666', fontWeight: routeMode ? 700 : 400,
-              }}>🥾 {routeMode ? 'ルート作成中' : 'ルートを作る'}</button>
+              }}><TrailIcon size={12} /> {routeMode ? 'ルート作成中' : 'ルートを作る'}</button>
             </div>
           )}
 
@@ -1164,6 +1170,47 @@ function MapApp() {
             </div>
           )}
         </div>
+
+        {/* 町検索：AllTrails（検索がヒーロー）の構成を踏襲し、マップタブでは常時最上部に出す */}
+        {tab === 'map' && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: '#fff', border: '1.5px solid #ddd', borderRadius: 999,
+              padding: '4px 6px 4px 14px',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+            }}>
+              <span style={{ color: '#999', display: 'inline-flex', flexShrink: 0 }}><SearchIcon size={16} /></span>
+              <input
+                value={regionQuery}
+                onChange={e => setRegionQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') searchRegion(); }}
+                placeholder="歩く町をさがす（例：渋谷区、別府市…）"
+                style={{
+                  flex: 1, minWidth: 0, padding: '7px 0', fontSize: 13,
+                  border: 'none', outline: 'none', background: 'transparent',
+                }}
+              />
+              <button onClick={searchRegion} disabled={regionSearching} style={{
+                padding: '7px 16px', borderRadius: 999, border: 'none', flexShrink: 0,
+                background: '#38ADA9', color: '#fff', fontSize: 13, fontWeight: 700,
+                cursor: regionSearching ? 'wait' : 'pointer',
+              }}>{regionSearching ? '検索中…' : '移動'}</button>
+            </div>
+            {regionError && <p style={{ color: '#E55039', fontSize: 12, margin: '4px 0 0' }}>{regionError}</p>}
+            {regionCandidates.length > 0 && (
+              <div style={{ marginTop: 6, background: '#fff', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
+                {regionCandidates.map((c, i) => (
+                  <button key={i} onClick={() => jumpToRegion(c)} style={{
+                    display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
+                    border: 'none', borderBottom: i < regionCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    background: '#fff', fontSize: 12, color: '#444', cursor: 'pointer',
+                  }}>{c.display_name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 今日の問い：ホーム相当のmapタブを開いた瞬間に見えるよう、投稿タブから移設 */}
         {tab === 'map' && !questDismissed && currentQuest && (
@@ -1214,7 +1261,7 @@ function MapApp() {
         {/* 一覧タブでも常に表示する（「近くのみ」を解除する手段がここにしかないため。無いと0件のまま抜け出せなくなる） */}
         {(tab === 'map' || tab === 'list') && (() => {
           const isActive = Boolean(
-            filterArchive || filterEmotion || nearbyOnly || detourMode || showRegionSearch ||
+            filterArchive || filterEmotion || nearbyOnly || detourMode ||
             intensityLayer !== 'all' || timeSliderOn
           );
           return (
@@ -1225,7 +1272,7 @@ function MapApp() {
               background: isActive ? '#FFF0F5' : '#fff',
               color: isActive ? '#FF6B9D' : '#666', fontWeight: isActive ? 700 : 400,
             }}>
-              🔍 絞り込み・発見{isActive ? '中' : ''} {filtersOpen ? '▴' : '▾'}
+              絞り込み・発見{isActive ? '中' : ''} {filtersOpen ? '▴' : '▾'}
             </button>
           );
         })()}
@@ -1242,29 +1289,26 @@ function MapApp() {
               } else { setNearbyOnly(n => !n); }
             }} style={{
               padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               border: `1.5px solid ${nearbyOnly ? '#38ADA9' : '#ddd'}`,
               background: nearbyOnly ? '#E8F8F7' : '#fff',
               color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
-            }}>📍 近く</button>
-            <button onClick={() => setShowRegionSearch(v => !v)} style={{
-              padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-              border: `1.5px solid ${showRegionSearch ? '#38ADA9' : '#ddd'}`,
-              background: showRegionSearch ? '#E8F8F7' : '#fff',
-              color: showRegionSearch ? '#38ADA9' : '#666', fontWeight: showRegionSearch ? 700 : 400,
-            }}>🔍 地域</button>
+            }}><PinIcon size={12} /> 近く</button>
             <button onClick={() => {
               setDetourMode(v => !v);
               if (detourMode) { setDetourDestination(null); setDetourQuery(''); setDetourCandidates([]); }
             }} style={{
               padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               border: `1.5px solid ${detourMode ? '#38ADA9' : '#ddd'}`,
               background: detourMode ? '#E8F8F7' : '#fff',
               color: detourMode ? '#38ADA9' : '#666', fontWeight: detourMode ? 700 : 400,
-            }}>🚶 寄り道</button>
+            }}><WalkIcon size={12} /> 寄り道</button>
             <button onClick={openUnexplored} style={{
               padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               border: '1.5px solid #F3EAFB', background: '#FBF6FF', color: '#8E44AD', fontWeight: 700,
-            }}>🧭 眠る痕跡</button>
+            }}><CompassIcon size={12} /> 眠る痕跡</button>
           </div>
         )}
 
@@ -1303,57 +1347,27 @@ function MapApp() {
             }}>すべて</button>
             <button onClick={() => setFilterArchive(filterArchive === 'trace' ? null : 'trace')} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               border: `1.5px solid ${filterArchive === 'trace' ? '#FF6B9D' : '#ddd'}`,
               background: filterArchive === 'trace' ? '#FF6B9D' : '#fff',
               color: filterArchive === 'trace' ? '#fff' : '#666',
-            }}>📍 痕跡</button>
-            {archiveCounts.map(a => (
-              <button key={a.key} onClick={() => setFilterArchive(filterArchive === a.key ? null : a.key)} style={{
-                padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                border: `1.5px solid ${filterArchive === a.key ? a.color : '#ddd'}`,
-                background: filterArchive === a.key ? a.color : '#fff',
-                color: filterArchive === a.key ? '#fff' : '#666',
-              }}>{a.emoji} {a.label} {a.count}</button>
-            ))}
+            }}><PinIcon size={12} /> 痕跡</button>
+            {archiveCounts.map(a => {
+              const ArchiveIcon = ARCHIVE_TYPE_ICONS[a.key];
+              return (
+                <button key={a.key} onClick={() => setFilterArchive(filterArchive === a.key ? null : a.key)} style={{
+                  padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  border: `1.5px solid ${filterArchive === a.key ? a.color : '#ddd'}`,
+                  background: filterArchive === a.key ? a.color : '#fff',
+                  color: filterArchive === a.key ? '#fff' : '#666',
+                }}>{ArchiveIcon && <ArchiveIcon size={12} />} {a.label} {a.count}</button>
+              );
+            })}
           </div>
         )}
         {tab === 'map' && mapMode === 'heat' && (
-          <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px' }}>🌡 ヒートは感情を記録した「痕跡」投稿のみが対象です</p>
-        )}
-
-        {/* 地域ジャンプ検索（マップ） */}
-        {tab === 'map' && showRegionSearch && (
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                value={regionQuery}
-                onChange={e => setRegionQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') searchRegion(); }}
-                placeholder="例：渋谷区、別府市…"
-                style={{
-                  flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 13,
-                  border: '1.5px solid #ddd', outline: 'none',
-                }}
-              />
-              <button onClick={searchRegion} disabled={regionSearching} style={{
-                padding: '7px 14px', borderRadius: 8, border: 'none',
-                background: '#38ADA9', color: '#fff', fontSize: 13, fontWeight: 700,
-                cursor: regionSearching ? 'wait' : 'pointer',
-              }}>{regionSearching ? '検索中…' : '移動'}</button>
-            </div>
-            {regionError && <p style={{ color: '#E55039', fontSize: 12, margin: '4px 0 0' }}>{regionError}</p>}
-            {regionCandidates.length > 0 && (
-              <div style={{ marginTop: 6, background: '#fff', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
-                {regionCandidates.map((c, i) => (
-                  <button key={i} onClick={() => jumpToRegion(c)} style={{
-                    display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
-                    border: 'none', borderBottom: i < regionCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
-                    background: '#fff', fontSize: 12, color: '#444', cursor: 'pointer',
-                  }}>{c.display_name}</button>
-                ))}
-              </div>
-            )}
-          </div>
+          <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px' }}>ヒートは感情を記録した「痕跡」投稿のみが対象です</p>
         )}
 
         {/* 寄り道モード（マップ） */}
@@ -1558,13 +1572,14 @@ function MapApp() {
                 onClick={() => setPinDropMode(v => !v)}
                 style={{
                   padding: '12px 16px', borderRadius: 24, border: 'none',
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
                   background: pinDropMode ? '#FF6B9D' : '#fff',
                   color: pinDropMode ? '#fff' : '#333',
                   fontWeight: 700, fontSize: 13, cursor: 'pointer',
                   boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
                 }}
               >
-                {pinDropMode ? '✕ 取消（地図をタップ）' : '📍 ここに記録する'}
+                {pinDropMode ? '✕ 取消（地図をタップ）' : <><PinIcon size={14} /> ここに記録する</>}
               </button>
             </div>
             {loading && !fetchError && (
@@ -2390,7 +2405,7 @@ function MapApp() {
           >
             {quickRecording ? '記録中…' : (
               <>
-                <span style={{ fontSize: 18 }}>📍</span>
+                <span style={{ display: 'inline-flex' }}><PinIcon size={18} /></span>
                 <span>痕跡を見つけた</span>
               </>
             )}

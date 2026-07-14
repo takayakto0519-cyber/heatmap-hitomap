@@ -14,6 +14,9 @@ export default function CorpHeader() {
   return (
     <header
       style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 200,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

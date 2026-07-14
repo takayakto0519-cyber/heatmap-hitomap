@@ -5,10 +5,14 @@ import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
+import EmotionTimeline from '@/components/profile/EmotionTimeline';
 import type { Trace } from '@/lib/types';
 import { computeBadges } from '@/lib/badges';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), { ssr: false });
+
+const BIO_MAX_LENGTH = 300;
+const APPOINTMENT_PURPOSE_MAX_LENGTH = 300;
 
 interface Profile {
   id: string;
@@ -16,6 +20,16 @@ interface Profile {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+}
+
+interface AppointmentRequest {
+  id: string;
+  requester_id: string;
+  requestee_id: string;
+  trace_id: string | null;
+  purpose: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
 }
 
 function Avatar({ url, size = 72 }: { url: string | null; size?: number }) {
@@ -60,6 +74,14 @@ export default function ProfilePage() {
   const [editError, setEditError] = useState('');
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [appointmentPurpose, setAppointmentPurpose] = useState('');
+  const [appointmentSending, setAppointmentSending] = useState(false);
+  const [appointmentSent, setAppointmentSent] = useState(false);
+  const [appointmentError, setAppointmentError] = useState('');
+  const [receivedAppointments, setReceivedAppointments] = useState<AppointmentRequest[]>([]);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -85,6 +107,10 @@ export default function ProfilePage() {
         if (me) {
           const bmRes = await fetch('/api/bookmarks').then(r => r.json()).catch(() => null);
           if (bmRes?.ok) setBookmarks(bmRes.traces ?? []);
+          const apptRes = await fetch('/api/appointments').then(r => r.json()).catch(() => null);
+          if (apptRes?.ok) {
+            setReceivedAppointments((apptRes.received ?? []).filter((a: AppointmentRequest) => a.status === 'pending'));
+          }
         }
 
         const followRes = await fetch(`/api/follows?user_id=${rows.id}`).then(r => r.json());
@@ -182,6 +208,48 @@ export default function ProfilePage() {
     }
   }
 
+  async function sendAppointmentRequest() {
+    if (!profile) return;
+    const purpose = appointmentPurpose.trim();
+    if (!purpose) { setAppointmentError('会いたい理由を書いてください'); return; }
+    setAppointmentSending(true);
+    setAppointmentError('');
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestee_id: profile.id, purpose }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAppointmentSent(true);
+        setShowAppointmentForm(false);
+        setAppointmentPurpose('');
+      } else if (res.status === 401) {
+        window.location.href = '/login';
+      } else {
+        setAppointmentError(data.error ?? '送信に失敗しました');
+      }
+    } catch (err) {
+      setAppointmentError(err instanceof Error ? err.message : '送信に失敗しました');
+    } finally {
+      setAppointmentSending(false);
+    }
+  }
+
+  async function respondAppointment(id: string, status: 'accepted' | 'declined') {
+    setRespondingId(id);
+    try {
+      const res = await fetch(`/api/appointments/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (data.ok) setReceivedAppointments(prev => prev.filter(a => a.id !== id));
+    } finally {
+      setRespondingId(null);
+    }
+  }
+
   if (loading) return <div style={{ padding: 20 }}>読み込み中…</div>;
   if (error || !profile) return <div style={{ padding: 20, color: '#E74C3C' }}>{error ?? 'ユーザーが見つかりません'}</div>;
 
@@ -222,9 +290,15 @@ export default function ProfilePage() {
             <input value={editDisplayName} onChange={e => setEditDisplayName(e.target.value)} placeholder={profile.username}
               style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }} />
             <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>自己紹介</label>
-            <textarea value={editBio} onChange={e => setEditBio(e.target.value)} rows={3}
-              placeholder="どんな痕跡を残していきたいか、書いてみてください"
-              style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+            <p style={{ margin: 0, fontSize: 11, color: '#999', lineHeight: 1.6 }}>
+              例：どんな痕跡に心が動くタイプか／なぜヒトマップを始めたか／これからどんな町を歩いてみたいか
+            </p>
+            <textarea value={editBio} onChange={e => setEditBio(e.target.value.slice(0, BIO_MAX_LENGTH))} rows={6}
+              placeholder={'例）\n古い商店の看板の文字が好きです。書いた人の手癖が残っているから。\n浦河町を歩いてから、モノに残った時間を探すのが習慣になりました。'}
+              style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit', resize: 'vertical' }} />
+            <p style={{ margin: 0, fontSize: 11, color: editBio.length >= BIO_MAX_LENGTH ? '#E55039' : '#bbb', textAlign: 'right' }}>
+              {editBio.length} / {BIO_MAX_LENGTH}
+            </p>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={saveProfile} disabled={saving} style={{
                 flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
@@ -237,7 +311,7 @@ export default function ProfilePage() {
             </div>
           </div>
         ) : (
-          profile.bio && <p style={{ fontSize: 13, color: '#555', marginBottom: 14 }}>{profile.bio}</p>
+          profile.bio && <p style={{ fontSize: 13, color: '#555', lineHeight: 1.7, marginBottom: 14, whiteSpace: 'pre-wrap' }}>{profile.bio}</p>
         )}
 
         <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#666', marginBottom: 16 }}>
@@ -267,19 +341,79 @@ export default function ProfilePage() {
           );
         })()}
         {!isMe && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={toggleFollow} style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
-              background: isFollowing ? '#eee' : '#38ADA9',
-              color: isFollowing ? '#666' : '#fff', fontWeight: 700, cursor: 'pointer',
-            }}>{isFollowing ? 'フォロー中 ✓' : 'フォローする'}</button>
-            {isMutual && (
-              <a href={`/messages/${profile.username}`} style={{
-                flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px solid #FF6B9D',
-                background: '#fff', color: '#FF6B9D', fontWeight: 700, cursor: 'pointer',
-                textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
-              }}>💬 メッセージ</a>
+          <div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={toggleFollow} style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+                background: isFollowing ? '#eee' : '#38ADA9',
+                color: isFollowing ? '#666' : '#fff', fontWeight: 700, cursor: 'pointer',
+              }}>{isFollowing ? 'フォロー中 ✓' : 'フォローする'}</button>
+              {isMutual && (
+                <a href={`/messages/${profile.username}`} style={{
+                  flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px solid #FF6B9D',
+                  background: '#fff', color: '#FF6B9D', fontWeight: 700, cursor: 'pointer',
+                  textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
+                }}>💬 メッセージ</a>
+              )}
+              {!appointmentSent && (
+                <button onClick={() => setShowAppointmentForm(v => !v)} style={{
+                  flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px solid #8E44AD',
+                  background: '#fff', color: '#8E44AD', fontWeight: 700, cursor: 'pointer',
+                }}>会ってみたい</button>
+              )}
+            </div>
+
+            {appointmentSent && (
+              <p style={{ marginTop: 10, fontSize: 12, color: '#8E44AD', background: '#FBF6FF', borderRadius: 8, padding: '8px 10px' }}>
+                申請を送りました。相手の承認をお待ちください。
+              </p>
             )}
+
+            {showAppointmentForm && !appointmentSent && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <p style={{ margin: 0, fontSize: 11, color: '#999' }}>
+                  フォロー関係がなくても送れます。何が気になったか、何のために会いたいかを一言書いてください。
+                </p>
+                <textarea
+                  value={appointmentPurpose}
+                  onChange={e => setAppointmentPurpose(e.target.value.slice(0, APPOINTMENT_PURPOSE_MAX_LENGTH))}
+                  rows={3}
+                  placeholder="例）あなたが記録した〇〇の痕跡に共感しました。実際にどんな場所だったか話を聞いてみたいです。"
+                  style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', resize: 'vertical' }}
+                />
+                <p style={{ margin: 0, fontSize: 11, color: appointmentPurpose.length >= APPOINTMENT_PURPOSE_MAX_LENGTH ? '#E55039' : '#bbb', textAlign: 'right' }}>
+                  {appointmentPurpose.length} / {APPOINTMENT_PURPOSE_MAX_LENGTH}
+                </p>
+                {appointmentError && <p style={{ margin: 0, color: '#E55039', fontSize: 12 }}>{appointmentError}</p>}
+                <button onClick={sendAppointmentRequest} disabled={appointmentSending} style={{
+                  padding: '9px 0', borderRadius: 8, border: 'none',
+                  background: '#8E44AD', color: '#fff', fontWeight: 700, cursor: appointmentSending ? 'wait' : 'pointer', fontSize: 13,
+                }}>{appointmentSending ? '送信中…' : '申請を送る'}</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isMe && receivedAppointments.length > 0 && (
+          <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#8E44AD' }}>
+              会ってみたいという申請が{receivedAppointments.length}件届いています
+            </p>
+            {receivedAppointments.map(appt => (
+              <div key={appt.id} style={{ background: '#FBF6FF', border: '1px solid #F3EAFB', borderRadius: 10, padding: '10px 12px' }}>
+                <p style={{ margin: '0 0 8px', fontSize: 13, color: '#555', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{appt.purpose}</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => respondAppointment(appt.id, 'accepted')} disabled={respondingId === appt.id} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+                    background: '#8E44AD', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                  }}>承認する</button>
+                  <button onClick={() => respondAppointment(appt.id, 'declined')} disabled={respondingId === appt.id} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid #ddd',
+                    background: '#fff', color: '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                  }}>見送る</button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
         {isMe && !editing && (
@@ -296,6 +430,16 @@ export default function ProfilePage() {
           <div style={{ height: 260, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
             <TraceMap traces={myTraces} mode="pin" allowWideZoom onTraceClick={setSelectedTrace} />
           </div>
+        </div>
+      )}
+
+      {myTraces.length > 1 && (
+        <div style={{ marginTop: 20, background: '#fff', borderRadius: 14, padding: 16, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>どんな出会いを重ねてきたか</h2>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
+            記録の感情の起伏を時系列で辿れます。点をタップすると、その記録を開きます。
+          </p>
+          <EmotionTimeline traces={myTraces} onSelect={setSelectedTrace} />
         </div>
       )}
 

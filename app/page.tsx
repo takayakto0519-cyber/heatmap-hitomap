@@ -1,8 +1,12 @@
 import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
 import Hero from '@/components/corp/Hero';
+import FeatureCards from '@/components/corp/FeatureCards';
 import CoreEquation from '@/components/corp/CoreEquation';
 import ServiceFlow from '@/components/corp/ServiceFlow';
+import EmotionPalette from '@/components/corp/EmotionPalette';
+import RecentTraces from '@/components/corp/RecentTraces';
+import CtaBand from '@/components/corp/CtaBand';
 import { corpColor, corpFont } from '@/components/corp/tokens';
 import AdSlot from '@/components/AdSlot';
 
@@ -39,10 +43,15 @@ export default function HomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <CorpHeader />
 
+      {/* 構成はYAMAPトップの骨格（ヒーロー→機能→説明→コミュニティ→事業→CTA帯→多段フッター）を踏襲し、
+          トーンはSANU（詩的な一行＋余白のリズム）に寄せている。 */}
       <main style={{ flex: 1 }}>
         <Hero />
-        <CoreEquation />
+        <FeatureCards />
         <ServiceFlow />
+        <EmotionPalette />
+        <RecentTraces />
+        <CoreEquation />
 
         <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
           <div style={{ maxWidth: 960, margin: '0 auto' }}>
@@ -128,7 +137,9 @@ export default function HomePage() {
           </div>
         </section>
 
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px 40px' }}>
+        <CtaBand />
+
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px' }}>
           <AdSlot />
         </div>
       </main>
