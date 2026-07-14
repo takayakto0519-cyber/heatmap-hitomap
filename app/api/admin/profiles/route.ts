@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { supabaseServer } = await import('@/lib/supabase/server');
 
   const [{ data: profiles, error: profileError }, { data: traces, error: traceError }, { data: follows }] = await Promise.all([
-    supabaseServer.from('profiles').select('id, username, display_name, bio, avatar_url, created_at'),
+    supabaseServer.from('profiles').select('id, username, display_name, bio, avatar_url, created_at, auto_approve'),
     supabaseServer.from('traces')
       .select('id, user_id, title, photo_url, emotion_key, visibility, why, created_at')
       .eq('is_deleted', false).not('user_id', 'is', null)
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
     bio: p.bio,
     avatar_url: p.avatar_url,
     created_at: p.created_at,
+    auto_approve: p.auto_approve ?? false,
     traceCount: traceStats.get(p.id)?.count ?? 0,
     lastPostedAt: traceStats.get(p.id)?.lastPostedAt ?? null,
     followerCount: followerCounts.get(p.id) ?? 0,

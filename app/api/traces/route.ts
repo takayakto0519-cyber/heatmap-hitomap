@@ -112,22 +112,29 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 
     const userId = await getCurrentUserId();
     const team = body.team?.trim() || null;
+    const supabaseServer = await getServerClient();
+
     // 匿名投稿は全国公開前に運営審査を通す（pending_review）。ログイン投稿のみ公開範囲を選べる（private/followers/pending_review）。
     // ただしリレー型イベント参加（team指定あり）の投稿は、ログイン有無にかかわらず必ずpublicにする。
     // ログイン投稿はデフォルトprivateになるため、そのままだとチームメンバー同士に投稿が見えなくなってしまう。
     const allowedVisibility = ['private', 'followers', 'pending_review'];
-    const visibility = team
+    let visibility = team
       ? 'public'
       : userId && body.visibility && allowedVisibility.includes(body.visibility)
         ? body.visibility
         : userId ? 'private' : 'pending_review';
 
+    // 運営が個別に信頼をおいたユーザー（profiles.auto_approve）は、審査待ちにせず即座に全国公開する
+    if (visibility === 'pending_review' && userId) {
+      const { data: profile } = await supabaseServer
+        .from('profiles').select('auto_approve').eq('id', userId).maybeSingle();
+      if (profile?.auto_approve) visibility = 'public';
+    }
+
     const region = await reverseGeocodeRegion(body.latitude, body.longitude);
 
     const photoUrls = (body.photo_urls ?? []).filter(Boolean).slice(0, 4);
     const photoUrl = photoUrls[0] ?? body.photo_url ?? null;
-
-    const supabaseServer = await getServerClient();
     const { data, error } = await supabaseServer
       .from('traces')
       .insert({

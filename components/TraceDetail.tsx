@@ -55,6 +55,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   );
   const [editIntensity, setEditIntensity] = useState(trace.intensity ?? 3);
   const [editCategory, setEditCategory] = useState(trace.category);
+  const [editVisibility, setEditVisibility] = useState(trace.visibility ?? 'private');
   const [editPhotoUrl, setEditPhotoUrl] = useState(trace.photo_url);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -286,6 +287,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
           photo_url: editPhotoUrl,
           photo_urls: editPhotoUrl ? [editPhotoUrl] : null,
           video_url: editVideoUrl,
+          ...(editVisibility !== trace.visibility ? { visibility: editVisibility } : {}),
         }),
       });
       const data = await res.json();
@@ -395,13 +397,13 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                   width: 32, height: 32, borderRadius: 16,
                   background: '#f0f0f0', border: 'none', cursor: 'pointer', fontSize: 15,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>⚠</button>
+                }}>🚩</button>
               )}
-              <button onClick={handleShare} style={{
+              <button onClick={handleShare} title="共有する" style={{
                 width: 32, height: 32, borderRadius: 16,
                 background: '#f0f0f0', border: 'none', cursor: 'pointer', fontSize: 16,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>🔗</button>
+              }}>📤</button>
             </>
           )}
         </div>
@@ -539,6 +541,45 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 {trace.title}
                 {trace.yomi && <span style={{ fontWeight: 400, color: '#aaa', fontSize: 14 }}>（{trace.yomi}）</span>}
               </h2>
+            )}
+
+            {/* 公開範囲：アカウント投稿のみ変更可能。非公開→全国公開は必ず運営審査（pending_review）を経由する */}
+            {editing && trace.user_id && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 6 }}>公開範囲</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {([
+                    ['private', '🔒 非公開'],
+                    ['followers', '👥 フォロワー限定'],
+                    ['pending_review', '🌏 全国公開を申請'],
+                  ] as [string, string][]).map(([key, label]) => {
+                    const selected = editVisibility === key
+                      || (key === 'pending_review' && editVisibility === 'public');
+                    return (
+                      <button key={key} type="button" onClick={() => {
+                        // すでに全国公開中の場合、「申請」ボタンを押しても状態を維持する（誤って公開取り消しを送らないため）
+                        if (key === 'pending_review' && trace.visibility === 'public') return;
+                        setEditVisibility(key);
+                      }} style={{
+                        padding: '8px 12px', borderRadius: 20,
+                        border: `2px solid ${selected ? '#38ADA9' : '#ddd'}`,
+                        background: selected ? '#38ADA9' : '#fff',
+                        color: selected ? '#fff' : '#333', fontSize: 13, cursor: 'pointer',
+                      }}>{label}</button>
+                    );
+                  })}
+                </div>
+                {trace.visibility === 'public' && editVisibility !== 'public' && (
+                  <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E5A139' }}>
+                    現在すでに全国公開されています。変更すると公開が取り消されます。
+                  </p>
+                )}
+                {editVisibility === 'pending_review' && trace.visibility !== 'pending_review' && trace.visibility !== 'public' && (
+                  <p style={{ margin: '6px 0 0', fontSize: 11, color: '#999' }}>
+                    保存すると運営の審査待ちになります。承認されると全国公開されます。
+                  </p>
+                )}
+              </div>
             )}
 
             {editing && !archiveType && (

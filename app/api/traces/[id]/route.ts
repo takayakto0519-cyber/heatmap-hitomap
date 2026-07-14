@@ -112,12 +112,20 @@ export async function PATCH(
     const allowed = [
       'title', 'why', 'interpretation', 'self_reflection', 'want_revisit', 'want_to_share',
       'archive_type', 'yomi', 'alt_names', 'era_label', 'source_ref', 'voice_relation', 'audio_url',
-      'audio_transcript', 'visibility', 'emotion_key', 'intensity', 'category', 'photo_url', 'photo_urls',
+      'audio_transcript', 'emotion_key', 'intensity', 'category', 'photo_url', 'photo_urls',
       'video_url',
     ];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) updates[key] = body[key] ?? null;
+    }
+    // 公開範囲は本人でも直接publicにはできない（必ず運営審査＝pending_reviewを経由させる）。POST側と同じガード。
+    const allowedVisibility = ['private', 'followers', 'pending_review'];
+    if ('visibility' in body) {
+      if (!allowedVisibility.includes(body.visibility)) {
+        return NextResponse.json({ ok: false, error: '不正な公開範囲です' }, { status: 400 });
+      }
+      updates.visibility = body.visibility;
     }
     // emotion_keys は未マイグレーション環境（列未追加）でも既存の編集が壊れないよう、指定時のみ送る。
     // 空配列(=全解除)も有効な更新として扱う（旧実装は空配列がfalsyになり無視されるバグがあった）

@@ -14,6 +14,27 @@ interface Props {
 // 「なにを感じた？」の下に置く、任意参加のAIサジェスト。
 // 表情から推定した感情タグを「候補」として出すだけで、選ぶ・使うかは常に本人が決める。
 // カメラは短時間だけ使い、解析後は即座に停止・破棄する（サーバー送信なし）。
+// 顔・表情が検出できないまま延々とカメラが回り続けるのを防ぐタイムアウト
+const SCAN_TIMEOUT_SECONDS = 9;
+
+// getUserMedia等の生の例外メッセージ（英語）を、原因ごとの分かりやすい日本語案内に置き換える
+function friendlyCameraError(err: unknown): string {
+  if (err instanceof DOMException) {
+    switch (err.name) {
+      case 'NotAllowedError':
+      case 'SecurityError':
+        return 'カメラの利用が許可されませんでした。ブラウザの設定でカメラへのアクセスを許可してから、もう一度お試しください。';
+      case 'NotFoundError':
+        return 'カメラが見つかりませんでした。カメラのある端末でお試しください。';
+      case 'NotReadableError':
+        return '他のアプリがカメラを使用中の可能性があります。他のアプリを閉じてから、もう一度お試しください。';
+      default:
+        break;
+    }
+  }
+  return 'カメラまたはAIモデルの読み込みに失敗しました。通信状況を確認して、もう一度お試しください。';
+}
+
 export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -21,10 +42,12 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
   const rafRef = useRef<number | null>(null);
   const dwellStartRef = useRef<number | null>(null);
   const dwellLabelRef = useRef<string | null>(null);
+  const scanStartRef = useRef<number>(0);
 
-  const [status, setStatus] = useState<'idle' | 'loading' | 'scanning' | 'done' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'scanning' | 'done' | 'timeout' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [reading, setReading] = useState<FaceReading | null>(null);
+  const [addedKeys, setAddedKeys] = useState<string[]>([]);
 
   useEffect(() => cleanup, []);
 
@@ -41,6 +64,7 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
     setStatus('loading');
     setErrorMsg('');
     setReading(null);
+    setAddedKeys([]);
     dwellStartRef.current = null;
     dwellLabelRef.current = null;
     try {
@@ -69,11 +93,12 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
       landmarkerRef.current = landmarker;
 
       setStatus('scanning');
+      scanStartRef.current = performance.now();
       loop();
     } catch (err) {
       cleanup();
       setStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : 'カメラまたはモデルの初期化に失敗しました');
+      setErrorMsg(friendlyCameraError(err));
     }
   }
 
@@ -81,6 +106,12 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
     const video = videoRef.current;
     const landmarker = landmarkerRef.current;
     if (!video || !landmarker) return;
+
+    if (performance.now() - scanStartRef.current > SCAN_TIMEOUT_SECONDS * 1000) {
+      cleanup();
+      setStatus('timeout');
+      return;
+    }
 
     if (video.readyState >= 2) {
       const now = performance.now();
@@ -122,7 +153,7 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
     setReading(null);
   }
 
-  const candidateKeys = reading?.suggestedKeys.filter((k) => !selectedKeys.includes(k)) ?? [];
+  const candidateKeys = reading?.suggestedKeys.filter((k) => !selectedKeys.includes(k) && !addedKeys.includes(k)) ?? [];
 
   return (
     <div style={{ marginTop: 10 }}>
@@ -135,20 +166,20 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
 
       {status === 'idle' && (
         <button type="button" onClick={start} style={{
-          padding: '8px 12px', borderRadius: 8, border: '1.5px dashed #ccc',
-          background: '#fafafa', color: '#888', fontSize: 12, cursor: 'pointer',
+          padding: '10px 14px', borderRadius: 20, border: '1.5px solid #38ADA9',
+          background: '#E8F8F7', color: '#38ADA9', fontSize: 13, fontWeight: 700, cursor: 'pointer',
         }}>
           🎥 表情からAIに感情を提案してもらう（任意・端末内のみ）
         </button>
       )}
 
       {status === 'loading' && (
-        <p style={{ fontSize: 12, color: '#999' }}>準備中…</p>
+        <p style={{ fontSize: 12, color: '#999' }}>カメラとAIモデルを準備しています…（数秒〜数十秒かかることがあります）</p>
       )}
 
       {status === 'scanning' && (
         <>
-          <p style={{ fontSize: 12, color: '#999', margin: '0 0 6px' }}>表情を見ています…</p>
+          <p style={{ fontSize: 12, color: '#999', margin: '0 0 6px' }}>表情を見ています…（{SCAN_TIMEOUT_SECONDS}秒ほどで自動終了します）</p>
           <button type="button" onClick={cancel} style={{
             padding: '6px 10px', borderRadius: 8, border: 'none',
             background: 'none', color: '#bbb', fontSize: 12, cursor: 'pointer',
@@ -156,8 +187,24 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
         </>
       )}
 
+      {status === 'timeout' && (
+        <div>
+          <p style={{ fontSize: 12, color: '#999', margin: '0 0 6px' }}>うまく表情を検出できませんでした。明るい場所で顔がよく見えるようにして、もう一度お試しください。</p>
+          <button type="button" onClick={start} style={{
+            padding: '6px 12px', borderRadius: 16, border: '1.5px solid #38ADA9',
+            background: '#fff', color: '#38ADA9', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>もう一度試す</button>
+        </div>
+      )}
+
       {status === 'error' && (
-        <p style={{ fontSize: 12, color: '#E55039' }}>{errorMsg}</p>
+        <div>
+          <p style={{ fontSize: 12, color: '#E55039', margin: '0 0 6px' }}>{errorMsg}</p>
+          <button type="button" onClick={start} style={{
+            padding: '6px 12px', borderRadius: 16, border: '1.5px solid #E55039',
+            background: '#fff', color: '#E55039', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>もう一度試す</button>
+        </div>
       )}
 
       {status === 'done' && (
@@ -172,7 +219,7 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
                   const e = getEmotion(key);
                   if (!e) return null;
                   return (
-                    <button key={key} type="button" onClick={() => { onAdd(key); setStatus('idle'); }} style={{
+                    <button key={key} type="button" onClick={() => { onAdd(key); setAddedKeys(prev => [...prev, key]); }} style={{
                       display: 'flex', alignItems: 'center', gap: 4,
                       padding: '8px 12px', borderRadius: 20, border: `1.5px solid ${e.color}`,
                       background: '#fff', color: e.color, fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -184,11 +231,19 @@ export default function FaceEmotionSuggest({ selectedKeys, onAdd }: Props) {
                 <button type="button" onClick={() => setStatus('idle')} style={{
                   padding: '8px 10px', borderRadius: 20, border: 'none',
                   background: 'none', color: '#bbb', fontSize: 12, cursor: 'pointer',
-                }}>不要</button>
+                }}>閉じる</button>
               </div>
             </>
           ) : (
-            <p style={{ fontSize: 12, color: '#bbb' }}>提案できる表情の変化は見つかりませんでした</p>
+            <div>
+              <p style={{ fontSize: 12, color: '#bbb', margin: '0 0 6px' }}>
+                {addedKeys.length > 0 ? '追加しました。' : '提案できる表情の変化は見つかりませんでした。'}
+              </p>
+              <button type="button" onClick={() => setStatus('idle')} style={{
+                padding: '6px 12px', borderRadius: 16, border: '1px solid #ddd',
+                background: '#fff', color: '#888', fontSize: 12, cursor: 'pointer',
+              }}>閉じる</button>
+            </div>
           )}
         </div>
       )}

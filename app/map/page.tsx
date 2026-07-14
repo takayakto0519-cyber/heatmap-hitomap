@@ -62,6 +62,10 @@ const inputStyle: React.CSSProperties = {
 };
 const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 6, color: '#333' };
 
+// 「薄い日常」「深い想い」「時間で見る」レイヤータブ：使い勝手が悪いため一時的に非表示。
+// stateとロジックは残してあるので、trueに戻せば即復活する。
+const SHOW_LEGACY_LAYER_TABS = false;
+
 export default function MapPage() {
   return (
     <Suspense fallback={<div style={mapLoadingStyle}>読み込み中…</div>}>
@@ -94,8 +98,8 @@ function MapApp() {
     blank: { region: string; distanceKm: number; direction: string }[];
   } | null>(null);
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
-  // regionもnearbyもない「文脈なし」の直接アクセスは、全国が見えてしまう前に現在地の町へ自動で絞る
-  const [nearbyOnly, setNearbyOnly] = useState(() => !regionParam);
+  // GPSピンポイントの「近く」ではなく、地域単位の閲覧をデフォルトにする（下の地域自動サジェストと対）
+  const [nearbyOnly, setNearbyOnly] = useState(false);
   const [filterEmotion, setFilterEmotion] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   // 'trace' = 痕跡のみ / それ以外は archive_type のキー / null = すべて
@@ -119,7 +123,9 @@ function MapApp() {
   const [regionSearching, setRegionSearching] = useState(false);
   const [regionError, setRegionError] = useState('');
   const [regionCandidates, setRegionCandidates] = useState<{ display_name: string; lat: string; lon: string; boundingbox: string[] }[]>([]);
-  const [showRegionSearch, setShowRegionSearch] = useState(false);
+  // regionもnearbyもない「文脈なし」の直接アクセスは、地域検索パネルをデフォルトで開いておく（全国が一気に見えるのを避けつつ、GPS「近く」を強制しない）
+  const [showRegionSearch, setShowRegionSearch] = useState(() => !regionParam);
+  const hasAutoSuggestedRegionRef = useRef(false);
 
   // ルート作成モード（一覧タブ）
   const [routeMode, setRouteMode] = useState(false);
@@ -390,6 +396,21 @@ function MapApp() {
       );
     }
   }, [tab, userPos]);
+
+  // regionパラメータなしの初回アクセス時、現在地からおおまかな地域名をサジェストする（近くの投稿に絞り込むのではなく、地域を選んでもらう導線）
+  useEffect(() => {
+    if (!showRegionSearch || regionParam || hasAutoSuggestedRegionRef.current || !userPos) return;
+    hasAutoSuggestedRegionRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/geocode/reverse?lat=${userPos[0]}&lon=${userPos[1]}`).then(r => r.json());
+        if (!res.ok) return;
+        const addr = res.result?.address ?? {};
+        const suggestion = addr.city || addr.town || addr.county || addr.state;
+        if (suggestion) setRegionQuery(suggestion);
+      } catch { /* サイレント失敗：手動検索で代替できる */ }
+    })();
+  }, [showRegionSearch, regionParam, userPos]);
 
   async function searchRegion() {
     if (!regionQuery.trim()) return;
@@ -1185,7 +1206,7 @@ function MapApp() {
         )}
 
         {/* 感情レイヤー・時間（マップのみ、ヒート以外） */}
-        {filtersOpen && tab === 'map' && !(mapMode === 'heat') && (
+        {SHOW_LEGACY_LAYER_TABS && filtersOpen && tab === 'map' && !(mapMode === 'heat') && (
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
             {([
               ['all', 'すべて'],
