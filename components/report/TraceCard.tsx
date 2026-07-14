@@ -4,6 +4,9 @@ import { getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 import { haversine } from '@/lib/geo';
+import { appColor, appRadius, appShadow } from '@/lib/appTokens';
+import { PinIcon, ClockIcon, MicIcon, EditIcon, TrashIcon, RepeatIcon, SpeakIcon, MapIcon, BookIcon } from '@/components/icons';
+import { EMOTION_ICONS, CATEGORY_ICONS, ARCHIVE_TYPE_ICONS } from './tagIcons';
 
 function formatDistance(m: number) {
   if (m < 1000) return `${Math.round(m)}m`;
@@ -38,14 +41,14 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
     <article
       onClick={onClick}
       style={{
-        border: '1px solid #eee', borderRadius: 14, overflow: 'hidden',
-        background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        border: 'none', borderRadius: appRadius.md, overflow: 'hidden',
+        background: appColor.surface, boxShadow: appShadow.sm,
         cursor: onClick ? 'pointer' : 'default',
         transition: 'box-shadow 0.15s, transform 0.1s',
         display: 'flex', flexDirection: 'column',
       }}
-      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; } }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLElement).style.boxShadow = appShadow.md; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = appShadow.sm; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
     >
       {/* 写真 */}
       {t.photo_url ? (
@@ -61,25 +64,28 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
           {distance !== null && (
             <span style={{
               position: 'absolute', top: 8, right: 8,
-              background: 'rgba(0,0,0,0.55)', color: '#fff',
-              padding: '2px 7px', borderRadius: 10, fontSize: 11, fontWeight: 700,
-              backdropFilter: 'blur(4px)',
+              background: 'rgba(33,30,27,0.6)', color: '#fff',
+              padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+              backdropFilter: 'blur(4px)', display: 'inline-flex', alignItems: 'center', gap: 3,
             }}>
-              📍 {formatDistance(distance)}
+              <PinIcon size={11} /> {formatDistance(distance)}
             </span>
           )}
           {t.is_past_memory && (
             <span style={{
               position: 'absolute', top: 8, left: 8,
-              background: 'rgba(255,243,205,0.9)', color: '#856404',
-              padding: '2px 7px', borderRadius: 10, fontSize: 11, fontWeight: 700,
-            }}>🕰 記憶</span>
+              background: 'rgba(245,237,221,0.92)', color: appColor.warning,
+              padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+            }}><ClockIcon size={11} /> 記憶</span>
           )}
         </div>
       ) : (
         distance !== null && (
           <div style={{ padding: '6px 12px 0', display: 'flex', justifyContent: 'flex-end' }}>
-            <span style={{ fontSize: 11, color: '#aaa' }}>📍 {formatDistance(distance)}</span>
+            <span style={{ fontSize: 11, color: appColor.inkGhost, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <PinIcon size={11} /> {formatDistance(distance)}
+            </span>
           </div>
         )
       )}
@@ -88,52 +94,61 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
 
         {/* バッジ行 */}
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          {archiveType && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              padding: '3px 8px', borderRadius: 20,
-              background: archiveType.color + '22', color: archiveType.color, fontSize: 12, fontWeight: 700,
-            }}>
-              {archiveType.emoji} {archiveType.label}
-            </span>
-          )}
-          {emotionList.map(emotion => (
-            <span key={emotion.key} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              padding: '3px 8px', borderRadius: 20,
-              background: emotion.color + '22', color: emotion.color, fontSize: 12, fontWeight: 700,
-            }}>
-              {emotion.emoji} {emotion.label}
-            </span>
-          ))}
-          {category && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              padding: '3px 8px', borderRadius: 20,
-              background: '#f0f0f0', color: '#888', fontSize: 11,
-            }}>
-              {category.emoji} {category.label}
-            </span>
-          )}
+          {archiveType && (() => {
+            const TagI = ARCHIVE_TYPE_ICONS[archiveType.key];
+            return (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '3px 8px', borderRadius: appRadius.sm + 12,
+                background: archiveType.color + '22', color: archiveType.color, fontSize: 12, fontWeight: 700,
+              }}>
+                {TagI && <TagI size={12} />} {archiveType.label}
+              </span>
+            );
+          })()}
+          {emotionList.map(emotion => {
+            const EmoI = EMOTION_ICONS[emotion.key];
+            return (
+              <span key={emotion.key} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '3px 8px', borderRadius: appRadius.sm + 12,
+                background: emotion.color + '22', color: emotion.color, fontSize: 12, fontWeight: 700,
+              }}>
+                {EmoI && <EmoI size={12} />} {emotion.label}
+              </span>
+            );
+          })}
+          {category && (() => {
+            const CatI = CATEGORY_ICONS[category.key];
+            return (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '3px 8px', borderRadius: appRadius.sm + 12,
+                background: appColor.lineSoft, color: appColor.inkFaint, fontSize: 11,
+              }}>
+                {CatI && <CatI size={11} />} {category.label}
+              </span>
+            );
+          })()}
           {t.intensity != null && (
-            <span style={{ fontSize: 11, color: '#ddd', letterSpacing: 1 }}>
+            <span style={{ fontSize: 11, color: appColor.lineSoft, letterSpacing: 1 }}>
               {'●'.repeat(t.intensity)}{'○'.repeat(5 - t.intensity)}
             </span>
           )}
           {t.audio_url && (
-            <span style={{ fontSize: 11, color: '#E55039' }} title="録音あり">🎙️</span>
+            <span style={{ color: appColor.danger, display: 'inline-flex' }} title="録音あり"><MicIcon size={13} /></span>
           )}
         </div>
 
         {/* タイトル */}
         <h3 style={{ margin: 0, fontSize: 15, lineHeight: 1.4, fontWeight: 700 }}>
           {t.title}
-          {t.yomi && <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>（{t.yomi}）</span>}
+          {t.yomi && <span style={{ fontWeight: 400, color: appColor.inkGhost, fontSize: 12 }}>（{t.yomi}）</span>}
         </h3>
 
         {/* 時代・語り手 */}
         {(t.era_label || voiceRelation) && (
-          <p style={{ margin: 0, fontSize: 11, color: '#999' }}>
+          <p style={{ margin: 0, fontSize: 11, color: appColor.inkFaint }}>
             {[t.era_label, voiceRelation ? `語り手：${voiceRelation.label}` : null].filter(Boolean).join(' · ')}
           </p>
         )}
@@ -141,7 +156,7 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
         {/* why */}
         {t.why && (
           <p style={{
-            margin: 0, fontSize: 13, color: '#555', lineHeight: 1.5,
+            margin: 0, fontSize: 13, color: appColor.inkSoft, lineHeight: 1.5,
             display: '-webkit-box', WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>
@@ -152,10 +167,11 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
         {/* 文献の出典 */}
         {t.source_ref && (
           <p style={{
-            margin: 0, fontSize: 11, color: '#B7791F',
+            margin: 0, fontSize: 11, color: appColor.warning,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            📚 {t.source_ref}
+            <BookIcon size={11} /> {t.source_ref}
           </p>
         )}
 
@@ -163,7 +179,7 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
         {(t.custom_tags ?? []).length > 0 && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {(t.custom_tags ?? []).map(tag => (
-              <span key={tag} style={{ fontSize: 10, color: '#999', background: '#f5f5f5', padding: '1px 6px', borderRadius: 8 }}>
+              <span key={tag} style={{ fontSize: 10, color: appColor.inkFaint, background: appColor.lineSoft, padding: '1px 6px', borderRadius: 8 }}>
                 #{tag}
               </span>
             ))}
@@ -172,12 +188,12 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
 
         {/* フッター行 */}
         <div style={{ marginTop: 'auto', paddingTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#bbb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: appColor.inkGhost }}>
             {avatarUrl && (
               <img src={avatarUrl} alt="" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} />
             )}
-            {t.want_revisit && <span>🔁</span>}
-            {t.want_to_share && <span>🗣</span>}
+            {t.want_revisit && <span style={{ display: 'inline-flex' }}><RepeatIcon size={12} /></span>}
+            {t.want_to_share && <span style={{ display: 'inline-flex' }}><SpeakIcon size={12} /></span>}
             <time>{new Date(t.created_at).toLocaleDateString('ja-JP')}</time>
             {t.nickname && <span>· {t.nickname}</span>}
           </div>
@@ -189,12 +205,13 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
                 onClick={e => { e.stopPropagation(); onEdit(t); }}
                 title="編集する"
                 style={{
-                  background: 'none', border: '1px solid #eee', borderRadius: 8,
-                  color: '#FF6B9D', fontSize: 11, cursor: 'pointer',
+                  background: 'none', border: `1px solid ${appColor.line}`, borderRadius: 8,
+                  color: appColor.accent, fontSize: 11, cursor: 'pointer',
                   padding: '3px 8px', fontWeight: 700,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}
               >
-                ✏️ 編集
+                <EditIcon size={12} /> 編集
               </button>
             )}
             {isOwn && onDelete && (
@@ -202,12 +219,13 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
                 onClick={e => { e.stopPropagation(); onDelete(t); }}
                 title="削除する"
                 style={{
-                  background: 'none', border: '1px solid #eee', borderRadius: 8,
-                  color: '#E55039', fontSize: 11, cursor: 'pointer',
+                  background: 'none', border: `1px solid ${appColor.line}`, borderRadius: 8,
+                  color: appColor.danger, fontSize: 11, cursor: 'pointer',
                   padding: '3px 8px', fontWeight: 700,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}
               >
-                🗑 削除
+                <TrashIcon size={12} /> 削除
               </button>
             )}
             {/* 地図で見る */}
@@ -215,12 +233,13 @@ export default function TraceCard({ trace: t, onClick, onShowOnMap, userPos, ava
               <button
                 onClick={e => { e.stopPropagation(); onShowOnMap(t); }}
                 style={{
-                  background: 'none', border: '1px solid #eee', borderRadius: 8,
-                  color: '#38ADA9', fontSize: 11, cursor: 'pointer',
+                  background: 'none', border: `1px solid ${appColor.line}`, borderRadius: 8,
+                  color: appColor.teal, fontSize: 11, cursor: 'pointer',
                   padding: '3px 8px', fontWeight: 700,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}
               >
-                🗺 地図
+                <MapIcon size={12} /> 地図
               </button>
             )}
           </div>

@@ -173,6 +173,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         ...(body.video_url ? { video_url: body.video_url } : {}),
         ...(body.emotion_keys && body.emotion_keys.length > 0 ? { emotion_keys: body.emotion_keys } : {}),
         ...(body.revisit_of ? { revisit_of: body.revisit_of } : {}),
+        ...(body.companion_tag ? { companion_tag: body.companion_tag } : {}),
       })
       .select()
       .single();

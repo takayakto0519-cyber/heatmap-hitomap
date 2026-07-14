@@ -243,6 +243,7 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#666', marginBottom: 16 }}>
           <span><strong>{followingCount}</strong> フォロー中</span>
           <span><strong>{followersCount}</strong> フォロワー</span>
+          <span><strong>{new Set(myTraces.map(t => t.region).filter(Boolean)).size}</strong> 訪問エリア</span>
         </div>
 
         {(() => {

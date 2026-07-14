@@ -17,6 +17,19 @@ dist/
 Thumbs.db
 ~$*
 
+# Python
+__pycache__/
+*.pyc
+
+# ログ・自動化ツールの実行時生成物
+agent-dashboard/server.log
+agents/work/
+affiliate-auto/logs/
+affiliate-auto/cache/
+affiliate-auto/drafts/
+affiliate-auto/results.json
+affiliate-auto/work/
+
 # Claude / エディタ設定
 .claude/
 

@@ -1,7 +1,9 @@
 // 運営ダッシュボード（新規投稿・通報など）の動きをDiscordへ通知する。
-// DISCORD_WEBHOOK_URL未設定の場合は何もしない。失敗しても投稿処理自体は継続させるためawaitせず握りつぶす。
+// news_digest.py（今日のニュース抽出AI）が使うDISCORD_WEBHOOK_URLとはチャンネルが別のため、
+// ヒトマップ本体専用のHITOMAP_DISCORD_WEBHOOK_URLを使う（誤って経済ニュースチャンネルに混ざるのを防ぐ）。
+// 未設定の場合は何もしない。失敗しても投稿処理自体は継続させるためawaitせず握りつぶす。
 export function notifyDiscord(content: string): void {
-  const url = process.env.DISCORD_WEBHOOK_URL;
+  const url = process.env.HITOMAP_DISCORD_WEBHOOK_URL;
   if (!url) return;
   fetch(url, {
     method: 'POST',

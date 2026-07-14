@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { Trace } from '@/lib/types';
+import { colors, radii } from '@/lib/theme';
 import EmotionPicker from './form/EmotionPicker';
 import FaceEmotionSuggest from './form/FaceEmotionSuggest';
 
@@ -10,6 +11,8 @@ interface Props {
   onClose: () => void;
   onUpdate: (updated: Trace) => void;
 }
+
+const NOTE_PLACEHOLDERS = ['修理された木の柱', '細い路地', '昔の郵便受け', 'すり減った石段', '手書きの貼り紙'];
 
 // クイック記録の直後に出す、最小限の追記シート。
 // 選ぶ・撮るの1タップごとに即保存する（「保存する」ボタンを挟まない＝迷わせない）。
@@ -21,6 +24,8 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [note, setNote] = useState('');
+  const notePlaceholder = useRef(NOTE_PLACEHOLDERS[Math.floor(Math.random() * NOTE_PLACEHOLDERS.length) % NOTE_PLACEHOLDERS.length]).current;
 
   async function patch(fields: Record<string, unknown>) {
     try {
@@ -39,6 +44,12 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
   async function selectEmotions(keys: string[]) {
     setEmotions(keys);
     await patch({ emotion_key: keys[0] ?? null, emotion_keys: keys.length > 0 ? keys : null, intensity: trace.intensity ?? 3 });
+  }
+
+  async function saveNote() {
+    const trimmed = note.trim();
+    if (!trimmed) return;
+    await patch({ title: trimmed });
   }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -93,7 +104,20 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
           {photoError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#E55039' }}>{photoError}</p>}
         </div>
 
-        <button type="button" onClick={onClose} style={{
+        <div style={{ marginTop: 16 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#aaa', fontWeight: 700 }}>何に心が動いた？（任意）</p>
+          <input
+            type="text" value={note} onChange={e => setNote(e.target.value)} onBlur={saveNote}
+            placeholder={notePlaceholder}
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '11px 12px', fontSize: 14,
+              border: `1.5px solid ${colors.border}`, borderRadius: radii.md, fontFamily: 'inherit', outline: 'none', background: colors.surfaceMuted,
+            }}
+          />
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: colors.textFaint }}>理由はあとから編集できます</p>
+        </div>
+
+        <button type="button" onClick={() => { saveNote(); onClose(); }} style={{
           width: '100%', marginTop: 14, padding: '12px 0', borderRadius: 10, border: 'none',
           background: '#FF6B9D', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
         }}>とじる</button>
