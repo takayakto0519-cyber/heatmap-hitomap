@@ -88,6 +88,7 @@ interface AdminUser {
   followerCount: number;
   followingCount: number;
   recentTraces: AdminUserRecentTrace[];
+  auto_approve: boolean;
 }
 
 const VISIBILITY_LABELS: Record<string, { label: string; color: string }> = {
@@ -1850,7 +1851,7 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'traces' | 'recent' | 'new'>('traces');
   const [q, setQ] = useState('');
-  const [fullTraces, setFullTraces] = useState<Record<string, AdminUser['recentTraces']>>({});
+  const [fullTraces, setFullTraces] = useState<Record<string, Trace[]>>({});
   const [loadingFull, setLoadingFull] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -1868,6 +1869,18 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  }
+
+  async function toggleAutoApprove(id: string, next: boolean) {
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, auto_approve: next } : u));
+    const res = await fetch(`/api/admin/profiles/${id}`, {
+      method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ auto_approve: next }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, auto_approve: !next } : u));
+      setError(data.error ?? '更新に失敗しました');
+    }
   }
 
   async function loadAllTraces(userId: string) {
@@ -1934,11 +1947,7 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>
                     {u.display_name ?? u.username}
-                    <a href={`/profile/${u.username}`} target="_blank" rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      style={{ marginLeft: 6, fontSize: 11, color: '#38ADA9', fontWeight: 400 }}>
-                      @{u.username} ↗
-                    </a>
+                    <span style={{ marginLeft: 6, fontSize: 11, color: '#999', fontWeight: 400 }}>@{u.username}</span>
                   </p>
                   {u.bio && <p style={{ margin: '2px 0', fontSize: 12, color: '#666' }}>{u.bio}</p>}
                   <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aaa' }}>
@@ -1953,6 +1962,13 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                   <span style={{ fontSize: 18, color: '#ccc', flexShrink: 0 }}>{isOpen ? '▴' : '▾'}</span>
                 )}
               </button>
+
+              <button onClick={() => toggleAutoApprove(u.id, !u.auto_approve)} title="今後の投稿を審査なしで即座に全国公開する" style={{
+                marginTop: 8, padding: '5px 10px', borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                border: `1.5px solid ${u.auto_approve ? '#27AE60' : '#ddd'}`,
+                background: u.auto_approve ? '#E8F8F1' : '#fff',
+                color: u.auto_approve ? '#27AE60' : '#999',
+              }}>{u.auto_approve ? '✓ 自動承認 ON' : '自動承認 OFF'}</button>
 
               {isOpen && u.recentTraces.length > 0 && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1972,29 +1988,48 @@ function UsersTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                   {(fullTraces[u.id] ?? u.recentTraces).map(t => {
                     const emotion = getEmotion(t.emotion_key);
                     const vis = VISIBILITY_LABELS[t.visibility];
+                    // fullTraces（/api/admin/traces由来）にだけ入っている詳細フィールド
+                    const full = 'region' in t ? (t as Trace) : null;
+                    const category = full?.category ? getCategory(full.category) : null;
                     return (
-                      <div key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <div key={t.id} style={{
+                        display: 'flex', gap: 10, alignItems: 'flex-start',
+                        padding: '8px 0', borderBottom: '1px solid #f5f5f5',
+                      }}>
                         {t.photo_url ? (
-                          <img src={t.photo_url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                          <img src={t.photo_url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
                         ) : (
                           <div style={{
-                            width: 40, height: 40, borderRadius: 6, background: (emotion?.color ?? '#eee') + '22', flexShrink: 0,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                            width: 56, height: 56, borderRadius: 8, background: (emotion?.color ?? '#eee') + '22', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
                           }}>{emotion?.emoji ?? '📍'}</div>
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
                             {t.title}
                           </p>
-                          {t.why && (
-                            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {t.why}
-                            </p>
-                          )}
                           <p style={{ margin: '2px 0 0', fontSize: 10, color: '#bbb' }}>
                             {new Date(t.created_at).toLocaleDateString('ja-JP')}
                             {vis && <span style={{ marginLeft: 6, color: vis.color, fontWeight: 700 }}>{vis.label}</span>}
+                            {emotion && <span style={{ marginLeft: 6 }}>{emotion.emoji} {emotion.label}</span>}
+                            {full?.region && <span style={{ marginLeft: 6 }}>🏘 {full.region}</span>}
+                            {category && <span style={{ marginLeft: 6 }}>🏷 {category.label}</span>}
                           </p>
+                          {t.why && (
+                            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+                              <strong style={{ color: '#999', fontWeight: 700 }}>なぜ気になった：</strong>{t.why}
+                            </p>
+                          )}
+                          {full?.interpretation && (
+                            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+                              <strong style={{ color: '#999', fontWeight: 700 }}>見えた暮らし：</strong>{full.interpretation}
+                            </p>
+                          )}
+                          {full?.self_reflection && (
+                            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+                              <strong style={{ color: '#999', fontWeight: 700 }}>自分とのつながり：</strong>{full.self_reflection}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
