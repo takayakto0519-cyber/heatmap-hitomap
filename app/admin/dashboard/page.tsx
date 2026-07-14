@@ -2250,6 +2250,11 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [form, setForm] = useState({ client_type: 'business', org_name: '', contact_name: '', email: '', phone: '' });
   const [saving, setSaving] = useState(false);
   const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
+  const [enrichOpen, setEnrichOpen] = useState<Record<string, boolean>>({});
+  const [enrichSource, setEnrichSource] = useState<Record<string, string>>({});
+  const [enrichLoading, setEnrichLoading] = useState<Record<string, boolean>>({});
+  const [enrichDraft, setEnrichDraft] = useState<Record<string, string>>({});
+  const [enrichError, setEnrichError] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -2299,6 +2304,37 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     const res = await fetch(`/api/admin/client-leads/${id}`, { method: 'DELETE', headers: authHeaders() });
     const data = await res.json();
     if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
+  }
+
+  // AIで証拠パックの下書きを生成する（ここでは保存しない。会長が確認してから「反映」で初めてmemoに入る）
+  async function runEnrich(id: string) {
+    const sourceText = (enrichSource[id] ?? '').trim();
+    if (!sourceText) return;
+    setEnrichLoading(prev => ({ ...prev, [id]: true }));
+    setEnrichError(prev => ({ ...prev, [id]: '' }));
+    try {
+      const res = await fetch(`/api/admin/client-leads/${id}/enrich`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ source_text: sourceText }),
+      });
+      const data = await res.json();
+      if (data.ok) setEnrichDraft(prev => ({ ...prev, [id]: data.draft }));
+      else setEnrichError(prev => ({ ...prev, [id]: data.error ?? '生成に失敗しました' }));
+    } catch {
+      setEnrichError(prev => ({ ...prev, [id]: '通信エラー' }));
+    } finally {
+      setEnrichLoading(prev => ({ ...prev, [id]: false }));
+    }
+  }
+
+  // 生成された下書きを、既存メモの下に追記する形でmemoに反映する（会長が明示的に押した時だけ保存される）
+  function applyEnrichDraft(id: string, existingMemo: string | null) {
+    const draft = enrichDraft[id];
+    if (!draft) return;
+    const merged = existingMemo?.trim() ? `${existingMemo.trim()}\n\n---\n${draft}` : draft;
+    setEditingMemo(prev => ({ ...prev, [id]: merged }));
+    updateLead(id, { memo: merged });
+    setEnrichDraft(prev => { const next = { ...prev }; delete next[id]; return next; });
+    setEnrichOpen(prev => ({ ...prev, [id]: false }));
   }
 
   const visibleLeads = leads.filter(l => filter === 'all' || l.client_type === filter);
@@ -2404,6 +2440,47 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
                   最終更新: {new Date(l.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
                 </p>
+
+                <button type="button" onClick={() => setEnrichOpen(prev => ({ ...prev, [l.id]: !prev[l.id] }))} style={{
+                  marginTop: 8, padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  border: '1.5px solid #8E44AD', background: enrichOpen[l.id] ? '#8E44AD' : '#FBF6FF',
+                  color: enrichOpen[l.id] ? '#fff' : '#8E44AD',
+                }}>🔎 AIで証拠パックを強化</button>
+
+                {enrichOpen[l.id] && (
+                  <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: '#FBF6FF', border: '1px solid #F3EAFB' }}>
+                    <p style={{ margin: '0 0 6px', fontSize: 11, color: '#8E44AD' }}>
+                      ニュース記事・IR情報・自治体の総合戦略資料など、参考になる文章を貼り付けてください（URLではなく本文を貼ると精度が上がります）。生成されるだけで、まだ保存はされません。
+                    </p>
+                    <textarea
+                      value={enrichSource[l.id] ?? ''}
+                      onChange={e => setEnrichSource(prev => ({ ...prev, [l.id]: e.target.value }))}
+                      placeholder="参考情報を貼り付け"
+                      rows={4}
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginBottom: 6 }}
+                    />
+                    <button type="button" onClick={() => runEnrich(l.id)} disabled={enrichLoading[l.id] || !(enrichSource[l.id] ?? '').trim()} style={{
+                      padding: '7px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700,
+                      background: enrichLoading[l.id] ? '#ddd' : '#8E44AD', color: '#fff',
+                      cursor: enrichLoading[l.id] ? 'wait' : 'pointer',
+                    }}>{enrichLoading[l.id] ? '生成中…' : '生成する（Claude Haiku使用）'}</button>
+
+                    {enrichError[l.id] && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E55039' }}>{enrichError[l.id]}</p>}
+
+                    {enrichDraft[l.id] && (
+                      <div style={{ marginTop: 8 }}>
+                        <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#8E44AD' }}>生成された下書き（確認してから反映してください）</p>
+                        <p style={{ margin: '0 0 6px', fontSize: 13, color: '#333', background: '#fff', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap' }}>
+                          {enrichDraft[l.id]}
+                        </p>
+                        <button type="button" onClick={() => applyEnrichDraft(l.id, l.memo)} style={{
+                          padding: '6px 12px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700,
+                          background: '#38ADA9', color: '#fff', cursor: 'pointer',
+                        }}>この内容を証拠パックに反映する</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </Card>
             );
           })}
