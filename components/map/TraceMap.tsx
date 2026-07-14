@@ -281,10 +281,14 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       {mode === 'heat'
         ? traces.filter(t => !t.archive_type).map((t) => {
             const color = getEmotionColor(t.emotion_key);
-            const radius = 40 * (t.intensity ?? 3);
+            const reactionCount = reactionCounts?.[t.id] ?? 0;
+            // 誰かが共感するほど、その痕跡のヒートは濃く・広くなる
+            const radius = 44 * (t.intensity ?? 3) * (1 + Math.min(reactionCount, 10) * 0.15);
+            // 情報を詰め込むヒートマップではなく、感情が積み重なるキャンバスの印象にするため、単体の主張は抑えめに・重なりで濃さが出るようにする
+            const fillOpacity = Math.min(0.18 + reactionCount * 0.035, 0.6);
             return (
               <Circle key={t.id} center={[t.latitude, t.longitude]} radius={radius}
-                pathOptions={{ color, fillColor: color, fillOpacity: 0.28, weight: 0 }} />
+                pathOptions={{ color, fillColor: color, fillOpacity, weight: 0 }} />
             );
           })
         : (

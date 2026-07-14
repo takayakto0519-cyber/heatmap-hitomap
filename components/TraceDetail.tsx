@@ -19,11 +19,12 @@ interface Props {
   onUpdate: (updated: Trace) => void;
   onDelete: (id: string) => void;
   onNavigateTo?: (trace: Trace) => void;
+  onFilterEmotion?: (emotionKey: string) => void;
   initialEditing?: boolean;
 }
 
 const REACTIONS = [
-  { key: 'empathy', emoji: '🔥', label: 'わかる', color: '#FF6B9D' },
+  { key: 'empathy', emoji: '🔥', label: '私も感じた', color: '#FF6B9D' },
   { key: 'want_to_visit', emoji: '🚶', label: '歩いてみたい', color: '#38ADA9' },
   { key: 'nostalgic', emoji: '🍂', label: '懐かしい', color: '#F6B93B' },
 ] as const;
@@ -34,7 +35,7 @@ const inputStyle: React.CSSProperties = {
   resize: 'vertical' as const, outline: 'none', background: '#fafafa',
 };
 
-export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, onDelete, onNavigateTo, initialEditing }: Props) {
+export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, onDelete, onNavigateTo, onFilterEmotion, initialEditing }: Props) {
   const [trace, setTrace] = useState(initial);
   const [editing, setEditing] = useState(Boolean(initialEditing && isOwn));
   const [saving, setSaving] = useState(false);
@@ -85,6 +86,9 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [commentLikeCounts, setCommentLikeCounts] = useState<Record<string, number>>({});
+  const [myCommentLikes, setMyCommentLikes] = useState<string[]>([]);
+  const [commentLikeLoading, setCommentLikeLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!trace.user_id) { setAuthorUsername(null); setAuthorAvatarUrl(null); return; }
@@ -119,8 +123,17 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
     })();
     (async () => {
       const res = await fetch(`/api/comments?trace_id=${trace.id}`).then((r) => r.json()).catch(() => null);
-      if (res?.ok) setComments(res.comments ?? []);
+      const cs: TraceComment[] = res?.ok ? (res.comments ?? []) : [];
+      if (res?.ok) setComments(cs);
       setCommentsLoaded(true);
+      if (cs.length > 0) {
+        const ids = cs.map((c) => c.id).join(',');
+        const lr = await fetch(`/api/comment-reactions?comment_ids=${ids}`).then((r) => r.json()).catch(() => null);
+        if (lr?.ok) {
+          setCommentLikeCounts(lr.counts ?? {});
+          setMyCommentLikes(lr.mine ?? []);
+        }
+      }
     })();
     (async () => {
       const res = await fetch('/api/profile').then((r) => r.json()).catch(() => null);
@@ -157,6 +170,29 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
     setComments((cs) => cs.filter((c) => c.id !== id));
     const res = await fetch(`/api/comments/${id}`, { method: 'DELETE' }).then((r) => r.json()).catch(() => null);
     if (!res?.ok) setComments(prev);
+  }
+
+  async function toggleCommentLike(commentId: string) {
+    if (commentLikeLoading) return;
+    const liked = myCommentLikes.includes(commentId);
+    setCommentLikeLoading(commentId);
+    setMyCommentLikes((prev) => liked ? prev.filter((id) => id !== commentId) : [...prev, commentId]);
+    setCommentLikeCounts((prev) => ({ ...prev, [commentId]: Math.max(0, (prev[commentId] ?? 0) + (liked ? -1 : 1)) }));
+    try {
+      const res = await fetch('/api/comment-reactions', {
+        method: liked ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment_id: commentId }),
+      });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      const data = await res.json();
+      if (!data.ok) {
+        setMyCommentLikes((prev) => liked ? [...prev, commentId] : prev.filter((id) => id !== commentId));
+        setCommentLikeCounts((prev) => ({ ...prev, [commentId]: Math.max(0, (prev[commentId] ?? 0) + (liked ? 1 : -1)) }));
+      }
+    } finally {
+      setCommentLikeLoading(null);
+    }
   }
 
   // この痕跡自体が「その後」の記録である場合、元の痕跡を取得しておく
@@ -505,11 +541,19 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 }}>🕰 過去の記憶{trace.memory_date ? `（${trace.memory_date}）` : ''}</span>
               )}
               {emotionList.map(emotion => (
-                <span key={emotion.key} style={{
-                  padding: '4px 10px', borderRadius: 20,
-                  background: emotion.color + '22', color: emotion.color,
-                  fontSize: 13, fontWeight: 700,
-                }}>{emotion.emoji} {emotion.label}</span>
+                onFilterEmotion ? (
+                  <button key={emotion.key} onClick={() => onFilterEmotion(emotion.key)} title="同じ感情の痕跡を見る" style={{
+                    padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                    background: emotion.color + '22', color: emotion.color,
+                    fontSize: 13, fontWeight: 700,
+                  }}>{emotion.emoji} {emotion.label}</button>
+                ) : (
+                  <span key={emotion.key} style={{
+                    padding: '4px 10px', borderRadius: 20,
+                    background: emotion.color + '22', color: emotion.color,
+                    fontSize: 13, fontWeight: 700,
+                  }}>{emotion.emoji} {emotion.label}</span>
+                )
               ))}
               {category && (
                 <span style={{
@@ -617,14 +661,15 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 {REACTIONS.map((r) => {
                   const active = myReactions.includes(r.key);
                   const count = reactionCounts[r.key] ?? 0;
+                  const primary = r.key === 'empathy';
                   return (
                     <button key={r.key} onClick={() => toggleReaction(r.key)} disabled={reactionLoading === r.key} style={{
                       display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '9px 14px', borderRadius: 20, cursor: reactionLoading === r.key ? 'wait' : 'pointer',
+                      padding: primary ? '10px 16px' : '9px 14px', borderRadius: 20, cursor: reactionLoading === r.key ? 'wait' : 'pointer',
                       border: `2px solid ${active ? r.color : '#eee'}`,
                       background: active ? r.color + '18' : '#fff',
                       color: active ? r.color : '#999',
-                      fontWeight: 700, fontSize: 13,
+                      fontWeight: primary ? 800 : 700, fontSize: primary ? 14 : 13,
                     }}>
                       {r.emoji} {r.label} {count > 0 ? count : ''}
                     </button>
@@ -795,6 +840,12 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                     background: '#8E44AD22', color: '#8E44AD', fontSize: 11, fontWeight: 700,
                   }}>🏳 {trace.team}</span>
                 )}
+                {trace.companion_tag && (
+                  <span style={{
+                    display: 'inline-block', padding: '2px 9px', borderRadius: 20,
+                    background: '#38ADA922', color: '#38ADA9', fontSize: 11, fontWeight: 700,
+                  }}>🧑‍🤝‍🧑 {trace.companion_tag}</span>
+                )}
               </p>
             )}
 
@@ -947,6 +998,18 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                             )}
                           </div>
                           <p style={{ margin: '2px 0 0', fontSize: 13, color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.body}</p>
+                          <button
+                            onClick={() => toggleCommentLike(c.id)}
+                            style={{
+                              marginTop: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+                              color: myCommentLikes.includes(c.id) ? '#FF6B9D' : '#bbb',
+                              fontWeight: myCommentLikes.includes(c.id) ? 700 : 400,
+                            }}
+                          >
+                            <span>{myCommentLikes.includes(c.id) ? '❤️' : '🤍'}</span>
+                            {(commentLikeCounts[c.id] ?? 0) > 0 && <span>{commentLikeCounts[c.id]}</span>}
+                          </button>
                         </div>
                       </div>
                     ))}

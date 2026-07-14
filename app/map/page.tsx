@@ -9,6 +9,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { TRACE_TYPES } from '@/lib/traceTypes';
 import { ARCHIVE_TYPES, getArchiveType, VOICE_RELATIONS } from '@/lib/archiveTypes';
 import { haversine } from '@/lib/geo';
+import { colors, shadows } from '@/lib/theme';
 import EmotionPicker from '@/components/form/EmotionPicker';
 import IntensityPicker from '@/components/form/IntensityPicker';
 import AudioRecorder from '@/components/form/AudioRecorder';
@@ -226,6 +227,7 @@ function MapApp() {
   const [quickAddTrace, setQuickAddTrace] = useState<Trace | null>(null);
   // クイック記録直後、立ち止まらず見られる軽い確認（タップした時だけ詳細シートを開く）
   const [quickToast, setQuickToast] = useState<Trace | null>(null);
+  const [quickToastUsedFallback, setQuickToastUsedFallback] = useState(false);
   const quickToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── ユーザー設定 ─────────────────────────
@@ -277,6 +279,7 @@ function MapApp() {
   const [wantToShare, setWantToShare] = useState(false);
   const [nickname, setNickname] = useState('');
   const [team, setTeam] = useState('');
+  const [companionTag, setCompanionTag] = useState('');
   const [traceTypeKey, setTraceTypeKey] = useState<string | null>(null);
   const [isPastMemory, setIsPastMemory] = useState(false);
   const [memoryYear, setMemoryYear] = useState('');
@@ -799,6 +802,7 @@ function MapApp() {
           session_code: sessionCode.trim() || null,
           nickname: nickname.trim() || null,
           team: team.trim() || null,
+          companion_tag: companionTag.trim() || null,
           visibility: currentUser ? postVisibility : undefined,
         }),
       });
@@ -829,16 +833,28 @@ function MapApp() {
     } finally { setSubmitting(false); }
   }
 
+  // 位置情報が使えない／許可されていない場合のフォールバック中心地点：
+  // 地域検索で絞り込み済みならその範囲の中心、それも無ければ東京駅周辺にしておく
+  // （クイック記録・ここに記録するを、位置情報オフでも必ず完了できるようにするため）。
+  function fallbackCenter(): [number, number] {
+    if (mapFitBounds) {
+      const [[south, west], [north, east]] = mapFitBounds;
+      return [(south + north) / 2, (west + east) / 2];
+    }
+    return DEFAULT_CENTER;
+  }
+
   // クイック記録：位置＋1タップだけで即記録する。タイトル・写真・言葉は後からTraceDetailの編集で追記できる
   async function handleQuickRecord() {
     setQuickRecordError('');
     setQuickRecording(true);
     try {
-      const pos = userPos ?? await new Promise<[number, number]>((resolve, reject) => {
-        if (!navigator.geolocation) { reject(new Error('位置情報が使えません')); return; }
+      let usedFallback = false;
+      const pos = userPos ?? await new Promise<[number, number]>((resolve) => {
+        if (!navigator.geolocation) { usedFallback = true; resolve(fallbackCenter()); return; }
         navigator.geolocation.getCurrentPosition(
           p => resolve([p.coords.latitude, p.coords.longitude]),
-          () => reject(new Error('位置情報を取得できませんでした')),
+          () => { usedFallback = true; resolve(fallbackCenter()); },
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
       });
@@ -861,7 +877,7 @@ function MapApp() {
         setQuickRecordError(data.error ?? '記録に失敗しました');
         return;
       }
-      setUserPos(pos);
+      if (!usedFallback) setUserPos(pos);
       setTraces(prev => [data.trace as Trace, ...prev]);
       const updatedIds = [...myTraceIds, data.trace.id];
       setMyTraceIds(updatedIds);
@@ -869,8 +885,9 @@ function MapApp() {
       // 画面を注視しなくても分かるよう振動でも知らせ、確認は軽いトーストだけにする（歩きながらでも立ち止まらず続けられる）
       if (navigator.vibrate) navigator.vibrate(80);
       if (quickToastTimerRef.current) clearTimeout(quickToastTimerRef.current);
+      setQuickToastUsedFallback(usedFallback);
       setQuickToast(data.trace);
-      quickToastTimerRef.current = setTimeout(() => setQuickToast(null), 4000);
+      quickToastTimerRef.current = setTimeout(() => setQuickToast(null), usedFallback ? 6000 : 4000);
     } catch (err) {
       setQuickRecordError(err instanceof Error ? err.message : '記録に失敗しました');
     } finally {
@@ -1101,17 +1118,18 @@ function MapApp() {
 
           {/* タブ別コントロール：常時見せるのは「今見るモード」の1組だけに絞り、それ以外は下の「絞り込み・発見」に集約する */}
           {tab === 'map' && (
-            <div style={{ display: 'flex', gap: 5 }}>
+            <div style={{ display: 'flex', gap: 3, background: colors.trackBg, borderRadius: 10, padding: 3 }}>
               {(['pin', 'heat'] as MapMode[]).map(m => (
                 <button key={m} onClick={() => {
                   setMapMode(m);
                   // ヒートは感情データを持つ痕跡のみが対象。アーカイブ種別で絞られたままだと0件になるためリセットする。
                   if (m === 'heat' && filterArchive && filterArchive !== 'trace') setFilterArchive(null);
                 }} style={{
-                  padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                  border: '1.5px solid #222',
-                  background: mapMode === m ? '#222' : '#fff',
-                  color: mapMode === m ? '#fff' : '#222', fontWeight: 700,
+                  padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: 'none',
+                  background: mapMode === m ? colors.surface : 'transparent',
+                  color: mapMode === m ? colors.textPrimary : colors.textMuted, fontWeight: 700,
+                  boxShadow: mapMode === m ? shadows.segment : 'none',
+                  transition: 'background 0.15s ease, box-shadow 0.15s ease',
                 }}>{m === 'pin' ? '📍 ピン' : '🌡 ヒート'}</button>
               ))}
             </div>
@@ -1146,6 +1164,51 @@ function MapApp() {
             </div>
           )}
         </div>
+
+        {/* 今日の問い：ホーム相当のmapタブを開いた瞬間に見えるよう、投稿タブから移設 */}
+        {tab === 'map' && !questDismissed && currentQuest && (
+          <div style={{
+            background: 'linear-gradient(135deg, #FBF6FF, #FFF)', border: '1.5px solid #F3EAFB',
+            borderRadius: 14, padding: '12px 14px', marginBottom: 8, position: 'relative',
+          }}>
+            <button type="button" onClick={() => setQuestDismissed(true)} style={{
+              position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
+              color: '#ccc', fontSize: 16, cursor: 'pointer', lineHeight: 1,
+            }}>✕</button>
+            {currentQuest.quest_type === 'emotion' ? (
+              <>
+                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今日の問い・今こんな感情を集めています</p>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                  {currentQuest.emoji} {currentQuest.title}
+                </p>
+                {currentQuest.target_emotion_key && (
+                  <p style={{ margin: '0 0 4px' }}>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+                      background: getEmotion(currentQuest.target_emotion_key)?.color + '22',
+                      color: getEmotion(currentQuest.target_emotion_key)?.color, fontSize: 12, fontWeight: 700,
+                    }}>
+                      {getEmotion(currentQuest.target_emotion_key)?.emoji} {getEmotion(currentQuest.target_emotion_key)?.label}
+                    </span>
+                  </p>
+                )}
+                <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                  {currentQuest.hint}
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今日の問い</p>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                  {currentQuest.emoji} {currentQuest.title}
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                  {currentQuest.hint}
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* 絞り込み・発見の開閉トグル：位置／感情レイヤー／時間／種別 の操作をすべてここに集約し、常時表示のボタン数を減らす */}
         {/* 一覧タブでも常に表示する（「近くのみ」を解除する手段がここにしかないため。無いと0件のまま抜け出せなくなる） */}
@@ -1581,50 +1644,6 @@ function MapApp() {
                 <button onClick={finishSubmitPost} style={{
                   marginTop: 16, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: 'pointer',
                 }}>続ける →</button>
-              </div>
-            )}
-
-            {!submitDone && !questDismissed && currentQuest && (
-              <div style={{
-                background: 'linear-gradient(135deg, #FBF6FF, #FFF)', border: '1.5px solid #F3EAFB',
-                borderRadius: 14, padding: '12px 14px', marginBottom: 12, position: 'relative',
-              }}>
-                <button type="button" onClick={() => setQuestDismissed(true)} style={{
-                  position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
-                  color: '#ccc', fontSize: 16, cursor: 'pointer', lineHeight: 1,
-                }}>✕</button>
-                {currentQuest.quest_type === 'emotion' ? (
-                  <>
-                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今こんな感情を集めています</p>
-                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
-                      {currentQuest.emoji} {currentQuest.title}
-                    </p>
-                    {currentQuest.target_emotion_key && (
-                      <p style={{ margin: '0 0 4px' }}>
-                        <span style={{
-                          display: 'inline-block', padding: '2px 10px', borderRadius: 20,
-                          background: getEmotion(currentQuest.target_emotion_key)?.color + '22',
-                          color: getEmotion(currentQuest.target_emotion_key)?.color, fontSize: 12, fontWeight: 700,
-                        }}>
-                          {getEmotion(currentQuest.target_emotion_key)?.emoji} {getEmotion(currentQuest.target_emotion_key)?.label}
-                        </span>
-                      </p>
-                    )}
-                    <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
-                      {currentQuest.hint}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今週のお題</p>
-                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
-                      {currentQuest.emoji} {currentQuest.title}
-                    </p>
-                    <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
-                      {currentQuest.hint}
-                    </p>
-                  </>
-                )}
               </div>
             )}
 
@@ -2086,11 +2105,17 @@ function MapApp() {
                       </div>
                     </section>
 
-                    {/* ニックネーム + 実験回コード */}
+                    {/* ニックネーム + 同行者 + 実験回コード */}
                     <section>
                       <label style={labelStyle}>👤 ニックネーム（任意）</label>
                       <input type="text" value={nickname} onChange={e => setNickname(e.target.value)}
                         placeholder="匿名でもOK" style={inputStyle} />
+                    </section>
+
+                    <section>
+                      <label style={labelStyle}>🧑‍🤝‍🧑 誰と一緒に見つけた？（任意）</label>
+                      <input type="text" value={companionTag} onChange={e => setCompanionTag(e.target.value)}
+                        placeholder="例: 田中さん、地元の人と2人で" style={inputStyle} />
                     </section>
 
                     <section style={{ padding: '10px', background: '#F8F9FA', borderRadius: 10, marginBottom: 0 }}>
@@ -2337,7 +2362,11 @@ function MapApp() {
               }}
             >
               <span style={{ fontSize: 13, fontWeight: 700 }}>📍 記録しました</span>
-              <span style={{ fontSize: 11, opacity: 0.8 }}>タップで感情・写真を追加 →</span>
+              {quickToastUsedFallback ? (
+                <span style={{ fontSize: 11, opacity: 0.8 }}>位置情報オフのため周辺の地点で記録・タップで場所を調整 →</span>
+              ) : (
+                <span style={{ fontSize: 11, opacity: 0.8 }}>タップで感情・写真を追加 →</span>
+              )}
             </button>
           )}
           {quickRecordError && (
@@ -2351,20 +2380,18 @@ function MapApp() {
             onClick={handleQuickRecord}
             disabled={quickRecording}
             style={{
-              width: 64, height: 64, borderRadius: '50%', border: 'none',
-              background: '#F6B93B', color: '#fff',
-              fontWeight: 700, fontSize: 11, cursor: quickRecording ? 'wait' : 'pointer',
-              boxShadow: '0 3px 14px rgba(0,0,0,0.3)', opacity: quickRecording ? 0.7 : 1,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
-              lineHeight: 1.2,
+              height: 52, padding: '0 22px', borderRadius: 26, border: 'none',
+              background: colors.gold, color: colors.surface,
+              fontWeight: 700, fontSize: 15, cursor: quickRecording ? 'wait' : 'pointer',
+              boxShadow: shadows.floating, opacity: quickRecording ? 0.7 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              whiteSpace: 'nowrap',
             }}
           >
-            {quickRecording ? (
-              <span style={{ fontSize: 20 }}>…</span>
-            ) : (
+            {quickRecording ? '記録中…' : (
               <>
-                <span style={{ fontSize: 22 }}>⚡</span>
-                <span>記録</span>
+                <span style={{ fontSize: 18 }}>📍</span>
+                <span>痕跡を見つけた</span>
               </>
             )}
           </button>
@@ -2385,6 +2412,7 @@ function MapApp() {
           onUpdate={handleTraceUpdate}
           onDelete={handleTraceDelete}
           onNavigateTo={t => { setOpenInEditMode(false); setSelectedTrace(t); }}
+          onFilterEmotion={key => { setFilterEmotion(key); setSelectedTrace(null); setTab('map'); }}
         />
       )}
       {quickAddTrace && (

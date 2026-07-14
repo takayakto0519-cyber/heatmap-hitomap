@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DmConversation } from '@/lib/types';
+import BottomNav from '@/components/BottomNav';
 
 function Avatar({ url, size = 48 }: { url: string | null; size?: number }) {
   if (url) {
@@ -52,7 +53,7 @@ export default function MessagesInboxPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '16px 16px 40px', flex: 1, width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '16px 16px 40px', flex: 1, width: '100%', boxSizing: 'border-box', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <button onClick={() => router.push('/map')}
             style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 }}>
@@ -117,6 +118,7 @@ export default function MessagesInboxPage() {
           ))}
         </div>
       </div>
+      <BottomNav active="messages" />
     </div>
   );
 }
