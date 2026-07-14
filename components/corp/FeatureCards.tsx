@@ -48,10 +48,12 @@ export default function FeatureCards() {
           {FEATURES.map(({ Icon, title, body }, i) => (
             <div
               key={title}
+              className="hm-lift"
               style={{
                 flex: '1 1 260px',
                 border: `1px solid ${corpColor.line}`,
                 padding: '28px 26px',
+                background: corpColor.white,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 14,

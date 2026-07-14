@@ -7,6 +7,7 @@ import ServiceFlow from '@/components/corp/ServiceFlow';
 import EmotionPalette from '@/components/corp/EmotionPalette';
 import RecentTraces from '@/components/corp/RecentTraces';
 import CtaBand from '@/components/corp/CtaBand';
+import Reveal from '@/components/corp/Reveal';
 import { corpColor, corpFont } from '@/components/corp/tokens';
 import AdSlot from '@/components/AdSlot';
 
@@ -47,13 +48,14 @@ export default function HomePage() {
           トーンはSANU（詩的な一行＋余白のリズム）に寄せている。 */}
       <main style={{ flex: 1 }}>
         <Hero />
-        <FeatureCards />
-        <ServiceFlow />
-        <EmotionPalette />
+        <Reveal><FeatureCards /></Reveal>
+        <Reveal><ServiceFlow /></Reveal>
+        <Reveal><EmotionPalette /></Reveal>
         <RecentTraces />
-        <CoreEquation />
+        <Reveal><CoreEquation /></Reveal>
 
         <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
+          <Reveal>
           <div style={{ maxWidth: 960, margin: '0 auto' }}>
             <p
               style={{
@@ -92,6 +94,7 @@ export default function HomePage() {
                 <a
                   key={card.href}
                   href={card.href}
+                  className="hm-lift"
                   style={{
                     flex: '1 1 260px',
                     display: 'block',
@@ -99,6 +102,7 @@ export default function HomePage() {
                     border: `1px solid ${corpColor.line}`,
                     textDecoration: 'none',
                     marginTop: card.offset, // 非対称に一段ずらす
+                    background: corpColor.white,
                   }}
                 >
                   <span
@@ -135,9 +139,10 @@ export default function HomePage() {
               ))}
             </div>
           </div>
+          </Reveal>
         </section>
 
-        <CtaBand />
+        <Reveal><CtaBand /></Reveal>
 
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px' }}>
           <AdSlot />

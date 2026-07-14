@@ -67,6 +67,7 @@ export default function RecentTraces() {
             <a
               key={t.id}
               href={`/t/${t.id}`}
+              className="hm-lift"
               style={{
                 flex: '0 0 220px',
                 background: corpColor.white,
@@ -77,13 +78,15 @@ export default function RecentTraces() {
               }}
             >
               {t.photo_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={t.photo_url}
-                  alt=""
-                  loading="lazy"
-                  style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }}
-                />
+                <div className="hm-photo-zoom" style={{ height: 130 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={t.photo_url}
+                    alt=""
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
               )}
               <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 <p

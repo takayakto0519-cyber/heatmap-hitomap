@@ -1,4 +1,5 @@
 import { corpColor, corpFont } from './tokens';
+import Reveal from './Reveal';
 
 // SANU（sa-nu.com）のヒーロー構成を踏襲：
 //   全面ビジュアル ＋ 詩的な一行のタグライン ＋ 控えめなサブコピー ＋ 主CTA。
@@ -40,11 +41,15 @@ function MapArt() {
         <path d="M0 330 C 160 300, 300 380, 460 340 S 680 250, 720 268" strokeOpacity="0.2" strokeWidth="1.5" />
       </g>
 
-      {/* 感情のにじみ */}
-      <circle cx="205" cy="190" r="150" fill="url(#heat-a)" />
-      <circle cx="480" cy="330" r="190" fill="url(#heat-a)" />
-      <circle cx="600" cy="120" r="120" fill="url(#heat-b)" />
-      <circle cx="120" cy="400" r="110" fill="url(#heat-b)" />
+      {/* 感情のにじみ：ゆっくり漂わせて「生きている地図」に見せる */}
+      <g className="hm-drift">
+        <circle cx="205" cy="190" r="150" fill="url(#heat-a)" />
+        <circle cx="480" cy="330" r="190" fill="url(#heat-a)" />
+      </g>
+      <g className="hm-drift-slow">
+        <circle cx="600" cy="120" r="120" fill="url(#heat-b)" />
+        <circle cx="120" cy="400" r="110" fill="url(#heat-b)" />
+      </g>
 
       {/* 痕跡ピン（点） */}
       <g fill={corpColor.mossDeep}>
@@ -91,93 +96,102 @@ export default function Hero() {
           padding: '104px 24px 96px',
         }}
       >
-        <p
-          style={{
-            margin: '0 0 22px',
-            fontSize: 12,
-            letterSpacing: '0.22em',
-            color: corpColor.moss,
-            fontFamily: corpFont.body,
-            fontWeight: 700,
-          }}
-        >
-          HITOMAP — まちの痕跡と感情の地図
-        </p>
-
-        <h1
-          style={{
-            margin: '0 0 20px',
-            fontFamily: corpFont.mincho,
-            fontSize: 'clamp(30px, 5vw, 52px)',
-            lineHeight: 1.55,
-            color: corpColor.ink,
-            fontWeight: 600,
-            maxWidth: 640,
-          }}
-        >
-          その色あせも、
-          <br />
-          誰かが生きた証。
-        </h1>
-
-        <p
-          style={{
-            margin: '0 0 40px',
-            fontSize: 15,
-            lineHeight: 2.1,
-            color: corpColor.inkSoft,
-            fontFamily: corpFont.body,
-            maxWidth: 460,
-          }}
-        >
-          まちで見つけた痕跡を、写真と一言で地図に残す。
-          記録が重なると、町ごとの感情の濃淡が浮かび上がる。
-          名所を見るのではなく、人に会いに行く旅がここから始まります。
-        </p>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-          <a
-            href="/start"
+        <Reveal immediate y={18}>
+          <p
             style={{
-              display: 'inline-block',
-              padding: '16px 36px',
-              background: corpColor.ink,
-              color: corpColor.white,
-              textDecoration: 'none',
-              fontWeight: 700,
-              fontSize: 14,
-              fontFamily: corpFont.body,
-              letterSpacing: '0.05em',
-            }}
-          >
-            地図をひらく — 無料
-          </a>
-          <a
-            href="/service"
-            style={{
-              fontSize: 13,
+              margin: '0 0 22px',
+              fontSize: 12,
+              letterSpacing: '0.22em',
               color: corpColor.moss,
-              textDecoration: 'none',
-              fontWeight: 700,
               fontFamily: corpFont.body,
-              borderBottom: `1px solid ${corpColor.moss}`,
-              paddingBottom: 2,
+              fontWeight: 700,
             }}
           >
-            使い方を見る →
-          </a>
-        </div>
+            HITOMAP — まちの痕跡と感情の地図
+          </p>
+        </Reveal>
 
-        <p
-          style={{
-            margin: '28px 0 0',
-            fontSize: 12,
-            color: corpColor.inkSoft,
-            fontFamily: corpFont.body,
-          }}
-        >
-          ログインしなくても、匿名のまま今日から記録できます。
-        </p>
+        <Reveal immediate delay={150} y={24}>
+          <h1
+            style={{
+              margin: '0 0 20px',
+              fontFamily: corpFont.mincho,
+              fontSize: 'clamp(30px, 5vw, 52px)',
+              lineHeight: 1.55,
+              color: corpColor.ink,
+              fontWeight: 600,
+              maxWidth: 640,
+            }}
+          >
+            その色あせも、
+            <br />
+            誰かが生きた証。
+          </h1>
+        </Reveal>
+
+        <Reveal immediate delay={350} y={20}>
+          <p
+            style={{
+              margin: '0 0 40px',
+              fontSize: 15,
+              lineHeight: 2.1,
+              color: corpColor.inkSoft,
+              fontFamily: corpFont.body,
+              maxWidth: 460,
+            }}
+          >
+            まちで見つけた痕跡を、写真と一言で地図に残す。
+            記録が重なると、町ごとの感情の濃淡が浮かび上がる。
+            名所を見るのではなく、人に会いに行く旅がここから始まります。
+          </p>
+        </Reveal>
+
+        <Reveal immediate delay={550} y={16}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+            <a
+              href="/start"
+              className="hm-lift"
+              style={{
+                display: 'inline-block',
+                padding: '16px 36px',
+                background: corpColor.ink,
+                color: corpColor.white,
+                textDecoration: 'none',
+                fontWeight: 700,
+                fontSize: 14,
+                fontFamily: corpFont.body,
+                letterSpacing: '0.05em',
+              }}
+            >
+              地図をひらく — 無料
+            </a>
+            <a
+              href="/service"
+              style={{
+                fontSize: 13,
+                color: corpColor.moss,
+                textDecoration: 'none',
+                fontWeight: 700,
+                fontFamily: corpFont.body,
+                borderBottom: `1px solid ${corpColor.moss}`,
+                paddingBottom: 2,
+              }}
+            >
+              使い方を見る →
+            </a>
+          </div>
+
+          <p
+            style={{
+              margin: '28px 0 0',
+              fontSize: 12,
+              color: corpColor.inkSoft,
+              fontFamily: corpFont.body,
+            }}
+          >
+            ログインしなくても、匿名のまま今日から記録できます。
+          </p>
+        </Reveal>
       </div>
     </section>
   );

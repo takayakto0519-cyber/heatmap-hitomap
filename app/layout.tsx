@@ -87,6 +87,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           color: '#222',
         }}
       >
+        {/* サイト全体の演出用ユーティリティ（SANU/YAMAP風のホバー・漂いアニメ）。reduced-motionでは全て無効化 */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+.hm-lift { transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s cubic-bezier(.22,1,.36,1); }
+.hm-lift:hover { transform: translateY(-4px); box-shadow: 0 14px 34px -16px rgba(35,35,31,.3); }
+.hm-photo-zoom { overflow: hidden; }
+.hm-photo-zoom img { transition: transform .6s cubic-bezier(.22,1,.36,1); }
+.hm-photo-zoom:hover img { transform: scale(1.045); }
+@keyframes hm-drift { 0% { transform: translate(0,0); } 50% { transform: translate(10px,-8px); } 100% { transform: translate(0,0); } }
+.hm-drift { animation: hm-drift 14s ease-in-out infinite; }
+.hm-drift-slow { animation: hm-drift 22s ease-in-out infinite reverse; }
+@media (prefers-reduced-motion: reduce) {
+  .hm-lift, .hm-photo-zoom img { transition: none; }
+  .hm-lift:hover { transform: none; box-shadow: none; }
+  .hm-drift, .hm-drift-slow { animation: none; }
+}
+`,
+          }}
+        />
         <ServiceWorkerRegister />
         {children}
         <Analytics />
