@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({})) as {
     client_type?: string; org_name?: string; contact_name?: string | null;
-    email?: string | null; phone?: string | null;
+    email?: string | null; phone?: string | null; memo?: string | null;
   };
   if (!body.org_name?.trim()) return NextResponse.json({ ok: false, error: '団体名は必須です' }, { status: 400 });
 
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       contact_name: body.contact_name?.trim() || null,
       email: body.email?.trim() || null,
       phone: body.phone?.trim() || null,
+      memo: body.memo?.trim() || null,
     })
     .select().single();
 
