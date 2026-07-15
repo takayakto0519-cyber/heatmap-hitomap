@@ -1,9 +1,19 @@
 // /api/admin/posts — 実績記事の管理（運営ダッシュボード用・パスワード必須）
 //   GET  ... 下書き含む全記事
 //   POST ... 新規作成
+import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 import { generateSlug } from '@/lib/sitePosts';
+
+// post_type ごとに公開ページのパスを再検証する。
+// /works・/blog は revalidate=300（5分ISR）のため、これを呼ばないと
+// 運営ダッシュボードでの更新が最大5分反映されない。
+function revalidatePostPaths(postType: string | undefined, slug: string) {
+  const listPath = postType === 'blog' ? '/blog' : '/works';
+  revalidatePath(listPath);
+  revalidatePath(`${listPath}/${slug}`);
+}
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -53,5 +63,6 @@ export async function POST(req: NextRequest) {
     .select('*')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  revalidatePostPaths(data.post_type, data.slug);
   return NextResponse.json({ ok: true, post: data });
 }

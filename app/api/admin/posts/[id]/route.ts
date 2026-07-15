@@ -1,8 +1,17 @@
 // /api/admin/posts/[id] — 実績記事の更新・削除（パスワード必須）
+import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+// /works・/blog は revalidate=300（5分ISR）のため、これを呼ばないと
+// 運営ダッシュボードでの更新・削除が最大5分反映されない。
+function revalidatePostPaths(postType: string | undefined, slug: string | undefined) {
+  const listPath = postType === 'blog' ? '/blog' : '/works';
+  revalidatePath(listPath);
+  if (slug) revalidatePath(`${listPath}/${slug}`);
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -25,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select('*')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  revalidatePostPaths(data.post_type, data.slug);
   return NextResponse.json({ ok: true, post: data });
 }
 
@@ -33,7 +43,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
+  const { data: existing } = await supabaseServer
+    .from('site_posts')
+    .select('post_type, slug')
+    .eq('id', params.id)
+    .maybeSingle();
+
   const { error } = await supabaseServer.from('site_posts').delete().eq('id', params.id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (existing) revalidatePostPaths(existing.post_type, existing.slug);
   return NextResponse.json({ ok: true });
 }
