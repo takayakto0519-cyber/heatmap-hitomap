@@ -80,11 +80,11 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
         boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
       }}>
         <p style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 16 }}>⚡ 記録しました</p>
-        <p style={{ margin: '0 0 16px', fontSize: 12, color: '#999' }}>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: '#726C5E' }}>
           今なら1タップで感情や写真を足せます。あとからでも大丈夫です。
         </p>
 
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: '#aaa', fontWeight: 700 }}>どんな感情？（複数選べます）</p>
+        <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8C8579', fontWeight: 700 }}>どんな感情？（複数選べます）</p>
         <EmotionPicker value={emotions} onChange={selectEmotions} />
         <FaceEmotionSuggest
           selectedKeys={emotions}
@@ -97,15 +97,15 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
           )}
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
           <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} style={{
-            width: '100%', padding: '11px 0', borderRadius: 10, border: '1.5px solid #ddd',
-            background: '#fafafa', color: '#555', fontWeight: 700, fontSize: 14,
+            width: '100%', padding: '11px 0', borderRadius: 10, border: '1.5px solid #D7CFB8',
+            background: '#F4F1E8', color: '#55524A', fontWeight: 700, fontSize: 14,
             cursor: uploading ? 'wait' : 'pointer',
           }}>{uploading ? 'アップロード中…' : photoUrl ? '📷 写真を撮り直す・選び直す' : '📷 写真を撮る・選ぶ'}</button>
-          {photoError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#E55039' }}>{photoError}</p>}
+          {photoError && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#B23A2E' }}>{photoError}</p>}
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#aaa', fontWeight: 700 }}>何に心が動いた？（任意）</p>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8C8579', fontWeight: 700 }}>何に心が動いた？（任意）</p>
           <input
             type="text" value={note} onChange={e => setNote(e.target.value)} onBlur={saveNote}
             placeholder={notePlaceholder}
@@ -119,7 +119,7 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
 
         <button type="button" onClick={() => { saveNote(); onClose(); }} style={{
           width: '100%', marginTop: 14, padding: '12px 0', borderRadius: 10, border: 'none',
-          background: '#FF6B9D', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          background: '#566246', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
         }}>とじる</button>
       </div>
     </>

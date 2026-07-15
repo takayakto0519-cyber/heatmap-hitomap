@@ -56,14 +56,14 @@ function memoryDateFromYearSeason(year: string, season: string): string {
 
 const mapLoadingStyle: React.CSSProperties = {
   height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: '#f0f0f0', color: '#aaa', fontSize: 14,
+  background: '#E9E3D2', color: '#8C8579', fontSize: 14,
 };
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '11px 13px', fontSize: 15,
   border: '1.5px solid #e8e8e8', borderRadius: 10, fontFamily: 'inherit',
   resize: 'vertical' as const, outline: 'none', background: '#fff',
 };
-const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 6, color: '#333' };
+const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 6, color: '#23231F' };
 
 // 「薄い日常」「深い想い」「時間で見る」レイヤータブ：使い勝手が悪いため一時的に非表示。
 // stateとロジックは残してあるので、trueに戻せば即復活する。
@@ -973,7 +973,7 @@ function MapApp() {
   const stepsDone = steps.filter(s => s.done).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f8f8' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#F4F1E8' }}>
       <Onboarding />
 
       {usernameSetupOpen && (
@@ -986,7 +986,7 @@ function MapApp() {
             boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
           }}>
             <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 16 }}>👤 マイページを作成</p>
-            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#999' }}>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#726C5E' }}>
               ユーザー名を設定すると、マイページ（プロフィール編集・アイコン設定）が使えるようになります。
             </p>
             <input
@@ -995,13 +995,13 @@ function MapApp() {
               placeholder="ユーザー名（半角英数字推奨）"
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '11px 12px', fontSize: 15,
-                border: `1.5px solid ${usernameSetupError ? '#E55039' : '#ddd'}`, borderRadius: 10, marginBottom: 8,
+                border: `1.5px solid ${usernameSetupError ? '#B23A2E' : '#D7CFB8'}`, borderRadius: 10, marginBottom: 8,
               }}
             />
-            {usernameSetupError && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#E55039' }}>{usernameSetupError}</p>}
+            {usernameSetupError && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#B23A2E' }}>{usernameSetupError}</p>}
             <button onClick={submitUsernameSetup} disabled={usernameSetupBusy} style={{
               width: '100%', padding: '13px', borderRadius: 10, border: 'none',
-              background: usernameSetupBusy ? '#ddd' : '#FF6B9D', color: '#fff',
+              background: usernameSetupBusy ? '#D7CFB8' : '#566246', color: '#fff',
               fontWeight: 700, fontSize: 15, cursor: usernameSetupBusy ? 'default' : 'pointer',
             }}>
               {usernameSetupBusy ? '設定中…' : '設定する'}
@@ -1011,14 +1011,14 @@ function MapApp() {
       )}
 
       {/* ── ヘッダー ── */}
-      <header style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: '1px solid #eee', flexShrink: 0 }}>
+      <header style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: '1px solid #E9E3D2', flexShrink: 0 }}>
         {regionParam && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 6, padding: '4px 10px', background: '#F3EAFB', borderRadius: 8,
+            marginBottom: 6, padding: '4px 10px', background: '#F3EDDE', borderRadius: 8,
           }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#8E44AD' }}>🏘 {regionParam}</span>
-            <a href="/" style={{ fontSize: 11, color: '#8E44AD', textDecoration: 'none' }}>← 他の地域へ</a>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#8A6B3F' }}>🏘 {regionParam}</span>
+            <a href="/" style={{ fontSize: 11, color: '#8A6B3F', textDecoration: 'none' }}>← 他の地域へ</a>
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -1027,7 +1027,7 @@ function MapApp() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentProfile?.username ? (
                 <a href={`/profile/${currentProfile.username}`} style={{
-                  display: 'flex', alignItems: 'center', gap: 5, color: '#666', fontSize: 11,
+                  display: 'flex', alignItems: 'center', gap: 5, color: '#55524A24A', fontSize: 11,
                   fontWeight: 700, textDecoration: 'none',
                 }}>
                   {currentProfile.avatar_url ? (
@@ -1039,7 +1039,7 @@ function MapApp() {
                 <button
                   onClick={() => { setUsernameSetupOpen(true); setUsernameSetupValue(''); setUsernameSetupError(''); }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 5, color: '#999', fontSize: 11,
+                    display: 'flex', alignItems: 'center', gap: 5, color: '#726C5E', fontSize: 11,
                     fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                   }}>
                   👤 マイページ（ユーザー名未設定）
@@ -1051,11 +1051,11 @@ function MapApp() {
                 setCurrentUser(null);
                 setCurrentProfile(null);
               }} style={{
-                background: 'none', border: 'none', color: '#999', fontSize: 11, cursor: 'pointer', padding: 0,
+                background: 'none', border: 'none', color: '#726C5E', fontSize: 11, cursor: 'pointer', padding: 0,
               }}>・ ログアウト</button>
             </div>
           ) : (
-            <a href="/login" style={{ color: '#38ADA9', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>ログイン / 新規登録</a>
+            <a href="/login" style={{ color: '#2F8C88', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>ログイン / 新規登録</a>
           )}
 
           {currentUser && (
@@ -1067,7 +1067,7 @@ function MapApp() {
               {dmUnreadCount > 0 && (
                 <span style={{
                   position: 'absolute', top: -2, right: 0, minWidth: 14, height: 14, borderRadius: 7,
-                  background: '#E55039', color: '#fff', fontSize: 9, fontWeight: 800,
+                  background: '#B23A2E', color: '#fff', fontSize: 9, fontWeight: 800,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
                 }}>{dmUnreadCount > 9 ? '9+' : dmUnreadCount}</span>
               )}
@@ -1084,7 +1084,7 @@ function MapApp() {
                 {unreadCount > 0 && (
                   <span style={{
                     position: 'absolute', top: -2, right: 0, minWidth: 14, height: 14, borderRadius: 7,
-                    background: '#E55039', color: '#fff', fontSize: 9, fontWeight: 800,
+                    background: '#B23A2E', color: '#fff', fontSize: 9, fontWeight: 800,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
                   }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
                 )}
@@ -1098,15 +1098,15 @@ function MapApp() {
                     padding: 8,
                   }}>
                     {notifications.length === 0 ? (
-                      <p style={{ margin: 0, padding: 12, fontSize: 12, color: '#bbb', textAlign: 'center' }}>まだ通知はありません</p>
+                      <p style={{ margin: 0, padding: 12, fontSize: 12, color: '#A79E8A', textAlign: 'center' }}>まだ通知はありません</p>
                     ) : notifications.map(n => (
                       <a key={n.id} href={n.trace_id ? `/t/${n.trace_id}` : '#'} style={{
                         display: 'block', padding: '8px 10px', borderRadius: 8, textDecoration: 'none',
-                        color: '#444', fontSize: 12, lineHeight: 1.5,
-                        background: n.is_read ? 'transparent' : '#FFF0F5',
+                        color: '#3E3B34', fontSize: 12, lineHeight: 1.5,
+                        background: n.is_read ? 'transparent' : '#E6E9DE',
                       }}>
                         {n.type === 'crossed_paths' ? '🚶 ' : ''}{n.message}
-                        <span style={{ display: 'block', fontSize: 10, color: '#bbb', marginTop: 2 }}>
+                        <span style={{ display: 'block', fontSize: 10, color: '#A79E8A', marginTop: 2 }}>
                           {new Date(n.created_at).toLocaleString('ja-JP')}
                         </span>
                       </a>
@@ -1140,10 +1140,10 @@ function MapApp() {
 
           {tab === 'list' && (
             <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: '#aaa' }}>{filtered.length}件</span>
+              <span style={{ fontSize: 12, color: '#8C8579' }}>{filtered.length}件</span>
               <button onClick={() => setSortOrder(o => o === 'new' ? 'old' : 'new')} style={{
                 padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                border: '1.5px solid #ddd', background: '#fff', color: '#555',
+                border: '1.5px solid #D7CFB8', background: '#fff', color: '#55524A',
               }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <ClockIcon size={12} /> {sortOrder === 'new' ? '新しい順' : '古い順'}
@@ -1152,9 +1152,9 @@ function MapApp() {
               <button onClick={() => { setRouteMode(v => !v); setRouteSelection([]); }} style={{
                 padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                border: `1.5px solid ${routeMode ? '#8E44AD' : '#ddd'}`,
-                background: routeMode ? '#F3EAFB' : '#fff',
-                color: routeMode ? '#8E44AD' : '#666', fontWeight: routeMode ? 700 : 400,
+                border: `1.5px solid ${routeMode ? '#8A6B3F' : '#D7CFB8'}`,
+                background: routeMode ? '#F3EDDE' : '#fff',
+                color: routeMode ? '#8A6B3F' : '#55524A24A', fontWeight: routeMode ? 700 : 400,
               }}><TrailIcon size={12} /> {routeMode ? 'ルート作成中' : 'ルートを作る'}</button>
             </div>
           )}
@@ -1163,7 +1163,7 @@ function MapApp() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* 進捗インジケーター */}
               {stepsDone < steps.length && (
-                <span style={{ fontSize: 11, color: '#aaa' }}>
+                <span style={{ fontSize: 11, color: '#8C8579' }}>
                   必須 {stepsDone}/{steps.length}
                 </span>
               )}
@@ -1176,11 +1176,11 @@ function MapApp() {
           <div style={{ marginBottom: 8 }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              background: '#fff', border: '1.5px solid #ddd', borderRadius: 999,
+              background: '#fff', border: '1.5px solid #D7CFB8', borderRadius: 999,
               padding: '4px 6px 4px 14px',
               boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
             }}>
-              <span style={{ color: '#999', display: 'inline-flex', flexShrink: 0 }}><SearchIcon size={16} /></span>
+              <span style={{ color: '#726C5E', display: 'inline-flex', flexShrink: 0 }}><SearchIcon size={16} /></span>
               <input
                 value={regionQuery}
                 onChange={e => setRegionQuery(e.target.value)}
@@ -1193,18 +1193,18 @@ function MapApp() {
               />
               <button onClick={searchRegion} disabled={regionSearching} style={{
                 padding: '7px 16px', borderRadius: 999, border: 'none', flexShrink: 0,
-                background: '#38ADA9', color: '#fff', fontSize: 13, fontWeight: 700,
+                background: '#2F8C88', color: '#fff', fontSize: 13, fontWeight: 700,
                 cursor: regionSearching ? 'wait' : 'pointer',
               }}>{regionSearching ? '検索中…' : '移動'}</button>
             </div>
-            {regionError && <p style={{ color: '#E55039', fontSize: 12, margin: '4px 0 0' }}>{regionError}</p>}
+            {regionError && <p style={{ color: '#B23A2E', fontSize: 12, margin: '4px 0 0' }}>{regionError}</p>}
             {regionCandidates.length > 0 && (
-              <div style={{ marginTop: 6, background: '#fff', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ marginTop: 6, background: '#fff', border: '1px solid #E9E3D2', borderRadius: 8, overflow: 'hidden' }}>
                 {regionCandidates.map((c, i) => (
                   <button key={i} onClick={() => jumpToRegion(c)} style={{
                     display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
-                    border: 'none', borderBottom: i < regionCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
-                    background: '#fff', fontSize: 12, color: '#444', cursor: 'pointer',
+                    border: 'none', borderBottom: i < regionCandidates.length - 1 ? '1px solid #E9E3D2' : 'none',
+                    background: '#fff', fontSize: 12, color: '#3E3B34', cursor: 'pointer',
                   }}>{c.display_name}</button>
                 ))}
               </div>
@@ -1215,17 +1215,17 @@ function MapApp() {
         {/* 今日の問い：ホーム相当のmapタブを開いた瞬間に見えるよう、投稿タブから移設 */}
         {tab === 'map' && !questDismissed && currentQuest && (
           <div style={{
-            background: 'linear-gradient(135deg, #FBF6FF, #FFF)', border: '1.5px solid #F3EAFB',
+            background: 'linear-gradient(135deg, #F8F4E9, #FFF)', border: '1.5px solid #F3EDDE',
             borderRadius: 14, padding: '12px 14px', marginBottom: 8, position: 'relative',
           }}>
             <button type="button" onClick={() => setQuestDismissed(true)} style={{
               position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
-              color: '#ccc', fontSize: 16, cursor: 'pointer', lineHeight: 1,
+              color: '#A79E8A', fontSize: 16, cursor: 'pointer', lineHeight: 1,
             }}>✕</button>
             {currentQuest.quest_type === 'emotion' ? (
               <>
-                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今日の問い・今こんな感情を集めています</p>
-                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8A6B3F', fontWeight: 700 }}>今日の問い・今こんな感情を集めています</p>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#23231F' }}>
                   {currentQuest.emoji} {currentQuest.title}
                 </p>
                 {currentQuest.target_emotion_key && (
@@ -1239,17 +1239,17 @@ function MapApp() {
                     </span>
                   </p>
                 )}
-                <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                <p style={{ margin: 0, fontSize: 12, color: '#726C5E', lineHeight: 1.6, paddingRight: 20 }}>
                   {currentQuest.hint}
                 </p>
               </>
             ) : (
               <>
-                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>今日の問い</p>
-                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#333' }}>
+                <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8A6B3F', fontWeight: 700 }}>今日の問い</p>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#23231F' }}>
                   {currentQuest.emoji} {currentQuest.title}
                 </p>
-                <p style={{ margin: 0, fontSize: 12, color: '#888', lineHeight: 1.6, paddingRight: 20 }}>
+                <p style={{ margin: 0, fontSize: 12, color: '#726C5E', lineHeight: 1.6, paddingRight: 20 }}>
                   {currentQuest.hint}
                 </p>
               </>
@@ -1268,9 +1268,9 @@ function MapApp() {
             <button onClick={() => setFiltersOpen(v => !v)} style={{
               display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
               padding: '5px 12px', borderRadius: 14, fontSize: 12, cursor: 'pointer', marginBottom: 4,
-              border: `1.5px solid ${isActive ? '#FF6B9D' : '#ddd'}`,
-              background: isActive ? '#FFF0F5' : '#fff',
-              color: isActive ? '#FF6B9D' : '#666', fontWeight: isActive ? 700 : 400,
+              border: `1.5px solid ${isActive ? '#566246' : '#D7CFB8'}`,
+              background: isActive ? '#E6E9DE' : '#fff',
+              color: isActive ? '#566246' : '#55524A24A', fontWeight: isActive ? 700 : 400,
             }}>
               絞り込み・発見{isActive ? '中' : ''} {filtersOpen ? '▴' : '▾'}
             </button>
@@ -1290,9 +1290,9 @@ function MapApp() {
             }} style={{
               padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              border: `1.5px solid ${nearbyOnly ? '#38ADA9' : '#ddd'}`,
-              background: nearbyOnly ? '#E8F8F7' : '#fff',
-              color: nearbyOnly ? '#38ADA9' : '#666', fontWeight: nearbyOnly ? 700 : 400,
+              border: `1.5px solid ${nearbyOnly ? '#2F8C88' : '#D7CFB8'}`,
+              background: nearbyOnly ? '#E9F3F2' : '#fff',
+              color: nearbyOnly ? '#2F8C88' : '#55524A24A', fontWeight: nearbyOnly ? 700 : 400,
             }}><PinIcon size={12} /> 近く</button>
             <button onClick={() => {
               setDetourMode(v => !v);
@@ -1300,14 +1300,14 @@ function MapApp() {
             }} style={{
               padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              border: `1.5px solid ${detourMode ? '#38ADA9' : '#ddd'}`,
-              background: detourMode ? '#E8F8F7' : '#fff',
-              color: detourMode ? '#38ADA9' : '#666', fontWeight: detourMode ? 700 : 400,
+              border: `1.5px solid ${detourMode ? '#2F8C88' : '#D7CFB8'}`,
+              background: detourMode ? '#E9F3F2' : '#fff',
+              color: detourMode ? '#2F8C88' : '#55524A24A', fontWeight: detourMode ? 700 : 400,
             }}><WalkIcon size={12} /> 寄り道</button>
             <button onClick={openUnexplored} style={{
               padding: '5px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              border: '1.5px solid #F3EAFB', background: '#FBF6FF', color: '#8E44AD', fontWeight: 700,
+              border: '1.5px solid #F3EDDE', background: '#F8F4E9', color: '#8A6B3F', fontWeight: 700,
             }}><CompassIcon size={12} /> 眠る痕跡</button>
           </div>
         )}
@@ -1322,16 +1322,16 @@ function MapApp() {
             ] as [typeof intensityLayer, string][]).map(([key, label]) => (
               <button key={key} onClick={() => setIntensityLayer(key)} style={{
                 padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
-                border: `1.5px solid ${intensityLayer === key ? '#8E44AD' : '#ddd'}`,
-                background: intensityLayer === key ? '#F3EAFB' : '#fff',
-                color: intensityLayer === key ? '#8E44AD' : '#888', fontWeight: intensityLayer === key ? 700 : 400,
+                border: `1.5px solid ${intensityLayer === key ? '#8A6B3F' : '#D7CFB8'}`,
+                background: intensityLayer === key ? '#F3EDDE' : '#fff',
+                color: intensityLayer === key ? '#8A6B3F' : '#726C5E', fontWeight: intensityLayer === key ? 700 : 400,
               }}>{label}</button>
             ))}
             <button onClick={() => setTimeSliderOn(v => !v)} style={{
               padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
-              border: `1.5px solid ${timeSliderOn ? '#38ADA9' : '#ddd'}`,
-              background: timeSliderOn ? '#E8F8F7' : '#fff',
-              color: timeSliderOn ? '#38ADA9' : '#888', fontWeight: timeSliderOn ? 700 : 400,
+              border: `1.5px solid ${timeSliderOn ? '#2F8C88' : '#D7CFB8'}`,
+              background: timeSliderOn ? '#E9F3F2' : '#fff',
+              color: timeSliderOn ? '#2F8C88' : '#726C5E', fontWeight: timeSliderOn ? 700 : 400,
             }}>🕰 時間で見る</button>
           </div>
         )}
@@ -1341,16 +1341,16 @@ function MapApp() {
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
             <button onClick={() => setFilterArchive(null)} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              border: `1.5px solid ${!filterArchive ? '#444' : '#ddd'}`,
-              background: !filterArchive ? '#444' : '#fff',
-              color: !filterArchive ? '#fff' : '#666',
+              border: `1.5px solid ${!filterArchive ? '#3E3B34' : '#D7CFB8'}`,
+              background: !filterArchive ? '#3E3B34' : '#fff',
+              color: !filterArchive ? '#fff' : '#55524A24A',
             }}>すべて</button>
             <button onClick={() => setFilterArchive(filterArchive === 'trace' ? null : 'trace')} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              border: `1.5px solid ${filterArchive === 'trace' ? '#FF6B9D' : '#ddd'}`,
-              background: filterArchive === 'trace' ? '#FF6B9D' : '#fff',
-              color: filterArchive === 'trace' ? '#fff' : '#666',
+              border: `1.5px solid ${filterArchive === 'trace' ? '#566246' : '#D7CFB8'}`,
+              background: filterArchive === 'trace' ? '#566246' : '#fff',
+              color: filterArchive === 'trace' ? '#fff' : '#55524A24A',
             }}><PinIcon size={12} /> 痕跡</button>
             {archiveCounts.map(a => {
               const ArchiveIcon = ARCHIVE_TYPE_ICONS[a.key];
@@ -1358,23 +1358,23 @@ function MapApp() {
                 <button key={a.key} onClick={() => setFilterArchive(filterArchive === a.key ? null : a.key)} style={{
                   padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  border: `1.5px solid ${filterArchive === a.key ? a.color : '#ddd'}`,
+                  border: `1.5px solid ${filterArchive === a.key ? a.color : '#D7CFB8'}`,
                   background: filterArchive === a.key ? a.color : '#fff',
-                  color: filterArchive === a.key ? '#fff' : '#666',
+                  color: filterArchive === a.key ? '#fff' : '#55524A24A',
                 }}>{ArchiveIcon && <ArchiveIcon size={12} />} {a.label} {a.count}</button>
               );
             })}
           </div>
         )}
         {tab === 'map' && mapMode === 'heat' && (
-          <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 4px' }}>ヒートは感情を記録した「痕跡」投稿のみが対象です</p>
+          <p style={{ fontSize: 11, color: '#8C8579', margin: '0 0 4px' }}>ヒートは感情を記録した「痕跡」投稿のみが対象です</p>
         )}
 
         {/* 寄り道モード（マップ） */}
         {tab === 'map' && detourMode && (
           <div style={{ marginBottom: 6 }}>
             {!userPos ? (
-              <p style={{ fontSize: 12, color: '#aaa', margin: 0 }}>現在地を取得しています…（位置情報を許可してください）</p>
+              <p style={{ fontSize: 12, color: '#8C8579', margin: 0 }}>現在地を取得しています…（位置情報を許可してください）</p>
             ) : !detourDestination ? (
               <>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -1383,35 +1383,35 @@ function MapApp() {
                     onChange={e => setDetourQuery(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') searchDetourDestination(); }}
                     placeholder="目的地は？（例：〇〇駅）"
-                    style={{ flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 13, border: '1.5px solid #ddd', outline: 'none' }}
+                    style={{ flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 13, border: '1.5px solid #D7CFB8', outline: 'none' }}
                   />
                   <button onClick={searchDetourDestination} disabled={detourSearching} style={{
                     padding: '7px 14px', borderRadius: 8, border: 'none',
-                    background: '#38ADA9', color: '#fff', fontSize: 13, fontWeight: 700,
+                    background: '#2F8C88', color: '#fff', fontSize: 13, fontWeight: 700,
                     cursor: detourSearching ? 'wait' : 'pointer',
                   }}>{detourSearching ? '検索中…' : '検索'}</button>
                 </div>
-                {detourError && <p style={{ color: '#E55039', fontSize: 12, margin: '4px 0 0' }}>{detourError}</p>}
+                {detourError && <p style={{ color: '#B23A2E', fontSize: 12, margin: '4px 0 0' }}>{detourError}</p>}
                 {detourCandidates.length > 0 && (
-                  <div style={{ marginTop: 6, background: '#fff', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ marginTop: 6, background: '#fff', border: '1px solid #E9E3D2', borderRadius: 8, overflow: 'hidden' }}>
                     {detourCandidates.map((c, i) => (
                       <button key={i} onClick={() => pickDetourDestination(c)} style={{
                         display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
-                        border: 'none', borderBottom: i < detourCandidates.length - 1 ? '1px solid #f0f0f0' : 'none',
-                        background: '#fff', fontSize: 12, color: '#444', cursor: 'pointer',
+                        border: 'none', borderBottom: i < detourCandidates.length - 1 ? '1px solid #E9E3D2' : 'none',
+                        background: '#fff', fontSize: 12, color: '#3E3B34', cursor: 'pointer',
                       }}>{c.display_name}</button>
                     ))}
                   </div>
                 )}
               </>
             ) : (
-              <div style={{ background: '#E8F8F7', border: '1.5px solid #38ADA933', borderRadius: 10, padding: '8px 12px' }}>
+              <div style={{ background: '#E9F3F2', border: '1.5px solid #2F8C8833', borderRadius: 10, padding: '8px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <p style={{ margin: 0, fontSize: 12, color: '#38ADA9', fontWeight: 700 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#2F8C88', fontWeight: 700 }}>
                     🚶 {detourDestination.name.split('、')[0]} まで・寄り道スポット {detourWaypoints.length}件
                   </p>
                   <button onClick={() => setDetourDestination(null)} style={{
-                    background: 'none', border: 'none', color: '#999', fontSize: 11, cursor: 'pointer',
+                    background: 'none', border: 'none', color: '#726C5E', fontSize: 11, cursor: 'pointer',
                   }}>やり直す</button>
                 </div>
                 {(detourWaypoints.length > 0 || detourSponsorNearby) && (
@@ -1419,7 +1419,7 @@ function MapApp() {
                     {detourWaypoints.map(w => (
                       <button key={w.trace.id} onClick={() => { setMapFlyToZoom(17); setMapFlyTo([w.trace.latitude, w.trace.longitude]); }} style={{
                         flexShrink: 0, padding: '5px 10px', borderRadius: 14, fontSize: 11,
-                        border: '1.5px solid #38ADA9', background: '#fff', color: '#38ADA9', cursor: 'pointer', whiteSpace: 'nowrap',
+                        border: '1.5px solid #2F8C88', background: '#fff', color: '#2F8C88', cursor: 'pointer', whiteSpace: 'nowrap',
                       }}>{w.trace.title}</button>
                     ))}
                     {detourSponsorNearby && (
@@ -1446,16 +1446,16 @@ function MapApp() {
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
             <button onClick={() => setFilterEmotion(null)} style={{
               padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              border: `1.5px solid ${!filterEmotion ? '#444' : '#ddd'}`,
-              background: !filterEmotion ? '#444' : '#fff',
-              color: !filterEmotion ? '#fff' : '#666',
+              border: `1.5px solid ${!filterEmotion ? '#3E3B34' : '#D7CFB8'}`,
+              background: !filterEmotion ? '#3E3B34' : '#fff',
+              color: !filterEmotion ? '#fff' : '#55524A24A',
             }}>すべて</button>
             {emotionCounts.map(e => (
               <button key={e.key} onClick={() => setFilterEmotion(filterEmotion === e.key ? null : e.key)} style={{
                 padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                border: `1.5px solid ${filterEmotion === e.key ? e.color : '#ddd'}`,
+                border: `1.5px solid ${filterEmotion === e.key ? e.color : '#D7CFB8'}`,
                 background: filterEmotion === e.key ? e.color : '#fff',
-                color: filterEmotion === e.key ? '#fff' : '#666',
+                color: filterEmotion === e.key ? '#fff' : '#55524A24A',
               }}>{e.emoji} {e.label} {e.count}</button>
             ))}
           </div>
@@ -1465,18 +1465,18 @@ function MapApp() {
         {tab === 'map' && timeSliderOn && timeMax > timeMin && (
           <div style={{
             marginTop: 8, padding: '12px 14px', borderRadius: 12,
-            background: '#EFFBFA', border: '1.5px solid #38ADA9',
+            background: '#E9F3F2', border: '1.5px solid #2F8C88',
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
               <p style={{ margin: 0, fontSize: 14, color: '#1F7A76', fontWeight: 800 }}>
                 🕰 {new Date(timeSliderCutoff).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
-              <p style={{ margin: 0, fontSize: 12, color: '#38ADA9', fontWeight: 700 }}>{filtered.length}件を表示中</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#2F8C88', fontWeight: 700 }}>{filtered.length}件を表示中</p>
             </div>
             <input
               type="range" min={0} max={100} value={timeSliderPct}
               onChange={e => setTimeSliderPct(Number(e.target.value))}
-              style={{ width: '100%', height: 28, accentColor: '#38ADA9', cursor: 'pointer' }}
+              style={{ width: '100%', height: 28, accentColor: '#2F8C88', cursor: 'pointer' }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#5FA8A4', fontWeight: 600, marginTop: 2 }}>
               <span>{new Date(timeMin).toLocaleDateString('ja-JP')}</span>
@@ -1495,7 +1495,7 @@ function MapApp() {
             onClick={() => setQuickAddTrace(unfinishedOwn[0])}
             style={{
               position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
-              background: '#8E44AD', color: '#fff', padding: '7px 16px', border: 'none',
+              background: '#8A6B3F', color: '#fff', padding: '7px 16px', border: 'none',
               borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', zIndex: 500,
               whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
@@ -1508,7 +1508,7 @@ function MapApp() {
         {tab === 'map' && pinDropMode && (
           <div style={{
             position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
-            background: '#FF6B9D', color: '#fff', padding: '8px 16px',
+            background: '#566246', color: '#fff', padding: '8px 16px',
             borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 500,
             whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}>
@@ -1520,7 +1520,7 @@ function MapApp() {
         {fetchError && (
           <div style={{
             position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
-            background: '#E55039', color: '#fff', padding: '8px 16px',
+            background: '#B23A2E', color: '#fff', padding: '8px 16px',
             borderRadius: 20, fontSize: 13, zIndex: 500,
             display: 'flex', gap: 10, alignItems: 'center', whiteSpace: 'nowrap',
           }}>
@@ -1573,8 +1573,8 @@ function MapApp() {
                 style={{
                   padding: '12px 16px', borderRadius: 24, border: 'none',
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  background: pinDropMode ? '#FF6B9D' : '#fff',
-                  color: pinDropMode ? '#fff' : '#333',
+                  background: pinDropMode ? '#566246' : '#fff',
+                  color: pinDropMode ? '#fff' : '#23231F',
                   fontWeight: 700, fontSize: 13, cursor: 'pointer',
                   boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
                 }}
@@ -1592,7 +1592,7 @@ function MapApp() {
             {nearbyOnly && userPos && (
               <div style={{
                 position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-                background: '#38ADA9', color: '#fff', padding: '6px 14px',
+                background: '#2F8C88', color: '#fff', padding: '6px 14px',
                 borderRadius: 20, fontSize: 12, zIndex: 500, whiteSpace: 'nowrap',
               }}>
                 現在地から{NEARBY_RADIUS}m以内：{filtered.length}件
@@ -1608,10 +1608,10 @@ function MapApp() {
                 {EMOTIONS.filter(e => filtered.some(t => t.emotion_key === e.key)).map(e => (
                   <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, lineHeight: 1.9 }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, display: 'inline-block' }} />
-                    <span style={{ color: '#444' }}>{e.label}</span>
+                    <span style={{ color: '#3E3B34' }}>{e.label}</span>
                   </div>
                 ))}
-                <div style={{ borderTop: '1px solid #eee', marginTop: 5, paddingTop: 5, fontSize: 10, color: '#bbb' }}>
+                <div style={{ borderTop: '1px solid #E9E3D2', marginTop: 5, paddingTop: 5, fontSize: 10, color: '#A79E8A' }}>
                   円が大きい＝強度が高い
                 </div>
               </div>
@@ -1623,12 +1623,12 @@ function MapApp() {
         {/* ─── 投稿フォーム ─── */}
         {tab === 'post' && (
           // 下部固定の公開範囲ボタン＋記録するボタン＋ボトムナビの高さ分、確実に見えるよう余白を確保
-          <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 230px', background: '#f8f8f8' }}>
+          <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 230px', background: '#F4F1E8' }}>
 
             {/* 送信完了 */}
             {submitDone && (
               <div style={{ textAlign: 'center', padding: '48px 20px 20px' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#38ADA9' }}>✓ 記録しました</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#2F8C88' }}>✓ 記録しました</div>
 
                 {lastPostedTrace?.visibility === 'public' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280, margin: '20px auto 0' }}>
@@ -1642,22 +1642,22 @@ function MapApp() {
                       }
                     }} style={{
                       padding: '12px 0', borderRadius: 10, border: 'none',
-                      background: 'linear-gradient(135deg, #FF6B9D, #FF9068)',
+                      background: 'linear-gradient(135deg, #566246, #FF9068)',
                       color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
                     }}>📤 シェアする</button>
                     <a
                       href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(lastPostedTrace.title)}&url=${encodeURIComponent(`${window.location.origin}/t/${lastPostedTrace.id}`)}`}
                       target="_blank" rel="noopener noreferrer"
                       style={{
-                        display: 'block', padding: '12px 0', borderRadius: 10, border: '1.5px solid #ddd',
-                        color: '#444', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+                        display: 'block', padding: '12px 0', borderRadius: 10, border: '1.5px solid #D7CFB8',
+                        color: '#3E3B34', fontWeight: 700, fontSize: 14, textDecoration: 'none',
                       }}
                     >𝕏 でシェア</a>
                   </div>
                 )}
 
                 <button onClick={finishSubmitPost} style={{
-                  marginTop: 16, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: 'pointer',
+                  marginTop: 16, background: 'none', border: 'none', color: '#726C5E', fontSize: 13, cursor: 'pointer',
                 }}>続ける →</button>
               </div>
             )}
@@ -1667,30 +1667,30 @@ function MapApp() {
 
                 {/* STEP 0: 何を記録する？（痕跡 or アーカイブ） */}
                 <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
+                  <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600, marginBottom: 8 }}>
                     何を記録する？
                   </label>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button type="button" onClick={() => setArchiveTypeKey(null)} style={{
                       padding: '8px 12px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-                      border: `2px solid ${!archiveTypeKey ? '#FF6B9D' : '#ddd'}`,
-                      background: !archiveTypeKey ? '#FFF0F5' : '#fff',
-                      color: !archiveTypeKey ? '#FF6B9D' : '#666',
+                      border: `2px solid ${!archiveTypeKey ? '#566246' : '#D7CFB8'}`,
+                      background: !archiveTypeKey ? '#E6E9DE' : '#fff',
+                      color: !archiveTypeKey ? '#566246' : '#55524A24A',
                       fontWeight: !archiveTypeKey ? 700 : 400,
                     }}>📍 痕跡</button>
                     {ARCHIVE_TYPES.map(a => (
                       <button key={a.key} type="button"
                         onClick={() => setArchiveTypeKey(archiveTypeKey === a.key ? null : a.key)} style={{
                           padding: '8px 12px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-                          border: `2px solid ${archiveTypeKey === a.key ? a.color : '#ddd'}`,
+                          border: `2px solid ${archiveTypeKey === a.key ? a.color : '#D7CFB8'}`,
                           background: archiveTypeKey === a.key ? a.color + '18' : '#fff',
-                          color: archiveTypeKey === a.key ? a.color : '#666',
+                          color: archiveTypeKey === a.key ? a.color : '#55524A24A',
                           fontWeight: archiveTypeKey === a.key ? 700 : 400,
                         }}>{a.emoji} {a.label}</button>
                     ))}
                   </div>
                   {selectedArchiveType && (
-                    <p style={{ fontSize: 11, color: '#aaa', margin: '8px 0 0' }}>
+                    <p style={{ fontSize: 11, color: '#8C8579', margin: '8px 0 0' }}>
                       この土地の記憶を後世に残す記録です。知っていることをそのまま書いてください。
                     </p>
                   )}
@@ -1715,9 +1715,9 @@ function MapApp() {
                       ))}
                       {photos.length < MAX_PHOTOS && (
                         <button type="button" onClick={() => fileRef.current?.click()} style={{
-                          width: 100, height: 100, borderRadius: 10, border: '1.5px dashed #ddd', background: '#fafafa',
+                          width: 100, height: 100, borderRadius: 10, border: '1.5px dashed #D7CFB8', background: '#F4F1E8',
                           cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          gap: 4, flexShrink: 0, color: '#bbb', fontSize: 11,
+                          gap: 4, flexShrink: 0, color: '#A79E8A', fontSize: 11,
                         }}>
                           <span style={{ fontSize: 22 }}>＋</span>追加（{photos.length}/{MAX_PHOTOS}）
                         </button>
@@ -1725,12 +1725,12 @@ function MapApp() {
                     </div>
                   ) : (
                     <button type="button" onClick={() => fileRef.current?.click()} style={{
-                      width: '100%', height: 130, border: 'none', background: '#fafafa',
+                      width: '100%', height: 130, border: 'none', background: '#F4F1E8',
                       cursor: 'pointer', display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}>
                       <span style={{ fontSize: 36 }}>📷</span>
-                      <span style={{ fontSize: 14, color: '#bbb' }}>タップして写真を撮る・選ぶ（最大{MAX_PHOTOS}枚）</span>
+                      <span style={{ fontSize: 14, color: '#A79E8A' }}>タップして写真を撮る・選ぶ（最大{MAX_PHOTOS}枚）</span>
                     </button>
                   )}
                 </div>
@@ -1750,28 +1750,28 @@ function MapApp() {
                     </div>
                   ) : (
                     <button type="button" onClick={() => videoRef.current?.click()} style={{
-                      width: '100%', height: 90, border: 'none', background: '#fafafa',
+                      width: '100%', height: 90, border: 'none', background: '#F4F1E8',
                       cursor: 'pointer', display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}>
                       <span style={{ fontSize: 26 }}>🎥</span>
-                      <span style={{ fontSize: 13, color: '#bbb' }}>短い動画を撮る・選ぶ（任意・最大{MAX_VIDEO_MB}MB）</span>
+                      <span style={{ fontSize: 13, color: '#A79E8A' }}>短い動画を撮る・選ぶ（任意・最大{MAX_VIDEO_MB}MB）</span>
                     </button>
                   )}
-                  {videoError && <p style={{ margin: '6px 10px 0', fontSize: 11, color: '#E55039' }}>{videoError}</p>}
+                  {videoError && <p style={{ margin: '6px 10px 0', fontSize: 11, color: '#B23A2E' }}>{videoError}</p>}
                 </div>
 
                 {/* STEP 2: タイトル（必須） */}
                 <div style={{ background: '#fff', borderRadius: 14, padding: '14px 14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 6 }}>
-                    {selectedArchiveType ? selectedArchiveType.titleLabel : '何を見つけた？'} <span style={{ color: '#FF6B9D' }}>*</span>
+                  <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600, marginBottom: 6 }}>
+                    {selectedArchiveType ? selectedArchiveType.titleLabel : '何を見つけた？'} <span style={{ color: '#566246' }}>*</span>
                   </label>
                   <input
                     type="text"
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder={selectedArchiveType ? selectedArchiveType.titlePlaceholder : '例：修理された木の椅子、古い看板…'}
-                    style={{ ...inputStyle, fontSize: 16, fontWeight: 600, border: '2px solid ' + (title.trim() ? '#38ADA9' : '#eee') }}
+                    style={{ ...inputStyle, fontSize: 16, fontWeight: 600, border: '2px solid ' + (title.trim() ? '#2F8C88' : '#E9E3D2') }}
                     required
                   />
                 </div>
@@ -1782,12 +1782,12 @@ function MapApp() {
                     {archiveTypeKey === 'chimei' && (
                       <>
                         <div>
-                          <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>よみ（ひらがな）</label>
+                          <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>よみ（ひらがな）</label>
                           <input type="text" value={yomi} onChange={e => setYomi(e.target.value)}
                             placeholder="例：どんどやきば" style={inputStyle} />
                         </div>
                         <div>
-                          <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>別名・旧称（カンマ区切り）</label>
+                          <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>別名・旧称（カンマ区切り）</label>
                           <input type="text" value={altNames} onChange={e => setAltNames(e.target.value)}
                             placeholder="例：才の神焼き場、どんどん場" style={inputStyle} />
                         </div>
@@ -1795,7 +1795,7 @@ function MapApp() {
                     )}
 
                     <div>
-                      <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>
+                      <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>
                         {selectedArchiveType.bodyLabel}
                       </label>
                       <textarea value={why} onChange={e => setWhy(e.target.value)}
@@ -1805,14 +1805,14 @@ function MapApp() {
 
                     {(archiveTypeKey === 'denshou' || archiveTypeKey === 'koe') && (
                       <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>🎙️ 音声で残す（任意）</label>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>🎙️ 音声で残す（任意）</label>
                         <AudioRecorder value={audioBlob} onChange={setAudioBlob} />
-                        <p style={{ fontSize: 11, color: '#bbb', margin: '6px 0 0' }}>
+                        <p style={{ fontSize: 11, color: '#A79E8A', margin: '6px 0 0' }}>
                           話し言葉のまま残すと、文字にならないニュアンスも伝わります
                         </p>
                         {audioBlob && (
                           <div style={{ marginTop: 10 }}>
-                            <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>📝 文字起こし（任意）</label>
+                            <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>📝 文字起こし（任意）</label>
                             <textarea value={audioTranscript} onChange={e => setAudioTranscript(e.target.value)}
                               placeholder="話した内容をそのまま書き起こしておくと、後から探しやすくなります"
                               rows={3} style={inputStyle} />
@@ -1823,7 +1823,7 @@ function MapApp() {
 
                     {archiveTypeKey === 'bunken' && (
                       <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>出典・URL</label>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>出典・URL</label>
                         <input type="text" value={sourceRef} onChange={e => setSourceRef(e.target.value)}
                           placeholder="例：〇〇村誌 p.123 / https://…" style={inputStyle} />
                       </div>
@@ -1831,15 +1831,15 @@ function MapApp() {
 
                     {archiveTypeKey === 'koe' && (
                       <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>この土地との関係</label>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>この土地との関係</label>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {VOICE_RELATIONS.map(r => (
                             <button key={r.key} type="button"
                               onClick={() => setVoiceRelation(voiceRelation === r.key ? null : r.key)} style={{
                                 padding: '6px 11px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-                                border: `1.5px solid ${voiceRelation === r.key ? selectedArchiveType.color : '#ddd'}`,
+                                border: `1.5px solid ${voiceRelation === r.key ? selectedArchiveType.color : '#D7CFB8'}`,
                                 background: voiceRelation === r.key ? selectedArchiveType.color : '#fff',
-                                color: voiceRelation === r.key ? '#fff' : '#666',
+                                color: voiceRelation === r.key ? '#fff' : '#55524A24A',
                               }}>{r.label}</button>
                           ))}
                         </div>
@@ -1848,14 +1848,14 @@ function MapApp() {
 
                     {archiveTypeKey !== 'koe' && (
                       <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>時代・年代（わかれば）</label>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>時代・年代（わかれば）</label>
                         <input type="text" value={eraLabel} onChange={e => setEraLabel(e.target.value)}
                           placeholder="例：昭和40年代まで、明治期、江戸末期…" style={inputStyle} />
                       </div>
                     )}
                     {archiveTypeKey === 'koe' && (
                       <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600 }}>いつ頃の話？（わかれば）</label>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600 }}>いつ頃の話？（わかれば）</label>
                         <input type="text" value={eraLabel} onChange={e => setEraLabel(e.target.value)}
                           placeholder="例：1960年代、戦後すぐ…" style={inputStyle} />
                       </div>
@@ -1866,7 +1866,7 @@ function MapApp() {
                 {/* STEP 3: 感情（痕跡のみ） */}
                 {!selectedArchiveType && (
                   <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                    <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
+                    <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600, marginBottom: 8 }}>
                       なにを感じた？（複数選べます）
                     </label>
                     <EmotionPicker value={emotionKeys} onChange={setEmotionKeys} />
@@ -1875,8 +1875,8 @@ function MapApp() {
 
                 {/* STEP 4: 位置（必須） */}
                 <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <label style={{ ...labelStyle, fontSize: 12, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>
-                    {selectedArchiveType ? 'その場所はどこ？' : 'いまいる場所'} <span style={{ color: '#FF6B9D' }}>*</span>
+                  <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600, marginBottom: 8 }}>
+                    {selectedArchiveType ? 'その場所はどこ？' : 'いまいる場所'} <span style={{ color: '#566246' }}>*</span>
                   </label>
 
                   {/* 地図をタップして記録（メインの記録方法） */}
@@ -1887,15 +1887,15 @@ function MapApp() {
                       onChange={(la, ln) => { setLat(la); setLng(ln); }}
                     />
                   </div>
-                  <p style={{ fontSize: 11, color: '#999', margin: '0 0 8px' }}>
+                  <p style={{ fontSize: 11, color: '#726C5E', margin: '0 0 8px' }}>
                     {lat ? 'タップしてピンの位置を調整できます' : '☝️ 地図をタップして場所を選んでください'}
                   </p>
 
                   {lat && (
-                    <p style={{ fontSize: 11, color: '#aaa', margin: '0 0 8px', display: 'flex', justifyContent: 'space-between' } as React.CSSProperties}>
+                    <p style={{ fontSize: 11, color: '#8C8579', margin: '0 0 8px', display: 'flex', justifyContent: 'space-between' } as React.CSSProperties}>
                       <span>✓ {lat.toFixed(5)}, {lng!.toFixed(5)}</span>
                       <button type="button" onClick={() => { setLat(null); setLng(null); }}
-                        style={{ background: 'none', border: 'none', color: '#E55039', cursor: 'pointer', fontSize: 11 }}>
+                        style={{ background: 'none', border: 'none', color: '#B23A2E', cursor: 'pointer', fontSize: 11 }}>
                         リセット
                       </button>
                     </p>
@@ -1903,19 +1903,19 @@ function MapApp() {
 
                   <button type="button" onClick={detectGPS} disabled={gpsLoading} style={{
                     width: '100%', padding: '11px', borderRadius: 10, marginBottom: 8,
-                    border: `2px solid ${lat ? '#38ADA9' : '#4A90E2'}`,
-                    background: lat ? '#E8F8F7' : '#EEF4FF',
-                    color: lat ? '#38ADA9' : '#4A90E2', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    border: `2px solid ${lat ? '#2F8C88' : '#4A90E2'}`,
+                    background: lat ? '#E9F3F2' : '#EEF4FF',
+                    color: lat ? '#2F8C88' : '#4A90E2', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   }}>
                     {gpsLoading ? '取得中…' : lat ? '✓ 現在地を再取得' : '📡 現在地を自動取得'}
                   </button>
-                  {gpsError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 8px' }}>{gpsError}</p>}
+                  {gpsError && <p style={{ color: '#B23A2E', fontSize: 12, margin: '0 0 8px' }}>{gpsError}</p>}
 
                   {/* 住所検索（任意・折りたたみ） */}
                   <button type="button" onClick={() => setShowAddressSearch(v => !v)} style={{
                     width: '100%', padding: '10px', borderRadius: 10, marginBottom: showAddressSearch ? 8 : 0,
-                    border: '1.5px solid #e0e0e0', background: '#fafafa',
-                    color: '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    border: '1.5px solid #D7CFB8', background: '#F4F1E8',
+                    color: '#55524A24A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                   }}>
                     {showAddressSearch ? '▲ 住所検索を閉じる' : '🔍 住所・地名で検索する'}
                   </button>
@@ -1937,7 +1937,7 @@ function MapApp() {
                       </div>
 
                       {addressCandidates.length > 0 && (
-                        <div style={{ border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+                        <div style={{ border: '1px solid #E9E3D2', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
                           {addressCandidates.map((c, i) => (
                             <button key={i} type="button" onClick={() => {
                               setLat(parseFloat(c.lat)); setLng(parseFloat(c.lon));
@@ -1945,14 +1945,14 @@ function MapApp() {
                             }} style={{
                               width: '100%', padding: '13px 14px', background: '#fff',
                               border: 'none', borderBottom: i < addressCandidates.length - 1 ? '1px solid #f5f5f5' : 'none',
-                              cursor: 'pointer', textAlign: 'left' as const, fontSize: 14, color: '#333',
+                              cursor: 'pointer', textAlign: 'left' as const, fontSize: 14, color: '#23231F',
                             }}>
                               📍 {c.display_name.split(',').slice(0, 3).join(', ')}
                             </button>
                           ))}
                         </div>
                       )}
-                      {addressError && <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px' }}>{addressError}</p>}
+                      {addressError && <p style={{ color: '#B23A2E', fontSize: 12, margin: '0 0 6px' }}>{addressError}</p>}
                     </div>
                   )}
                 </div>
@@ -1963,9 +1963,9 @@ function MapApp() {
                   onClick={() => setShowAdvanced(v => !v)}
                   style={{
                     width: '100%', padding: '12px', borderRadius: 12, marginBottom: 12,
-                    border: `1.5px dashed ${showAdvanced ? '#FF6B9D' : '#ddd'}`,
-                    background: showAdvanced ? '#FFF0F5' : '#fafafa',
-                    color: showAdvanced ? '#FF6B9D' : '#999',
+                    border: `1.5px dashed ${showAdvanced ? '#566246' : '#D7CFB8'}`,
+                    background: showAdvanced ? '#E6E9DE' : '#F4F1E8',
+                    color: showAdvanced ? '#566246' : '#726C5E',
                     fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
@@ -1994,7 +1994,7 @@ function MapApp() {
                         { label: '自分のどんな記憶・感情とつながった？', val: selfReflection, set: setSelfReflection, ph: 'なぜ自分はこれに反応したのか' },
                       ].map(({ label, val, set, ph }) => (
                         <div key={label} style={{ marginBottom: 10 }}>
-                          <p style={{ fontSize: 12, color: '#888', margin: '0 0 4px' }}>{label}</p>
+                          <p style={{ fontSize: 12, color: '#726C5E', margin: '0 0 4px' }}>{label}</p>
                           <textarea value={val} onChange={e => set(e.target.value)} placeholder={ph} rows={2} style={inputStyle} />
                         </div>
                       ))}
@@ -2014,9 +2014,9 @@ function MapApp() {
                           <button key={c.key} type="button"
                             onClick={() => setCategoryKey(categoryKey === c.key ? null : c.key)} style={{
                               padding: '6px 11px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-                              border: `1.5px solid ${categoryKey === c.key ? '#555' : '#ddd'}`,
-                              background: categoryKey === c.key ? '#555' : '#fff',
-                              color: categoryKey === c.key ? '#fff' : '#666',
+                              border: `1.5px solid ${categoryKey === c.key ? '#55524A' : '#D7CFB8'}`,
+                              background: categoryKey === c.key ? '#55524A' : '#fff',
+                              color: categoryKey === c.key ? '#fff' : '#55524A24A',
                             }}>{c.emoji} {c.label}</button>
                         ))}
                       </div>
@@ -2030,9 +2030,9 @@ function MapApp() {
                           <button key={t.key} type="button"
                             onClick={() => setTraceTypeKey(traceTypeKey === t.key ? null : t.key)} style={{
                               flex: 1, padding: '10px 6px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-                              border: `2px solid ${traceTypeKey === t.key ? t.color : '#ddd'}`,
+                              border: `2px solid ${traceTypeKey === t.key ? t.color : '#D7CFB8'}`,
                               background: traceTypeKey === t.key ? t.color + '18' : '#fff',
-                              color: traceTypeKey === t.key ? t.color : '#666',
+                              color: traceTypeKey === t.key ? t.color : '#55524A24A',
                               fontWeight: traceTypeKey === t.key ? 700 : 400,
                             }}>
                             {t.emoji} {t.label}
@@ -2045,15 +2045,15 @@ function MapApp() {
                     <section>
                       <button type="button" onClick={() => setIsPastMemory(v => !v)} style={{
                         width: '100%', padding: '16px', borderRadius: 10, cursor: 'pointer',
-                        border: `2px solid ${isPastMemory ? '#F6B93B' : '#ddd'}`,
+                        border: `2px solid ${isPastMemory ? '#9C6B23' : '#D7CFB8'}`,
                         background: isPastMemory ? '#FFFBF0' : '#fff',
-                        color: isPastMemory ? '#856404' : '#888', fontWeight: isPastMemory ? 700 : 400, fontSize: 16,
+                        color: isPastMemory ? '#856404' : '#726C5E', fontWeight: isPastMemory ? 700 : 400, fontSize: 16,
                       }}>
                         {isPastMemory ? '🕰 昔の思い出として登録する' : '📍 今の記録として登録する'}
                       </button>
                       {isPastMemory && (
                         <div style={{ marginTop: 10 }}>
-                          <p style={{ fontSize: 13, color: '#999', margin: '0 0 8px' }}>
+                          <p style={{ fontSize: 13, color: '#726C5E', margin: '0 0 8px' }}>
                             何十年も前の思い出でも大丈夫です。だいたいの年でけっこうです。
                           </p>
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -2082,12 +2082,12 @@ function MapApp() {
                         {customTags.map(tag => (
                           <span key={tag} style={{
                             padding: '4px 10px', borderRadius: 20, fontSize: 12,
-                            background: '#f0f0f0', color: '#444',
+                            background: '#E9E3D2', color: '#3E3B34',
                             display: 'flex', alignItems: 'center', gap: 4,
                           }}>
                             #{tag}
                             <button type="button" onClick={() => setCustomTags(tags => tags.filter(t => t !== tag))}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#aaa', padding: 0 }}>×</button>
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#8C8579', padding: 0 }}>×</button>
                           </span>
                         ))}
                       </div>
@@ -2098,7 +2098,7 @@ function MapApp() {
                           }}
                           placeholder="例: 木造り、昭和…" style={{ ...inputStyle, flex: 1, fontSize: 13 }} />
                         <button type="button" onClick={() => { const t = tagInput.trim(); if (t && !customTags.includes(t)) setCustomTags(tags => [...tags, t]); setTagInput(''); }} style={{
-                          padding: '0 12px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
+                          padding: '0 12px', borderRadius: 10, border: '1.5px solid #D7CFB8', background: '#fff', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
                         }}>追加</button>
                       </div>
                     </section>
@@ -2112,8 +2112,8 @@ function MapApp() {
                         ] as { label: string; val: boolean; toggle: () => void }[]).map(({ label, val, toggle }) => (
                           <button key={label} type="button" onClick={toggle} style={{
                             flex: 1, padding: '11px 6px', borderRadius: 10, fontSize: 13,
-                            border: `2px solid ${val ? '#38ADA9' : '#ddd'}`,
-                            background: val ? '#E8F8F7' : '#fff', color: val ? '#38ADA9' : '#aaa',
+                            border: `2px solid ${val ? '#2F8C88' : '#D7CFB8'}`,
+                            background: val ? '#E9F3F2' : '#fff', color: val ? '#2F8C88' : '#8C8579',
                             fontWeight: val ? 700 : 400, cursor: 'pointer',
                           }}>{label}</button>
                         ))}
@@ -2134,17 +2134,17 @@ function MapApp() {
                     </section>
 
                     <section style={{ padding: '10px', background: '#F8F9FA', borderRadius: 10, marginBottom: 0 }}>
-                      <label style={{ ...labelStyle, fontSize: 12, color: '#888', marginBottom: 4 }}>🔖 実験回コード（グループ共通）</label>
+                      <label style={{ ...labelStyle, fontSize: 12, color: '#726C5E', marginBottom: 4 }}>🔖 実験回コード（グループ共通）</label>
                       <input type="text" value={sessionCode} onChange={e => saveSessionCode(e.target.value)}
                         placeholder="例: yanaka-20260701" style={{ ...inputStyle, fontSize: 13, background: '#fff' }} />
                     </section>
 
                     {sessionCode && (
-                      <section style={{ padding: '10px', background: '#FBF6FF', borderRadius: 10, marginBottom: 0, marginTop: 8 }}>
-                        <label style={{ ...labelStyle, fontSize: 12, color: '#8E44AD', marginBottom: 4 }}>🏳 チーム名（イベント参加時）</label>
+                      <section style={{ padding: '10px', background: '#F8F4E9', borderRadius: 10, marginBottom: 0, marginTop: 8 }}>
+                        <label style={{ ...labelStyle, fontSize: 12, color: '#8A6B3F', marginBottom: 4 }}>🏳 チーム名（イベント参加時）</label>
                         <input type="text" value={team} onChange={e => setTeam(e.target.value)}
                           placeholder="例: 新宿チーム" style={{ ...inputStyle, fontSize: 13, background: '#fff' }} />
-                        <p style={{ fontSize: 11, color: '#aaa', margin: '4px 0 0' }}>
+                        <p style={{ fontSize: 11, color: '#8C8579', margin: '4px 0 0' }}>
                           チーム名を入れると、この投稿はチームメンバー全員に見える公開投稿になります
                         </p>
                       </section>
@@ -2158,7 +2158,7 @@ function MapApp() {
 
         {/* ─── 一覧 ─── */}
         {tab === 'list' && (
-          <div style={{ height: '100%', overflowY: 'auto', padding: '12px 12px 80px', background: '#f8f8f8' }}>
+          <div style={{ height: '100%', overflowY: 'auto', padding: '12px 12px 80px', background: '#F4F1E8' }}>
 
             {/* 統計パネル */}
             <StatsPanel traces={filtered} sessionCode={sessionCode || undefined} />
@@ -2169,7 +2169,7 @@ function MapApp() {
                 background: '#FFF8FC', border: '1.5px solid #FFD6E7',
                 borderRadius: 12, padding: '12px 14px', marginBottom: 14,
               }}>
-                <p style={{ margin: '0 0 7px', fontSize: 12, fontWeight: 700, color: '#FF6B9D' }}>✨ あなたの感情プロフィール</p>
+                <p style={{ margin: '0 0 7px', fontSize: 12, fontWeight: 700, color: '#566246' }}>✨ あなたの感情プロフィール</p>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {myProfile.map((e, i) => (
                     <span key={e.key} style={{
@@ -2187,14 +2187,14 @@ function MapApp() {
               <div style={{ display: 'flex', gap: 5, overflowX: 'auto', marginBottom: 10, paddingBottom: 2, scrollbarWidth: 'none' }}>
                 <button onClick={() => setFilterCategory(null)} style={{
                   padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                  border: `1.5px solid ${!filterCategory ? '#444' : '#ddd'}`,
-                  background: !filterCategory ? '#444' : '#fff', color: !filterCategory ? '#fff' : '#666',
+                  border: `1.5px solid ${!filterCategory ? '#3E3B34' : '#D7CFB8'}`,
+                  background: !filterCategory ? '#3E3B34' : '#fff', color: !filterCategory ? '#fff' : '#55524A24A',
                 }}>すべて</button>
                 {CATEGORIES.filter(c => traces.some(t => t.category === c.key)).map(c => (
                   <button key={c.key} onClick={() => setFilterCategory(filterCategory === c.key ? null : c.key)} style={{
                     padding: '3px 9px', borderRadius: 16, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                    border: `1.5px solid ${filterCategory === c.key ? '#555' : '#ddd'}`,
-                    background: filterCategory === c.key ? '#555' : '#fff', color: filterCategory === c.key ? '#fff' : '#666',
+                    border: `1.5px solid ${filterCategory === c.key ? '#55524A' : '#D7CFB8'}`,
+                    background: filterCategory === c.key ? '#55524A' : '#fff', color: filterCategory === c.key ? '#fff' : '#55524A24A',
                   }}>{c.emoji} {c.label}</button>
                 ))}
               </div>
@@ -2211,8 +2211,8 @@ function MapApp() {
             {/* ルート作成モードの案内 */}
             {routeMode && (
               <div style={{
-                background: '#F3EAFB', border: '1.5px solid #8E44AD33', borderRadius: 12,
-                padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#8E44AD',
+                background: '#F3EDDE', border: '1.5px solid #8A6B3F33', borderRadius: 12,
+                padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#8A6B3F',
               }}>
                 🥾 歩いた順にカードをタップして選んでください（{routeSelection.length}件選択中、2件以上必要）
               </div>
@@ -2220,9 +2220,9 @@ function MapApp() {
 
             {/* カード一覧 */}
             {loading ? (
-              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>読み込み中…</p>
+              <p style={{ color: '#8C8579', textAlign: 'center', marginTop: 40 }}>読み込み中…</p>
             ) : sorted.length === 0 ? (
-              <div style={{ textAlign: 'center', marginTop: 50, color: '#bbb' }}>
+              <div style={{ textAlign: 'center', marginTop: 50, color: '#A79E8A' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🗺</div>
                 <p style={{ fontSize: 14, margin: 0 }}>
                   {sessionCode ? `「${sessionCode}」の記録はまだありません` : 'まだ記録がありません'}
@@ -2249,9 +2249,9 @@ function MapApp() {
                         <div style={{
                           position: 'absolute', top: 8, left: 8, width: 26, height: 26, borderRadius: 13,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: selectedIndex >= 0 ? '#8E44AD' : 'rgba(255,255,255,0.85)',
-                          color: selectedIndex >= 0 ? '#fff' : '#bbb',
-                          border: selectedIndex >= 0 ? 'none' : '1.5px solid #ddd',
+                          background: selectedIndex >= 0 ? '#8A6B3F' : 'rgba(255,255,255,0.85)',
+                          color: selectedIndex >= 0 ? '#fff' : '#A79E8A',
+                          border: selectedIndex >= 0 ? 'none' : '1.5px solid #D7CFB8',
                           fontSize: 12, fontWeight: 800, pointerEvents: 'none',
                         }}>{selectedIndex >= 0 ? selectedIndex + 1 : ''}</div>
                       )}
@@ -2269,19 +2269,19 @@ function MapApp() {
         <div style={{
           position: 'fixed', bottom: 60, left: 0, right: 0, padding: '10px 14px',
           background: 'rgba(250,250,250,0.97)', backdropFilter: 'blur(10px)',
-          borderTop: '1px solid #eee', zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8,
+          borderTop: '1px solid #E9E3D2', zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8,
         }}>
           <input
             value={routeTitle}
             onChange={e => setRouteTitle(e.target.value)}
             placeholder="ルート名（例：谷中の路地を歩く道）"
-            style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }}
+            style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #D7CFB8', fontSize: 13 }}
           />
           <input
             value={routeNickname}
             onChange={e => setRouteNickname(e.target.value)}
             placeholder="ニックネーム（削除・編集時の確認用、任意）"
-            style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }}
+            style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #D7CFB8', fontSize: 13 }}
           />
           {currentUser && (
             <>
@@ -2290,21 +2290,21 @@ function MapApp() {
                 onChange={e => setRouteHighlights(e.target.value)}
                 placeholder="見どころ・おすすめポイント（任意）"
                 rows={2}
-                style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+                style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #D7CFB8', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
               />
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8E44AD' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8A6B3F' }}>
                 <input type="checkbox" checked={routeRecommend} onChange={e => setRouteRecommend(e.target.checked)} />
                 ✨ おすすめルートとして公開申請する（運営の承認後、ルート一覧に掲載されます）
               </label>
             </>
           )}
-          {routeSaveError && <p style={{ color: '#E55039', fontSize: 12, margin: 0 }}>{routeSaveError}</p>}
+          {routeSaveError && <p style={{ color: '#B23A2E', fontSize: 12, margin: 0 }}>{routeSaveError}</p>}
           <button
             onClick={saveRoute}
             disabled={!routeTitle.trim() || routeSelection.length < 2 || routeSaving}
             style={{
               padding: '12px', borderRadius: 10, border: 'none',
-              background: (!routeTitle.trim() || routeSelection.length < 2 || routeSaving) ? '#e0e0e0' : '#8E44AD',
+              background: (!routeTitle.trim() || routeSelection.length < 2 || routeSaving) ? '#D7CFB8' : '#8A6B3F',
               color: '#fff', fontWeight: 800, fontSize: 14,
               cursor: (!routeTitle.trim() || routeSelection.length < 2 || routeSaving) ? 'not-allowed' : 'pointer',
             }}
@@ -2317,11 +2317,11 @@ function MapApp() {
         <div style={{
           position: 'fixed', bottom: 60, left: 0, right: 0, padding: '8px 14px',
           background: 'rgba(250,250,250,0.96)', backdropFilter: 'blur(10px)',
-          borderTop: '1px solid #eee', zIndex: 200,
+          borderTop: '1px solid #E9E3D2', zIndex: 200,
         }}>
           {currentUser && (
             <div style={{ marginBottom: 8 }}>
-              <p style={{ margin: '0 0 5px', fontSize: 11, color: '#999', fontWeight: 700 }}>
+              <p style={{ margin: '0 0 5px', fontSize: 11, color: '#726C5E', fontWeight: 700 }}>
                 🔓 だれに見せる？
               </p>
               <div style={{ display: 'flex', gap: 5 }}>
@@ -2332,9 +2332,9 @@ function MapApp() {
               ] as const).map(v => (
                 <button key={v.key} type="button" onClick={() => setPostVisibility(v.key)} style={{
                   flex: 1, padding: '6px 4px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
-                  border: `1.5px solid ${postVisibility === v.key ? '#38ADA9' : '#ddd'}`,
-                  background: postVisibility === v.key ? '#E8F8F7' : '#fff',
-                  color: postVisibility === v.key ? '#38ADA9' : '#888',
+                  border: `1.5px solid ${postVisibility === v.key ? '#2F8C88' : '#D7CFB8'}`,
+                  background: postVisibility === v.key ? '#E9F3F2' : '#fff',
+                  color: postVisibility === v.key ? '#2F8C88' : '#726C5E',
                   fontWeight: postVisibility === v.key ? 700 : 400,
                 }}>{v.label}</button>
               ))}
@@ -2342,13 +2342,13 @@ function MapApp() {
             </div>
           )}
           {submitError && (
-            <p style={{ color: '#E55039', fontSize: 12, margin: '0 0 6px', textAlign: 'center' }}>{submitError}</p>
+            <p style={{ color: '#B23A2E', fontSize: 12, margin: '0 0 6px', textAlign: 'center' }}>{submitError}</p>
           )}
           <button type="submit" form="trace-form" disabled={!canSubmit} style={{
             width: '100%', padding: '15px',
             background: canSubmit
-              ? `linear-gradient(135deg, #FF6B9D, #FF8C42)`
-              : '#e0e0e0',
+              ? `linear-gradient(135deg, #566246, #FF8C42)`
+              : '#D7CFB8',
             color: '#fff', border: 'none', borderRadius: 12,
             fontSize: 16, fontWeight: 800,
             cursor: canSubmit ? 'pointer' : 'not-allowed',
@@ -2386,7 +2386,7 @@ function MapApp() {
           )}
           {quickRecordError && (
             <p style={{
-              margin: 0, fontSize: 11, color: '#fff', background: '#E55039',
+              margin: 0, fontSize: 11, color: '#fff', background: '#B23A2E',
               padding: '5px 10px', borderRadius: 8, maxWidth: 220, textAlign: 'right',
             }}>{quickRecordError}</p>
           )}
@@ -2447,25 +2447,25 @@ function MapApp() {
             padding: '18px 16px calc(18px + env(safe-area-inset-bottom))', boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
           }}>
             <p style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 16 }}>🧭 眠っている痕跡を探す</p>
-            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#999' }}>現在地の近くで、まだ記録が少ない・全くない町を提案します</p>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#726C5E' }}>現在地の近くで、まだ記録が少ない・全くない町を提案します</p>
 
             {!userPos ? (
-              <p style={{ fontSize: 13, color: '#E55039' }}>現在地が分からないため探せません。「📍 近く」で位置を取得してください</p>
+              <p style={{ fontSize: 13, color: '#B23A2E' }}>現在地が分からないため探せません。「📍 近く」で位置を取得してください</p>
             ) : unexploredLoading ? (
-              <p style={{ fontSize: 13, color: '#999' }}>探しています…（数秒かかります）</p>
+              <p style={{ fontSize: 13, color: '#726C5E' }}>探しています…（数秒かかります）</p>
             ) : unexploredResult && (unexploredResult.sparse.length > 0 || unexploredResult.blank.length > 0) ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {unexploredResult.blank.length > 0 && (
                   <div>
-                    <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8E44AD', fontWeight: 700 }}>⚪ まだ誰の痕跡もない町</p>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8A6B3F', fontWeight: 700 }}>⚪ まだ誰の痕跡もない町</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {unexploredResult.blank.map(b => (
                         <button key={b.region} onClick={() => goToUnexploredRegion(b.region)} style={{
-                          textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #F3EAFB',
-                          background: '#FBF6FF', cursor: 'pointer', fontSize: 13, color: '#333',
+                          textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #F3EDDE',
+                          background: '#F8F4E9', cursor: 'pointer', fontSize: 13, color: '#23231F',
                         }}>
                           <strong>{b.region}</strong>
-                          <span style={{ color: '#999', fontSize: 11 }}> ・ {b.direction}へ約{b.distanceKm}km</span>
+                          <span style={{ color: '#726C5E', fontSize: 11 }}> ・ {b.direction}へ約{b.distanceKm}km</span>
                         </button>
                       ))}
                     </div>
@@ -2473,15 +2473,15 @@ function MapApp() {
                 )}
                 {unexploredResult.sparse.length > 0 && (
                   <div>
-                    <p style={{ margin: '0 0 8px', fontSize: 12, color: '#38ADA9', fontWeight: 700 }}>🌱 記録がまだ少ない町</p>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: '#2F8C88', fontWeight: 700 }}>🌱 記録がまだ少ない町</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {unexploredResult.sparse.map(s => (
                         <button key={s.region} onClick={() => goToUnexploredRegion(s.region)} style={{
-                          textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E8F8F7',
-                          background: '#F3FDFC', cursor: 'pointer', fontSize: 13, color: '#333',
+                          textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E9F3F2',
+                          background: '#F3FDFC', cursor: 'pointer', fontSize: 13, color: '#23231F',
                         }}>
                           <strong>{s.region}</strong>
-                          <span style={{ color: '#999', fontSize: 11 }}> ・ {s.count}件 ・ 約{s.distanceKm}km</span>
+                          <span style={{ color: '#726C5E', fontSize: 11 }}> ・ {s.count}件 ・ 約{s.distanceKm}km</span>
                         </button>
                       ))}
                     </div>
@@ -2489,7 +2489,7 @@ function MapApp() {
                 )}
               </div>
             ) : unexploredResult ? (
-              <p style={{ fontSize: 13, color: '#999' }}>近くはすでによく歩かれているようです。範囲を広げて探してみましょう。</p>
+              <p style={{ fontSize: 13, color: '#726C5E' }}>近くはすでによく歩かれているようです。範囲を広げて探してみましょう。</p>
             ) : null}
           </div>
         </>

@@ -62,7 +62,7 @@ export default function Onboarding() {
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483647,
-        background: 'linear-gradient(160deg, #D6336C, #E8590C)',
+        background: 'linear-gradient(160deg, #3B4530, #566246)',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: 32, color: '#fff', textAlign: 'center',
@@ -104,7 +104,7 @@ export default function Onboarding() {
         onClick={(e) => { e.stopPropagation(); isLast ? finish() : setStep((s) => s + 1); }}
         style={{
           width: '100%', maxWidth: 280, padding: '14px', borderRadius: 12, border: 'none',
-          background: '#fff', color: '#D6336C', fontWeight: 800, fontSize: 15, cursor: 'pointer',
+          background: '#fff', color: '#3B4530', fontWeight: 800, fontSize: 15, cursor: 'pointer',
         }}
       >
         {isLast ? 'はじめる →' : '次へ'}

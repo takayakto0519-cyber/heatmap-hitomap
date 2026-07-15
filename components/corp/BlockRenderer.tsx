@@ -106,7 +106,7 @@ function renderBlockBody(block: SiteBlock) {
                 <Wrapper
                   key={i}
                   {...(item.href ? { href: item.href } : {})}
-                  className="hm-lift"
+                  className="hm-lift hm-tilt"
                   style={{
                     flex: '1 1 240px', display: 'block', padding: '24px 26px',
                     border: `1px solid ${corpColor.line}`, background: corpColor.white,

@@ -1,6 +1,8 @@
 import { corpColor, corpFont } from './tokens';
 import Reveal from './Reveal';
 import MapArt from './MapArt';
+import CharReveal from './CharReveal';
+import Parallax from './Parallax';
 
 // SANU（sa-nu.com）のヒーロー構成を踏襲：
 //   全面ビジュアル ＋ 詩的な一行のタグライン ＋ 控えめなサブコピー ＋ 主CTA。
@@ -18,7 +20,9 @@ export default function Hero() {
         borderBottom: `1px solid ${corpColor.line}`,
       }}
     >
-      <MapArt variant={0} id="hero" />
+      <Parallax speed={0.1}>
+        <MapArt variant={0} id="hero" />
+      </Parallax>
 
       {/* 文字の可読性を保つための、左からのグラデーション */}
       <div
@@ -52,23 +56,20 @@ export default function Hero() {
           </p>
         </Reveal>
 
-        <Reveal immediate delay={150} y={24}>
-          <h1
-            style={{
-              margin: '0 0 20px',
-              fontFamily: corpFont.mincho,
-              fontSize: 'clamp(30px, 5vw, 52px)',
-              lineHeight: 1.55,
-              color: corpColor.ink,
-              fontWeight: 600,
-              maxWidth: 640,
-            }}
-          >
-            その色あせも、
-            <br />
-            誰かが生きた証。
-          </h1>
-        </Reveal>
+        <CharReveal
+          lines={['その色あせも、', '誰かが生きた証。']}
+          baseDelay={200}
+          charDelay={55}
+          style={{
+            margin: '0 0 20px',
+            fontFamily: corpFont.mincho,
+            fontSize: 'clamp(30px, 5vw, 52px)',
+            lineHeight: 1.55,
+            color: corpColor.ink,
+            fontWeight: 600,
+            maxWidth: 640,
+          }}
+        />
 
         <Reveal immediate delay={350} y={20}>
           <p

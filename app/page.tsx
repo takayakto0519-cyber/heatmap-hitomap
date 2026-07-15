@@ -3,6 +3,7 @@ import CorpFooter from '@/components/corp/CorpFooter';
 import Hero from '@/components/corp/Hero';
 import EmotionPalette from '@/components/corp/EmotionPalette';
 import RecentTraces from '@/components/corp/RecentTraces';
+import ProofBand from '@/components/corp/ProofBand';
 import BlockRenderer from '@/components/corp/BlockRenderer';
 import { corpColor } from '@/components/corp/tokens';
 import AdSlot from '@/components/AdSlot';
@@ -65,6 +66,7 @@ export default async function HomePage() {
           事業紹介・CTA帯等）は運営が /admin/blocks から自由に追加・並び替え・削除できるブロックで構成される。 */}
       <main style={{ flex: 1 }}>
         <Hero />
+        <ProofBand />
         <BlockRenderer blocks={blocks} />
         <EmotionPalette />
         <RecentTraces />

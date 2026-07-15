@@ -99,11 +99,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 @keyframes hm-drift { 0% { transform: translate(0,0); } 50% { transform: translate(10px,-8px); } 100% { transform: translate(0,0); } }
 .hm-drift { animation: hm-drift 14s ease-in-out infinite; }
 .hm-drift-slow { animation: hm-drift 22s ease-in-out infinite reverse; }
+::selection { background: #566246; color: #FBFAF6; }
+h1, h2, h3 { font-feature-settings: "palt" 1; }
+.hm-tilt { transform-style: preserve-3d; }
 @media (prefers-reduced-motion: reduce) {
   .hm-lift, .hm-photo-zoom img { transition: none; }
   .hm-lift:hover { transform: none; box-shadow: none; }
   .hm-drift, .hm-drift-slow { animation: none; }
 }
+`,
+          }}
+        />
+        {/* カードのカーソル追従チルト（最大約2度）。タッチ端末・reduced-motionでは無効 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function(){
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia('(pointer: coarse)').matches) return;
+  var MAX = 2.2;
+  document.addEventListener('pointermove', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('.hm-tilt') : null;
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    var px = (e.clientX - r.left) / r.width - 0.5;
+    var py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = 'translateY(-4px) rotateX(' + (-py * MAX) + 'deg) rotateY(' + (px * MAX) + 'deg)';
+  }, { passive: true });
+  document.addEventListener('pointerout', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('.hm-tilt') : null;
+    if (!el) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    el.style.transform = '';
+  }, { passive: true });
+})();
 `,
           }}
         />
