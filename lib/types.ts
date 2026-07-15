@@ -253,6 +253,36 @@ export interface RegionAggregateResponse {
   error?: string;
 }
 
+// ------------------------------------------------------------
+// 顧客専用ダッシュボードアクセス（Phase 2）：Supabase Authのアカウントを
+// 持たない自治体・法人顧客に、トークン付きURLで集計データだけを見せる。
+// ------------------------------------------------------------
+
+export interface DashboardAccess {
+  id: string;
+  client_lead_id: string | null;
+  token: string;
+  region: string;
+  label: string | null;
+  is_active: boolean;
+  created_at: string;
+  last_accessed_at: string | null;
+}
+
+export interface IssueDashboardTokenResponse {
+  ok: boolean;
+  access?: DashboardAccess;
+  url?: string;
+  error?: string;
+}
+
+export interface DashboardResponse {
+  ok: boolean;
+  label: string | null;
+  aggregate?: RegionAggregateResponse;
+  error?: string;
+}
+
 export interface Sponsor {
   id: string;
   placement: 'region' | 'detour';
