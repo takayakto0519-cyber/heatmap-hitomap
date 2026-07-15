@@ -5,6 +5,7 @@ import EmotionPalette from '@/components/corp/EmotionPalette';
 import RecentTraces from '@/components/corp/RecentTraces';
 import ProofBand from '@/components/corp/ProofBand';
 import BlockRenderer from '@/components/corp/BlockRenderer';
+import MobileCTABar from '@/components/corp/MobileCTABar';
 import { corpColor } from '@/components/corp/tokens';
 import AdSlot from '@/components/AdSlot';
 import type { SiteBlock } from '@/lib/siteBlocks';
@@ -77,6 +78,7 @@ export default async function HomePage() {
       </main>
 
       <CorpFooter />
+      <MobileCTABar />
     </div>
   );
 }

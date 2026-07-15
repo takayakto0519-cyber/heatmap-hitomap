@@ -125,7 +125,7 @@ export default function Hero() {
 
           <p
             style={{
-              margin: '28px 0 0',
+              margin: '28px 0 12px',
               fontSize: 12,
               color: corpColor.inkSoft,
               fontFamily: corpFont.body,
@@ -133,6 +133,20 @@ export default function Hero() {
           >
             ログインしなくても、匿名のまま今日から記録できます。
           </p>
+
+          {/* 個人利用者だけでなく法人・自治体の見込み客も同じ導線を通るため、
+              最初の画面で行き先を分岐させる（両者に無関係な証跡を延々スクロールさせない）。 */}
+          <a
+            href="/business"
+            style={{
+              fontSize: 12.5,
+              color: corpColor.inkSoft,
+              textDecoration: 'none',
+              fontFamily: corpFont.body,
+            }}
+          >
+            法人・自治体の方はこちら →
+          </a>
         </Reveal>
       </div>
     </section>

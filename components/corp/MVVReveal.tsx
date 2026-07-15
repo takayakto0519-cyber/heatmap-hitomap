@@ -5,6 +5,12 @@
 // スクロールでせり出してくる「受け渡し」演出になる（JSでのスクロール計算は不要）。
 // 背景はHeroと同じMapArt（地図アート）の別区画バリエーションを使い、
 // 「同じ町の、違う場所」という一貫した世界観を保つ。
+//
+// 2026-07-15: NN/gのscrolljacking研究では、スクロール挙動を変える演出はユーザーの
+// 操作感を損なうリスクがあると指摘されており、特にスマホでは86vh×3枚(約2.5画面分)を
+// CTAなしでスクロールさせることになり離脱要因になり得る。そのためsticky積み重ねは
+// デスクトップ(861px以上)限定とし、スマホでは通常の縦積みブロック（各枠は控えめな高さ）
+// に切り替える。
 import { useEffect, useRef, useState } from 'react';
 import { corpColor, corpFont } from './tokens';
 import MapArt from './MapArt';
@@ -23,7 +29,7 @@ function Panel({ item, index, panelId }: { item: BlockCardItem; index: number; p
     if (!el) return;
     const observer = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) setShown(true); }),
-      { threshold: 0.5 }
+      { threshold: 0.35 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -34,11 +40,8 @@ function Panel({ item, index, panelId }: { item: BlockCardItem; index: number; p
   return (
     <div
       ref={ref}
+      className="hm-mvv-panel"
       style={{
-        position: 'sticky',
-        top: 0,
-        height: '86vh',
-        minHeight: 440,
         display: 'flex',
         alignItems: 'flex-end',
         overflow: 'hidden',
@@ -54,12 +57,12 @@ function Panel({ item, index, panelId }: { item: BlockCardItem; index: number; p
         }}
       />
       <div
+        className="hm-mvv-panel-copy"
         style={{
           position: 'relative',
           zIndex: 1,
           maxWidth: 720,
           margin: '0 auto',
-          padding: '0 24px 64px',
           width: '100%',
           opacity: shown ? 1 : 0,
           transform: shown ? 'none' : 'translateY(24px)',
@@ -68,7 +71,7 @@ function Panel({ item, index, panelId }: { item: BlockCardItem; index: number; p
       >
         <p
           style={{
-            margin: '0 0 14px',
+            margin: '0 0 12px',
             fontSize: 12,
             letterSpacing: '0.22em',
             color: corpColor.white,
@@ -83,7 +86,7 @@ function Panel({ item, index, panelId }: { item: BlockCardItem; index: number; p
           style={{
             margin: 0,
             fontFamily: corpFont.mincho,
-            fontSize: 'clamp(24px, 4vw, 36px)',
+            fontSize: 'clamp(21px, 4vw, 36px)',
             lineHeight: 1.7,
             color: corpColor.white,
             fontWeight: 600,
@@ -101,6 +104,29 @@ export default function MVVReveal({ eyebrow, items }: { eyebrow?: string | null;
   if (items.length === 0) return null;
   return (
     <section aria-label={eyebrow ?? 'Mission / Vision / Value'}>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+.hm-mvv-panel {
+  position: relative;
+  height: auto;
+  min-height: 280px;
+  padding: 40px 20px;
+}
+.hm-mvv-panel-copy { padding: 0; }
+@media (min-width: 861px) {
+  .hm-mvv-panel {
+    position: sticky;
+    top: 0;
+    height: 86vh;
+    min-height: 440px;
+    padding: 0;
+  }
+  .hm-mvv-panel-copy { padding: 0 24px 64px; }
+}
+`,
+        }}
+      />
       {items.map((item, i) => (
         <Panel key={item.title + i} item={item} index={i} panelId={`mvv-${i}`} />
       ))}
