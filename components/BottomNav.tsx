@@ -17,7 +17,7 @@ const ITEMS: { id: BottomNavTab; Icon: (p: IconProps) => React.ReactElement; lab
   { id: 'map', Icon: MapIcon, label: 'マップ' },
   { id: 'post', Icon: AddIcon, label: '記録する' },
   { id: 'list', Icon: ListIcon, label: '一覧' },
-  { id: 'routes', Icon: TrailIcon, label: 'ルート' },
+  { id: 'routes', Icon: TrailIcon, label: 'イベント' },
   { id: 'following', Icon: PeopleIcon, label: 'つながり' },
   { id: 'messages', Icon: MessageIcon, label: 'メッセージ' },
 ];

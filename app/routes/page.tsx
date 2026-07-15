@@ -27,8 +27,8 @@ export default function RoutesListPage() {
     <div style={{ minHeight: '100dvh', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
       <header style={{ padding: '16px 20px', background: '#fff', borderBottom: '1px solid #eee' }}>
         <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← ヒトマップ全体へ</a>
-        <h1 style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#8E44AD' }}>🥾 おすすめルート</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>みんなが歩いて見つけた、運営おすすめの散歩道</p>
+        <h1 style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#8E44AD' }}>🎉 イベント</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>ヒトマップが開催・運営しているイベント一覧</p>
       </header>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 16px 60px', flex: 1, width: '100%', boxSizing: 'border-box' }}>
@@ -36,15 +36,15 @@ export default function RoutesListPage() {
         {error && <p style={{ color: '#E74C3C', textAlign: 'center', marginTop: 40 }}>{error}</p>}
         {!loading && !error && routes.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: 60, color: '#bbb' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🥾</div>
-            <p style={{ fontSize: 14, margin: 0 }}>まだおすすめルートはありません</p>
-            <p style={{ fontSize: 12, marginTop: 6 }}>ログインしてルートを作成し、公開申請してみましょう</p>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+            <p style={{ fontSize: 14, margin: 0 }}>まだ公開中のイベントはありません</p>
           </div>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {routes.map(r => (
-            <a key={r.id} href={`/routes/${r.id}`} style={{
+            // bonno型は地図・地点を持たないので、イベントページ（/events/[slug]）へ直接飛ばす
+            <a key={r.id} href={r.event_mode === 'bonno' && r.event_slug ? `/events/${r.event_slug}` : `/routes/${r.id}`} style={{
               display: 'block', background: '#fff', borderRadius: 14, padding: 16,
               border: '1px solid #f0f0f0', textDecoration: 'none', color: 'inherit',
               boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
@@ -63,10 +63,12 @@ export default function RoutesListPage() {
                   padding: '8px 10px', borderRadius: 8, whiteSpace: 'pre-wrap',
                 }}>👀 {r.highlights}</p>
               )}
-              <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>
-                {r.trace_ids.length}地点
-                {r.sponsor_name && ` ・ 協賛：${r.sponsor_name}`}
-              </p>
+              {r.event_mode !== 'bonno' && (
+                <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>
+                  {r.trace_ids.length}地点
+                  {r.sponsor_name && ` ・ 協賛：${r.sponsor_name}`}
+                </p>
+              )}
             </a>
           ))}
         </div>

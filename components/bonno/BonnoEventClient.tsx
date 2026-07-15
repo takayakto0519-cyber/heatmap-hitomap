@@ -66,9 +66,6 @@ export default function BonnoEventClient({ route }: { route: Route }) {
         <h1 style={{ fontSize: 26, fontWeight: 800, color: colors.textPrimary, margin: '0 0 10px', lineHeight: 1.35 }}>
           {route.title}
         </h1>
-        <p style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary, margin: '0 0 10px', lineHeight: 1.6 }}>
-          見せたくない欲ほど、噓がない。
-        </p>
         {route.description && (
           <p style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.8, margin: '0 0 24px', whiteSpace: 'pre-wrap' }}>
             {route.description}

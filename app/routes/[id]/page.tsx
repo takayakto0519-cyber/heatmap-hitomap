@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { Route, Trace, RouteDetailResponse } from '@/lib/types';
 import { haversine } from '@/lib/geo';
@@ -24,6 +24,7 @@ const ARRIVAL_RADIUS = 40; // メートル。この距離に入ったら「到�
 
 export default function RoutePage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [route, setRoute] = useState<Route | null>(null);
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,14 @@ export default function RoutePage() {
     fetch(`/api/routes/${id}`)
       .then(r => r.json() as Promise<RouteDetailResponse>)
       .then(d => {
-        if (d.ok) { setRoute(d.route ?? null); setTraces(d.traces ?? []); }
+        if (d.ok) {
+          // bonno型は地図・地点を持たないため、このページではなくイベントページで表示する
+          if (d.route?.event_mode === 'bonno' && d.route.event_slug) {
+            router.replace(`/events/${d.route.event_slug}`);
+            return;
+          }
+          setRoute(d.route ?? null); setTraces(d.traces ?? []);
+        }
         else setError(d.error ?? '取得に失敗しました');
       })
       .catch(e => setError(e instanceof Error ? e.message : '通信エラー'))
