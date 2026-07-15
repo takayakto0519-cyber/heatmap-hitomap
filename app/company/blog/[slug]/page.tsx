@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
-import Reveal from '@/components/corp/Reveal';
 import { corpColor, corpFont } from '@/components/corp/tokens';
-import { categoryLabel, type SitePost } from '@/lib/sitePosts';
+import type { SitePost } from '@/lib/sitePosts';
 
 export const revalidate = 300;
 
@@ -17,7 +16,7 @@ async function fetchPost(slug: string): Promise<SitePost | null> {
       .select('*')
       .eq('slug', slug)
       .eq('is_published', true)
-      .eq('post_type', 'achievement')
+      .eq('post_type', 'blog')
       .maybeSingle();
     return (data as SitePost) ?? null;
   } catch {
@@ -27,7 +26,7 @@ async function fetchPost(slug: string): Promise<SitePost | null> {
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await fetchPost(params.slug);
-  if (!post) return { title: '実績' };
+  if (!post) return { title: 'ブログ' };
   return {
     title: post.title,
     description: post.body.slice(0, 90),
@@ -35,7 +34,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function WorkDetailPage({ params }: { params: { slug: string } }) {
+export default async function BlogDetailPage({ params }: { params: { slug: string } }) {
   const post = await fetchPost(params.slug);
   if (!post) notFound();
 
@@ -49,12 +48,11 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
         <article>
           <section style={{ padding: '64px 24px 36px' }}>
             <div style={{ maxWidth: 720, margin: '0 auto' }}>
-              <a href="/works" style={{ fontSize: 12, color: corpColor.moss, textDecoration: 'none', fontFamily: corpFont.body, fontWeight: 700 }}>
-                ← 実績一覧に戻る
+              <a href="/blog" style={{ fontSize: 12, color: corpColor.moss, textDecoration: 'none', fontFamily: corpFont.body, fontWeight: 700 }}>
+                ← ブログ一覧に戻る
               </a>
               <p style={{ margin: '22px 0 12px', fontSize: 11, letterSpacing: '0.12em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
-                {categoryLabel(post.category)}
-                {post.event_date && ` ・ ${new Date(post.event_date).toLocaleDateString('ja-JP')}`}
+                {new Date(post.created_at).toLocaleDateString('ja-JP')}
               </p>
               <h1
                 style={{
@@ -98,20 +96,6 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
                 </p>
               ))}
 
-              {post.related_slug && (
-                <a
-                  href={`/blog/${post.related_slug}`}
-                  className="hm-lift"
-                  style={{
-                    display: 'inline-block', margin: '0 0 32px', padding: '14px 24px',
-                    border: `1px solid ${corpColor.moss}`, color: corpColor.moss,
-                    textDecoration: 'none', fontWeight: 700, fontSize: 13.5, fontFamily: corpFont.body,
-                  }}
-                >
-                  この取り組みの背景をブログで読む →
-                </a>
-              )}
-
               {post.photo_urls.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, margin: '36px 0' }}>
                   {post.photo_urls.map(url => (
@@ -123,51 +107,9 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
                 </div>
               )}
 
-              {post.testimonials.length > 0 && (
-                <div style={{ marginTop: 48 }}>
-                  <p style={{ margin: '0 0 20px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
-                    参加者の声
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {post.testimonials.map((t, i) => (
-                      <Reveal key={i} delay={Math.min(i * 90, 270)}>
-                        <figure
-                          style={{
-                            margin: 0,
-                            borderLeft: `2px solid ${corpColor.moss}`,
-                            background: corpColor.ground,
-                            padding: '18px 22px',
-                            marginLeft: i % 2 === 1 ? 24 : 0,
-                          }}
-                        >
-                          <blockquote
-                            style={{
-                              margin: '0 0 10px',
-                              fontFamily: corpFont.mincho,
-                              fontSize: 15,
-                              lineHeight: 2,
-                              color: corpColor.ink,
-                              whiteSpace: 'pre-wrap',
-                            }}
-                          >
-                            {t.comment}
-                          </blockquote>
-                          <figcaption style={{ fontSize: 12, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
-                            — {t.name}
-                          </figcaption>
-                        </figure>
-                      </Reveal>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div style={{ marginTop: 56, borderTop: `1px solid ${corpColor.line}`, paddingTop: 28 }}>
-                <p style={{ margin: '0 0 16px', fontSize: 13, color: corpColor.inkSoft, fontFamily: corpFont.body, lineHeight: 1.9 }}>
-                  同じような取り組みをご検討中の学校・法人・行政の方は、お気軽にご相談ください。
-                </p>
                 <a
-                  href="/contact"
+                  href="/start"
                   className="hm-lift"
                   style={{
                     display: 'inline-block',
@@ -181,7 +123,7 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
                     letterSpacing: '0.05em',
                   }}
                 >
-                  お問い合わせ
+                  地図をひらく — 無料
                 </a>
               </div>
             </div>

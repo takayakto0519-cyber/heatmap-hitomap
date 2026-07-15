@@ -11,6 +11,7 @@ const NAV = [
   { href: '/business', label: '法人・行政' },
   { href: '/school', label: '学校' },
   { href: '/works', label: '実績' },
+  { href: '/blog', label: 'ブログ' },
   { href: '/team', label: '運営' },
 ];
 

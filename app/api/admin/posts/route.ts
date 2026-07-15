@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const body = await req.json().catch(() => ({})) as {
-    title?: string; category?: string; event_date?: string | null; body?: string;
+    title?: string; category?: string; post_type?: string; related_slug?: string | null;
+    event_date?: string | null; body?: string;
     cover_url?: string | null; photo_urls?: string[]; testimonials?: { name: string; comment: string }[];
     is_published?: boolean;
   };
@@ -40,6 +41,8 @@ export async function POST(req: NextRequest) {
       slug: generateSlug(body.event_date),
       title,
       category: body.category ?? 'event',
+      post_type: body.post_type ?? 'achievement',
+      related_slug: body.related_slug || null,
       event_date: body.event_date || null,
       body: body.body ?? '',
       cover_url: body.cover_url || null,

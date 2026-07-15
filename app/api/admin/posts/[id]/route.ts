@@ -10,7 +10,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const key of ['title', 'category', 'event_date', 'body', 'cover_url', 'photo_urls', 'testimonials', 'is_published'] as const) {
+  for (const key of ['title', 'category', 'post_type', 'related_slug', 'event_date', 'body', 'cover_url', 'photo_urls', 'testimonials', 'is_published'] as const) {
     if (key in body) patch[key] = body[key];
   }
   if (typeof patch.title === 'string' && !patch.title.trim()) {

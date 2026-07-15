@@ -10,6 +10,8 @@ export interface SitePost {
   slug: string;
   title: string;
   category: 'event' | 'case' | 'note';
+  post_type: 'achievement' | 'blog';
+  related_slug: string | null;
   event_date: string | null;
   body: string;
   cover_url: string | null;
@@ -28,6 +30,16 @@ export const POST_CATEGORIES = [
 
 export function categoryLabel(key: string): string {
   return POST_CATEGORIES.find(c => c.key === key)?.label ?? key;
+}
+
+// 実績（achievement）＝箇条書き＋写真の簡単な投稿。 ブログ（blog）＝実績の背景を深掘りする読み物。
+export const POST_TYPES = [
+  { key: 'achievement', label: '実績（簡単な報告）' },
+  { key: 'blog', label: 'ブログ（深掘り記事）' },
+] as const;
+
+export function postTypeLabel(key: string): string {
+  return POST_TYPES.find(t => t.key === key)?.label ?? key;
 }
 
 // タイトルから重複しにくいslugを生成する（日本語タイトルはそのままURLに使わない）

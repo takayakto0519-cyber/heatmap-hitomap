@@ -3,12 +3,14 @@
 // 運営ダッシュボードに統合された実績ブログタブ。認証は親のauthHeadersを共有する。
 import { useEffect, useState } from 'react';
 import LivePreview from './LivePreview';
-import { POST_CATEGORIES, categoryLabel, type SitePost, type Testimonial } from '@/lib/sitePosts';
+import { POST_CATEGORIES, POST_TYPES, categoryLabel, postTypeLabel, type SitePost, type Testimonial } from '@/lib/sitePosts';
 
 interface Draft {
   id?: string;
   title: string;
   category: string;
+  post_type: string;
+  related_slug: string;
   event_date: string;
   body: string;
   cover_url: string;
@@ -18,7 +20,7 @@ interface Draft {
 }
 
 const EMPTY_DRAFT: Draft = {
-  title: '', category: 'event', event_date: '', body: '',
+  title: '', category: 'event', post_type: 'achievement', related_slug: '', event_date: '', body: '',
   cover_url: '', photo_urls: [], testimonials: [], is_published: false,
 };
 
@@ -30,6 +32,7 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [previewVersion, setPreviewVersion] = useState(0);
+  const [listFilter, setListFilter] = useState<'all' | 'achievement' | 'blog'>('all');
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -74,6 +77,8 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
       const payload = {
         title: draft.title.trim(),
         category: draft.category,
+        post_type: draft.post_type,
+        related_slug: draft.post_type === 'achievement' ? (draft.related_slug || null) : null,
         event_date: draft.event_date || null,
         body: draft.body,
         cover_url: draft.cover_url || null,
@@ -115,23 +120,37 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <LivePreview path="/works" version={previewVersion} />
+        <LivePreview path={listFilter === 'blog' ? '/blog' : '/works'} version={previewVersion} />
       </div>
       {message && <p style={{ fontSize: 13, color: '#566246', fontWeight: 700 }}>{message}</p>}
 
       {!draft && (
         <>
-          <button onClick={() => setDraft({ ...EMPTY_DRAFT })} style={{
-            margin: '0 0 20px', padding: '12px 24px', borderRadius: 8, border: 'none',
+          <button onClick={() => setDraft({ ...EMPTY_DRAFT, post_type: listFilter === 'blog' ? 'blog' : 'achievement' })} style={{
+            margin: '0 0 16px', padding: '12px 24px', borderRadius: 8, border: 'none',
             background: '#566246', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14,
           }}>＋ 新しい記事を書く</button>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {(['all', 'achievement', 'blog'] as const).map(f => (
+              <button key={f} onClick={() => setListFilter(f)} style={{
+                padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${listFilter === f ? '#566246' : '#ddd'}`,
+                background: listFilter === f ? '#566246' : '#fff', color: listFilter === f ? '#fff' : '#555',
+                fontWeight: 700, fontSize: 12.5, cursor: 'pointer',
+              }}>
+                {f === 'all' ? 'すべて' : f === 'achievement' ? '実績' : 'ブログ'}
+              </button>
+            ))}
+          </div>
 
           {loading ? (
             <p style={{ fontSize: 13, color: '#999' }}>読み込み中…</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {posts.length === 0 && <p style={{ fontSize: 13, color: '#999' }}>まだ記事がありません。最初のイベント記録を書いてみましょう。</p>}
-              {posts.map(p => (
+              {posts.filter(p => listFilter === 'all' || p.post_type === listFilter).length === 0 && (
+                <p style={{ fontSize: 13, color: '#999' }}>まだ記事がありません。</p>
+              )}
+              {posts.filter(p => listFilter === 'all' || p.post_type === listFilter).map(p => (
                 <div key={p.id} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                   border: '1px solid #e5e0d0', borderRadius: 10, padding: '14px 16px', background: '#fff',
@@ -142,14 +161,17 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
                       {!p.is_published && <span style={{ marginLeft: 8, fontSize: 11, color: '#9C6B23', background: '#F5EDDD', padding: '2px 8px', borderRadius: 10 }}>下書き</span>}
                     </p>
                     <p style={{ margin: '4px 0 0', fontSize: 11, color: '#999' }}>
-                      {categoryLabel(p.category)}
+                      <span style={{ color: p.post_type === 'blog' ? '#2F8C88' : '#566246', fontWeight: 700 }}>{postTypeLabel(p.post_type)}</span>
+                      {' ・ '}{categoryLabel(p.category)}
                       {p.event_date && ` ・ ${new Date(p.event_date).toLocaleDateString('ja-JP')}`}
                       {` ・ 感想${p.testimonials.length}件 ・ 写真${p.photo_urls.length}枚`}
+                      {p.related_slug && ' ・ 関連ブログあり'}
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => setDraft({
                       id: p.id, title: p.title, category: p.category,
+                      post_type: p.post_type, related_slug: p.related_slug ?? '',
                       event_date: p.event_date ?? '', body: p.body,
                       cover_url: p.cover_url ?? '', photo_urls: p.photo_urls,
                       testimonials: p.testimonials, is_published: p.is_published,
@@ -170,6 +192,12 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 200px' }}>
+              <label style={labelStyle}>区分（実績かブログか）</label>
+              <select value={draft.post_type} onChange={e => setDraft({ ...draft, post_type: e.target.value })} style={inputStyle}>
+                {POST_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: '1 1 200px' }}>
               <label style={labelStyle}>種別</label>
               <select value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })} style={inputStyle}>
                 {POST_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
@@ -180,6 +208,18 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
               <input type="date" value={draft.event_date} onChange={e => setDraft({ ...draft, event_date: e.target.value })} style={inputStyle} />
             </div>
           </div>
+
+          {draft.post_type === 'achievement' && (
+            <>
+              <label style={labelStyle}>参考ブログ（この実績の背景を深掘りした記事があれば選ぶ）</label>
+              <select value={draft.related_slug} onChange={e => setDraft({ ...draft, related_slug: e.target.value })} style={inputStyle}>
+                <option value="">なし</option>
+                {posts.filter(p => p.post_type === 'blog').map(p => (
+                  <option key={p.slug} value={p.slug}>{p.title}</option>
+                ))}
+              </select>
+            </>
+          )}
 
           <label style={labelStyle}>本文（空行で段落が分かれます）</label>
           <textarea rows={10} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })}

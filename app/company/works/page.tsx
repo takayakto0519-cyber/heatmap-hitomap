@@ -20,6 +20,7 @@ async function fetchPosts(): Promise<SitePost[]> {
       .from('site_posts')
       .select('*')
       .eq('is_published', true)
+      .eq('post_type', 'achievement')
       .order('event_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(50);
