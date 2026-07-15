@@ -38,7 +38,7 @@ const SEEDS: Record<string, SeedBlock[]> = {
       ],
     },
     {
-      block_type: 'cards',
+      block_type: 'mvv',
       eyebrow: 'MISSION / VISION / VALUE',
       items: [
         { title: 'MISSION', body: '人の生き方を通して、地域を伝える。' },

@@ -1,7 +1,7 @@
 // 運営が自由に編集できるサイトコンテンツ（site_blocks）の型とメタ情報。
 // テキスト・画像・カード・引用・CTAをブロック単位で追加・並び替え・削除できるようにする。
 
-export type BlockType = 'heading' | 'text' | 'image' | 'cards' | 'quote' | 'cta';
+export type BlockType = 'heading' | 'text' | 'image' | 'cards' | 'quote' | 'cta' | 'mvv';
 
 export interface BlockCardItem {
   title: string;
@@ -40,6 +40,7 @@ export const BLOCK_TYPES: { key: BlockType; label: string; hint: string }[] = [
   { key: 'cards', label: 'カード（複数項目）', hint: '機能紹介・実績・メニュー等を並べるカード群' },
   { key: 'quote', label: '声・感想の引用', hint: '参加者・利用者の声を複数並べる' },
   { key: 'cta', label: 'CTA帯', hint: '濃色背景の行動喚起（ボタン付き）' },
+  { key: 'mvv', label: 'MVV演出（全幅・順番表示）', hint: '地図アート背景で1項目ずつ全画面表示。カード（title/body）をそのまま流用' },
 ];
 
 export const SITE_PAGES: { key: string; label: string; path: string }[] = [

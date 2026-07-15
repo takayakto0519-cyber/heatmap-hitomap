@@ -23,7 +23,7 @@ function emptyDraft(type: BlockType): Draft {
   return {
     block_type: type, eyebrow: '', heading: '', body: '', image_url: '',
     cta_label: '', cta_href: '',
-    items: type === 'cards' ? [{ title: '', body: '' }] : type === 'quote' ? [{ name: '', comment: '' }] : [],
+    items: type === 'cards' || type === 'mvv' ? [{ title: '', body: '' }] : type === 'quote' ? [{ name: '', comment: '' }] : [],
     is_visible: true,
   };
 }
@@ -226,7 +226,7 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
         <div style={{ marginTop: 20 }}>
           <p style={{ fontSize: 12, color: '#999' }}>種類：{blockTypeLabel(draft.block_type)}</p>
 
-          {(draft.block_type === 'heading' || draft.block_type === 'text' || draft.block_type === 'cards') && (
+          {(draft.block_type === 'heading' || draft.block_type === 'text' || draft.block_type === 'cards' || draft.block_type === 'mvv') && (
             <>
               <label style={labelStyle}>小ラベル（任意・上に小さく出る文言）</label>
               <input value={draft.eyebrow} onChange={e => setDraft({ ...draft, eyebrow: e.target.value })} style={inputStyle} />
@@ -269,9 +269,11 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
             </>
           )}
 
-          {draft.block_type === 'cards' && (
+          {(draft.block_type === 'cards' || draft.block_type === 'mvv') && (
             <>
-              <label style={labelStyle}>カード</label>
+              <label style={labelStyle}>
+                {draft.block_type === 'mvv' ? '項目（各項目のtitleが小見出し、bodyが大きな一行になります）' : 'カード'}
+              </label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {(draft.items as BlockCardItem[]).map((item, i) => (
                   <div key={i} style={{ border: '1px solid #e5e0d0', borderRadius: 10, padding: 12, background: '#fff' }}>

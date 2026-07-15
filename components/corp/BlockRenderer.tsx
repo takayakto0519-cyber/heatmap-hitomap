@@ -1,5 +1,6 @@
 import { corpColor, corpFont } from './tokens';
 import Reveal from './Reveal';
+import MVVReveal from './MVVReveal';
 import type { SiteBlock, BlockCardItem, BlockQuoteItem } from '@/lib/siteBlocks';
 
 // 運営が /admin/blocks から自由に追加・並び替えできるサイトブロックの描画。
@@ -14,6 +15,10 @@ export default function BlockRenderer({ blocks }: { blocks: SiteBlock[] }) {
   return (
     <>
       {blocks.map((block, i) => {
+        // MVVは全幅・sticky積み重ね演出のため、他ブロックと違い余白付きsectionで包まない
+        if (block.block_type === 'mvv') {
+          return <MVVReveal key={block.id} eyebrow={block.eyebrow} items={block.items as BlockCardItem[]} />;
+        }
         const alt = i % 2 === 1;
         const bg = block.block_type === 'cta' ? corpColor.ink : alt ? corpColor.ground : corpColor.white;
         return (

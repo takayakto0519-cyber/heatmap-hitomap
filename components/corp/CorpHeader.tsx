@@ -1,4 +1,5 @@
 import { corpColor, corpFont } from './tokens';
+import ReadingProgress from './ReadingProgress';
 
 // 「思想」ページはまだ内容を作り込み中のため、ナビゲーションからは一旦外す。
 // ページ自体は残しているので、準備ができ次第ここに追加する。
@@ -27,6 +28,7 @@ export default function CorpHeader() {
         fontFamily: corpFont.body,
       }}
     >
+      <ReadingProgress />
       <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
         <img src="/logo.png" alt="ヒトマップ" style={{ height: 26, width: 'auto' }} />
         <span style={{ fontSize: 15, fontWeight: 700, color: corpColor.ink, letterSpacing: '0.02em' }}>
