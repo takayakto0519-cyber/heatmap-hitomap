@@ -120,6 +120,8 @@ function MapApp() {
   // クイック記録モード：現地では位置＋1タップだけ記録し、写真・言葉は後から追記する
   const [quickRecording, setQuickRecording] = useState(false);
   const [quickRecordError, setQuickRecordError] = useState('');
+  // 地図をタップした場所（未指定ならGPS位置を使う）。タップ後1回のクイック記録で使い切る
+  const [quickTapPos, setQuickTapPos] = useState<[number, number] | null>(null);
 
   // 地図タブの地域ジャンプ検索
   const [regionQuery, setRegionQuery] = useState('');
@@ -852,7 +854,8 @@ function MapApp() {
     setQuickRecording(true);
     try {
       let usedFallback = false;
-      const pos = userPos ?? await new Promise<[number, number]>((resolve) => {
+      const usedTap = quickTapPos !== null;
+      const pos = quickTapPos ?? userPos ?? await new Promise<[number, number]>((resolve) => {
         if (!navigator.geolocation) { usedFallback = true; resolve(fallbackCenter()); return; }
         navigator.geolocation.getCurrentPosition(
           p => resolve([p.coords.latitude, p.coords.longitude]),
@@ -879,7 +882,8 @@ function MapApp() {
         setQuickRecordError(data.error ?? '記録に失敗しました');
         return;
       }
-      if (!usedFallback) setUserPos(pos);
+      if (!usedFallback && !usedTap) setUserPos(pos);
+      if (usedTap) setQuickTapPos(null);
       setTraces(prev => [data.trace as Trace, ...prev]);
       const updatedIds = [...myTraceIds, data.trace.id];
       setMyTraceIds(updatedIds);
@@ -1556,11 +1560,17 @@ function MapApp() {
               reactionCounts={reactionCounts}
               onLocate={pos => setUserPos(pos)}
               onTraceClick={setSelectedTrace}
+              pinDropPos={!pinDropMode ? quickTapPos ?? undefined : undefined}
               onMapClick={pinDropMode ? (la, ln) => {
                 setLat(la); setLng(ln);
                 setPinDropMode(false);
                 setTab('post');
-              } : undefined}
+              } : (la, ln) => {
+                // クイック記録は既定でGPS位置に記録するが、先に地図をタップしておけば
+                // そのタップ地点にピンが立つ（GPSの誤差を避けたい／別の場所を記録したい時のため）
+                setQuickTapPos([la, ln]);
+                if (navigator.vibrate) navigator.vibrate(30);
+              }}
             />
             {/* ピンを立てる（地図タップで場所を指定して本記録） */}
             <div style={{
@@ -2389,6 +2399,20 @@ function MapApp() {
               margin: 0, fontSize: 11, color: '#fff', background: '#B23A2E',
               padding: '5px 10px', borderRadius: 8, maxWidth: 220, textAlign: 'right',
             }}>{quickRecordError}</p>
+          )}
+          {tab === 'map' && quickTapPos && !quickRecording && (
+            <button
+              type="button"
+              onClick={() => setQuickTapPos(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                background: '#566246', color: '#fff', fontSize: 11.5, fontWeight: 700,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              }}
+            >
+              <PinIcon size={12} /> タップした場所に記録 ✕取消
+            </button>
           )}
           <button
             type="button"
