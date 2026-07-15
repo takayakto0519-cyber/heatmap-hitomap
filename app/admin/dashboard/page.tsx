@@ -986,6 +986,7 @@ interface EventFieldsForm {
   event_fee: string;
   event_meeting_info: string;
   event_photo_urls: string[];
+  is_public_recommendation: boolean;
 }
 
 const emptyEventFields: EventFieldsForm = {
@@ -995,6 +996,7 @@ const emptyEventFields: EventFieldsForm = {
   event_end_lat: null, event_end_lng: null, event_end_label: '',
   event_waypoints: [],
   event_fee: '', event_meeting_info: '', event_photo_urls: [],
+  is_public_recommendation: false,
 };
 
 interface RelayCreateForm {
@@ -1282,6 +1284,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       event_waypoints: r.event_waypoints ?? [],
       event_fee: r.event_fee ?? '', event_meeting_info: r.event_meeting_info ?? '',
       event_photo_urls: r.event_photo_urls ?? (r.event_cover_url ? [r.event_cover_url] : []),
+      is_public_recommendation: r.is_public_recommendation ?? false,
     });
   }
 
@@ -1306,6 +1309,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_waypoints: eventFields.event_waypoints.length > 0 ? eventFields.event_waypoints : null,
           event_fee: eventFields.event_fee.trim() || null,
           event_meeting_info: eventFields.event_meeting_info.trim() || null,
+          is_public_recommendation: eventFields.is_public_recommendation,
         }),
       });
       const data = await res.json();
@@ -1675,6 +1679,12 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                   lat={eventFields.event_end_lat} lng={eventFields.event_end_lng} label={eventFields.event_end_label}
                   onChange={v => setEventFields(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
                 <p style={{ margin: '-4px 0 0', fontSize: 11, color: '#c3a6dd' }}>スタート→経由地点→ゴールの順で地図に線が引かれます。</p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8E44AD', fontWeight: 700, cursor: 'pointer', marginTop: 4 }}>
+                  <input type="checkbox" checked={eventFields.is_public_recommendation}
+                    onChange={e => setEventFields(f => ({ ...f, is_public_recommendation: e.target.checked }))} />
+                  「おすすめルート」一覧（/routes）にも掲載する
+                </label>
+                <Hint>チェックすると審査待ちを経由せず即座に一覧に載ります（会長がここで直接判断するため）。</Hint>
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   <button onClick={() => saveEventFields(r.id)} disabled={eventSaving} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
