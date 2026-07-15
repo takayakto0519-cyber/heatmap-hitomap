@@ -66,9 +66,12 @@ export default async function SupportPage({ searchParams }: { searchParams: { ch
             </a>
           </div>
         ) : plan === PLAN.SUPPORTER ? (
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: corpColor.moss }}>
-            すでにサポーターです。ありがとうございます。
-          </p>
+          <div>
+            <p style={{ margin: '0 0 20px', fontSize: 14, fontWeight: 700, color: corpColor.moss }}>
+              すでにサポーターです。ありがとうございます。
+            </p>
+            <SupportButton mode="portal" />
+          </div>
         ) : !BILLING_READY ? (
           <p style={{ margin: 0, fontSize: 13, color: corpColor.inkSoft, lineHeight: 1.9 }}>
             サポータープランは現在準備中です。開始次第、このページからお申し込みいただけます。
