@@ -38,6 +38,8 @@ const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] 
   { label: '学校向け', href: '/school', icon: '🏫', desc: '学校・教育機関向けの紹介ページ' },
   { label: '法人向け', href: '/business', icon: '🏢', desc: '法人・自治体向けの紹介ページ' },
   { label: '投稿を始める', href: '/start', icon: '📸', desc: '新規投稿フローの確認' },
+  { label: 'サイトCMS', href: '/admin/blocks', icon: '🧩', desc: 'トップページのセクションを自由に編集' },
+  { label: '実績ブログ管理', href: '/admin/posts', icon: '📝', desc: 'イベント記録・参加者の声を管理' },
 ];
 
 const inputStyle: React.CSSProperties = {
