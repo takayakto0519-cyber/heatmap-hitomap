@@ -248,7 +248,7 @@ export default function BonnoWall({ route }: { route: Route }) {
           justifyContent: 'center',
         }}>
           <p style={{ color: '#5C574A', fontSize: 22, letterSpacing: 6 }}>
-            最初の煩悩を待っています
+            まだ、誰も打ち明けていません
           </p>
         </div>
       )}

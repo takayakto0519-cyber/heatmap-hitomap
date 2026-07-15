@@ -66,6 +66,9 @@ export default function BonnoEventClient({ route }: { route: Route }) {
         <h1 style={{ fontSize: 26, fontWeight: 800, color: colors.textPrimary, margin: '0 0 10px', lineHeight: 1.35 }}>
           {route.title}
         </h1>
+        <p style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary, margin: '0 0 10px', lineHeight: 1.6 }}>
+          見せたくない欲ほど、噓がない。
+        </p>
         {route.description && (
           <p style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.8, margin: '0 0 24px', whiteSpace: 'pre-wrap' }}>
             {route.description}
@@ -85,7 +88,7 @@ export default function BonnoEventClient({ route }: { route: Route }) {
               奉納しました
             </p>
             <p style={{ fontSize: 13, color: colors.textMuted, lineHeight: 1.8, margin: '0 0 24px' }}>
-              あなたの煩悩は、まもなく会場の壁に浮かび上がります。
+              この煩悩は、まもなく会場の壁に浮かび上がります。書いたのが誰かは、もう誰にも分かりません。
             </p>
             <button
               onClick={() => { setDone(false); setError(null); }}
@@ -182,7 +185,7 @@ export default function BonnoEventClient({ route }: { route: Route }) {
               {submitting ? '奉納中…' : 'この煩悩を奉納する'}
             </button>
             <p style={{ fontSize: 11, color: colors.textFaint, lineHeight: 1.7, margin: '14px 0 0' }}>
-              投稿された煩悩は会場の壁に投影されます。個人が特定される内容や、他の人を傷つける言葉は控えてください。運営の判断で表示を取り下げる場合があります。
+              書いたものは会場の壁に投影されます。個人が特定される内容や、人を傷つける言葉は控えてください。運営の判断で表示を取り下げる場合があります。
             </p>
           </div>
         )}
