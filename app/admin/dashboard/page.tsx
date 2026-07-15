@@ -974,7 +974,7 @@ interface EventFieldsForm {
   event_starts_at: string;
   event_ends_at: string;
   event_area: string;
-  event_mode: 'route' | 'relay';
+  event_mode: 'route' | 'relay' | 'bonno';
   event_session_code: string;
   event_start_lat: number | null;
   event_start_lng: number | null;
@@ -1000,6 +1000,7 @@ const emptyEventFields: EventFieldsForm = {
 interface RelayCreateForm {
   title: string;
   description: string;
+  event_mode: 'relay' | 'bonno';
   event_session_code: string;
   event_slug: string;
   event_cover_url: string;
@@ -1019,7 +1020,7 @@ interface RelayCreateForm {
 }
 
 const emptyRelayForm: RelayCreateForm = {
-  title: '', description: '', event_session_code: '', event_slug: '', event_cover_url: '',
+  title: '', description: '', event_mode: 'relay', event_session_code: '', event_slug: '', event_cover_url: '',
   event_area: '', event_starts_at: '', event_ends_at: '',
   event_start_lat: null, event_start_lng: null, event_start_label: '',
   event_end_lat: null, event_end_lng: null, event_end_label: '',
@@ -1274,7 +1275,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       event_starts_at: isoToInputValue(r.event_starts_at),
       event_ends_at: isoToInputValue(r.event_ends_at),
       event_area: r.event_area ?? '',
-      event_mode: r.event_mode === 'relay' ? 'relay' : 'route',
+      event_mode: r.event_mode === 'relay' ? 'relay' : r.event_mode === 'bonno' ? 'bonno' : 'route',
       event_session_code: r.event_session_code ?? '',
       event_start_lat: r.event_start_lat, event_start_lng: r.event_start_lng, event_start_label: r.event_start_label ?? '',
       event_end_lat: r.event_end_lat, event_end_lng: r.event_end_lng, event_end_label: r.event_end_label ?? '',
@@ -1331,10 +1332,11 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       const data = await res.json();
       if (!data.ok) { setError(data.error ?? '作成に失敗しました'); return; }
 
-      // 続けて event_slug 等の公開情報を設定
+      // 続けて event_slug 等の公開情報を設定（bonno型は/api/routesが受けないため、ここでモードを確定させる）
       const patchRes = await fetch(`/api/admin/routes/${data.route.id}`, {
         method: 'PATCH', headers: authHeaders(),
         body: JSON.stringify({
+          event_mode: relayForm.event_mode,
           event_slug: relayForm.event_slug.trim() || null,
           event_cover_url: relayForm.event_photo_urls[0] ?? null,
           event_photo_urls: relayForm.event_photo_urls.length > 0 ? relayForm.event_photo_urls : null,
@@ -1410,8 +1412,24 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
 
       {showRelayCreate ? (
         <Card>
-          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>🏃 新規relayイベントを作成</p>
+          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>＋ 新規イベントを作成</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>イベント形式</label>
+            <Hint>relay＝参加者が街で発見して投稿していく型。煩悩＝会場で参加者が煩悩を投稿し、壁一面に投影する型（煩悩オークションなど）。</Hint>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setRelayForm(f => ({ ...f, event_mode: 'relay' }))} style={{
+                flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                border: relayForm.event_mode === 'relay' ? '1.5px solid #38ADA9' : '1.5px solid #ddd',
+                background: relayForm.event_mode === 'relay' ? '#38ADA9' : '#fff',
+                color: relayForm.event_mode === 'relay' ? '#fff' : '#888',
+              }}>🏃 relay（発見連鎖型）</button>
+              <button onClick={() => setRelayForm(f => ({ ...f, event_mode: 'bonno' }))} style={{
+                flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                border: relayForm.event_mode === 'bonno' ? '1.5px solid #B7791F' : '1.5px solid #ddd',
+                background: relayForm.event_mode === 'bonno' ? '#B7791F' : '#fff',
+                color: relayForm.event_mode === 'bonno' ? '#fff' : '#888',
+              }}>🔥 煩悩（会場投影型）</button>
+            </div>
             <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>① イベント名</label>
             <input placeholder="例：ヒトマップ×山手線一周プロジェクト" value={relayForm.title}
               onChange={e => setRelayForm(f => ({ ...f, title: e.target.value }))} style={inputStyle} />
@@ -1419,10 +1437,14 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             <textarea placeholder="どんなイベントか、参加者に伝えたいことを書いてください" value={relayForm.description} rows={3}
               onChange={e => setRelayForm(f => ({ ...f, description: e.target.value }))} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
 
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>③ 参加コード</label>
-            <Hint>参加者が投稿するときにこの文字を入力してもらうと、投稿がこのイベントに自動でまとまります。</Hint>
-            <input placeholder="例：yamanote2026（好きな英数字でOK）" value={relayForm.event_session_code}
-              onChange={e => setRelayForm(f => ({ ...f, event_session_code: e.target.value }))} style={inputStyle} />
+            {relayForm.event_mode === 'relay' && (
+              <>
+                <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>③ 参加コード</label>
+                <Hint>参加者が投稿するときにこの文字を入力してもらうと、投稿がこのイベントに自動でまとまります。</Hint>
+                <input placeholder="例：yamanote2026（好きな英数字でOK）" value={relayForm.event_session_code}
+                  onChange={e => setRelayForm(f => ({ ...f, event_session_code: e.target.value }))} style={inputStyle} />
+              </>
+            )}
 
             <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>④ イベントページのアドレス</label>
             <Hint>「hitomap.com/events/○○」の○○の部分になります。英数字とハイフンだけで、他と被らない文字にしてください。</Hint>
@@ -1462,17 +1484,21 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
               </div>
             </div>
 
-            <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑩ スタート・ゴール地点（任意）</label>
-            <Hint>歩くルートがまだ決まっていなくても、待ち合わせ場所だけ地図で先に決められます。</Hint>
-            <StartEndPicker kind="start"
-              lat={relayForm.event_start_lat} lng={relayForm.event_start_lng} label={relayForm.event_start_label}
-              onChange={v => setRelayForm(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
-            <WaypointsEditor waypoints={relayForm.event_waypoints}
-              onChange={wp => setRelayForm(f => ({ ...f, event_waypoints: wp }))} />
-            <StartEndPicker kind="end"
-              lat={relayForm.event_end_lat} lng={relayForm.event_end_lng} label={relayForm.event_end_label}
-              onChange={v => setRelayForm(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
-            <p style={{ margin: '-4px 0 0', fontSize: 11, color: '#aaa' }}>スタート→経由地点→ゴールの順で地図に線が引かれます。</p>
+            {relayForm.event_mode === 'relay' && (
+              <>
+                <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>⑩ スタート・ゴール地点（任意）</label>
+                <Hint>歩くルートがまだ決まっていなくても、待ち合わせ場所だけ地図で先に決められます。</Hint>
+                <StartEndPicker kind="start"
+                  lat={relayForm.event_start_lat} lng={relayForm.event_start_lng} label={relayForm.event_start_label}
+                  onChange={v => setRelayForm(f => ({ ...f, event_start_lat: v.lat, event_start_lng: v.lng, event_start_label: v.label }))} />
+                <WaypointsEditor waypoints={relayForm.event_waypoints}
+                  onChange={wp => setRelayForm(f => ({ ...f, event_waypoints: wp }))} />
+                <StartEndPicker kind="end"
+                  lat={relayForm.event_end_lat} lng={relayForm.event_end_lng} label={relayForm.event_end_label}
+                  onChange={v => setRelayForm(f => ({ ...f, event_end_lat: v.lat, event_end_lng: v.lng, event_end_label: v.label }))} />
+                <p style={{ margin: '-4px 0 0', fontSize: 11, color: '#aaa' }}>スタート→経由地点→ゴールの順で地図に線が引かれます。</p>
+              </>
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button onClick={createRelayEvent} disabled={relaySaving} style={{
                 flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
@@ -1489,7 +1515,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         <button onClick={() => setShowRelayCreate(true)} style={{
           display: 'block', width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px dashed #38ADA9',
           background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 12,
-        }}>＋ 新規relayイベントを作成</button>
+        }}>＋ 新規イベントを作成（relay / 煩悩）</button>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1536,11 +1562,18 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             )}
             {r.event_slug && (
               <p style={{ margin: '0 0 8px', fontSize: 12 }}>
-                <a href={`/events/${r.event_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: r.event_mode === 'relay' ? '#38ADA9' : '#8E44AD', fontWeight: 700 }}>
-                  {r.event_mode === 'relay' ? '🏃 relay' : '🎪 route'} ・ /events/{r.event_slug} を公開中 ↗
+                <a href={`/events/${r.event_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: r.event_mode === 'relay' ? '#38ADA9' : r.event_mode === 'bonno' ? '#B7791F' : '#8E44AD', fontWeight: 700 }}>
+                  {r.event_mode === 'relay' ? '🏃 relay' : r.event_mode === 'bonno' ? '🔥 煩悩' : '🎪 route'} ・ /events/{r.event_slug} を公開中 ↗
                 </a>
                 {r.event_mode === 'relay' && r.event_session_code && (
                   <span style={{ marginLeft: 8, color: '#999' }}>コード: {r.event_session_code}</span>
+                )}
+                {r.event_mode === 'bonno' && (
+                  <span style={{ marginLeft: 8 }}>
+                    <a href={`/events/${r.event_slug}/wall`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F', marginRight: 8 }}>投影ウォール ↗</a>
+                    <a href={`/events/${r.event_slug}/console`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F', marginRight: 8 }}>運営 ↗</a>
+                    <a href={`/events/${r.event_slug}/analysis`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F' }}>分析 ↗</a>
+                  </span>
                 )}
               </p>
             )}
@@ -1570,7 +1603,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             {eventEditingId === r.id ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, padding: 10, background: '#FBF6FF', borderRadius: 8 }}>
                 <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>イベント形式</label>
-                <Hint>route＝運営が決めた順路を歩いてもらう型。relay＝参加者が自由に見つけて投稿していく型（コースは決まっていなくてもOK）。</Hint>
+                <Hint>route＝運営が決めた順路を歩いてもらう型。relay＝参加者が自由に見つけて投稿していく型（コースは決まっていなくてもOK）。煩悩＝会場で参加者が煩悩を投稿し、壁に投影する型。</Hint>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setEventFields(f => ({ ...f, event_mode: 'route' }))} style={{
                     flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
@@ -1584,6 +1617,12 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                     background: eventFields.event_mode === 'relay' ? '#38ADA9' : '#fff',
                     color: eventFields.event_mode === 'relay' ? '#fff' : '#888',
                   }}>🏃 relay（発見連鎖型）</button>
+                  <button onClick={() => setEventFields(f => ({ ...f, event_mode: 'bonno' }))} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    border: eventFields.event_mode === 'bonno' ? '1.5px solid #B7791F' : '1.5px solid #ddd',
+                    background: eventFields.event_mode === 'bonno' ? '#B7791F' : '#fff',
+                    color: eventFields.event_mode === 'bonno' ? '#fff' : '#888',
+                  }}>🔥 煩悩（会場投影型）</button>
                 </div>
                 {eventFields.event_mode === 'relay' && (
                   <>

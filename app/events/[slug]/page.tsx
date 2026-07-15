@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase/server';
 import EventPageClient from '@/components/EventPageClient';
 import RelayEventClient from '@/components/RelayEventClient';
+import BonnoEventClient from '@/components/bonno/BonnoEventClient';
 import type { Route, Trace } from '@/lib/types';
 
 interface Props {
@@ -13,6 +14,11 @@ async function getEvent(slug: string): Promise<{ route: Route; traces: Trace[] }
   const { data: route, error } = await supabaseServer
     .from('routes').select('*').eq('event_slug', slug).eq('is_deleted', false).single();
   if (error || !route) return null;
+
+  // bonno型（煩悩オークション）は痕跡を使わない。投稿はbonno_submissionsにありクライアント側で取得する
+  if ((route as Route).event_mode === 'bonno') {
+    return { route: route as Route, traces: [] };
+  }
 
   // relay型（発見連鎖型）は事前に地点が決まっていないため、trace_ids ではなく event_session_code で参加者投稿を束ねる
   if ((route as Route).event_mode === 'relay') {
@@ -39,9 +45,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = await getEvent(params.slug);
   if (!event) return { title: 'ヒトマップ' };
   const { route, traces } = event;
-  const description = route.description ?? (route.event_mode === 'relay'
-    ? 'みんなで発見をつないでいくヒトマップのリレー型イベント'
-    : `${traces.length}地点を歩いて巡るヒトマップのイベント`);
+  const description = route.description ?? (route.event_mode === 'bonno'
+    ? 'あなたの煩悩を奉納するヒトマップのイベント'
+    : route.event_mode === 'relay'
+      ? 'みんなで発見をつないでいくヒトマップのリレー型イベント'
+      : `${traces.length}地点を歩いて巡るヒトマップのイベント`);
   return {
     title: `${route.title} | ヒトマップ`,
     description,
@@ -62,6 +70,9 @@ export default async function EventPage({ params }: Props) {
   const event = await getEvent(params.slug);
   if (!event) notFound();
 
+  if (event.route.event_mode === 'bonno') {
+    return <BonnoEventClient route={event.route} />;
+  }
   if (event.route.event_mode === 'relay') {
     return <RelayEventClient route={event.route} traces={event.traces} />;
   }

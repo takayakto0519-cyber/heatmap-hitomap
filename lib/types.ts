@@ -170,7 +170,7 @@ export interface Route {
   event_starts_at: string | null;
   event_ends_at: string | null;
   event_area: string | null;
-  event_mode: string;              // 'route'（事前ルート型） | 'relay'（発見連鎖型）
+  event_mode: string;              // 'route'（事前ルート型） | 'relay'（発見連鎖型） | 'bonno'（煩悩オークション型）
   event_session_code: string | null; // relay型イベントの参加者投稿を束ねるsession_code
 
   // スタート・ゴール地点（relay型は投稿ルートが事前に決まっていないため、運営がピンだけ先に設定できるようにする）
@@ -227,6 +227,24 @@ export interface RouteCompletionsResponse {
   ok: boolean;
   count: number;
   error?: string;
+}
+
+// ------------------------------------------------------------
+// 煩悩オークション（event_mode='bonno'）：参加者が投稿した煩悩の短文。
+// 会場の投影ウォール・運営コンソール・AI分析ダッシュボードで使う。
+// ------------------------------------------------------------
+
+export interface BonnoSubmission {
+  id: string;
+  event_slug: string;          // routes.event_slug と対応
+  text: string;                // 煩悩本文（最大100字）
+  nickname: string | null;
+  status: 'visible' | 'hidden';
+  featured_at: string | null;  // スポットライト指名時刻（NULL=非指名）
+  intensity_score: number | null; // 1〜5 切実さ（AI分析で記入）
+  ai_keywords: string[] | null;   // ワードクラウド用キーワード（AI分析で記入）
+  analyzed_at: string | null;
+  created_at: string;
 }
 
 // ------------------------------------------------------------
