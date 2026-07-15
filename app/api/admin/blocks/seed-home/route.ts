@@ -65,7 +65,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'すでにブロックが存在します（重複投入を防止のため中止しました）' }, { status: 400 });
   }
 
-  const rows = SEED.map((s, i) => ({ page: 'home', sort_order: i, is_visible: true, ...s }));
+  // 一括insertでは行ごとにキーが揃っていないと欠けた列がNULL扱いになる（DEFAULTが効かない）ため、
+  // 全行に同じキー集合を明示的に持たせる
+  const rows = SEED.map((s, i) => ({
+    page: 'home', sort_order: i, is_visible: true,
+    eyebrow: null, heading: null, body: null, image_url: null, cta_label: null, cta_href: null, items: [],
+    ...s,
+  }));
   const { error } = await supabaseServer.from('site_blocks').insert(rows);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, inserted: rows.length });
