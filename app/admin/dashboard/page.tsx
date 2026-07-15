@@ -195,6 +195,13 @@ export default function AdminDashboardPage() {
       .catch(() => {});
   }, [unlocked, tab, authHeaders]);
 
+  // ページ更新のたびにログインし直すのが煩雑だったため、タブを閉じるまではsessionStorageに保持する
+  useEffect(() => {
+    const saved = sessionStorage.getItem('admin_dashboard_password');
+    if (saved) tryUnlock(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function tryUnlock(pw: string) {
     setUnlocking(true);
     setUnlockError('');
@@ -202,9 +209,12 @@ export default function AdminDashboardPage() {
       const res = await fetch('/api/admin/stats', { headers: { 'x-admin-password': pw } });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? 'パスワードが違います');
+      setPassword(pw);
       setUnlocked(true);
+      sessionStorage.setItem('admin_dashboard_password', pw);
     } catch (e) {
       setUnlockError(e instanceof Error ? e.message : '認証に失敗しました');
+      sessionStorage.removeItem('admin_dashboard_password');
     } finally {
       setUnlocking(false);
     }
