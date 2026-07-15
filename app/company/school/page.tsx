@@ -1,29 +1,36 @@
 import type { Metadata } from 'next';
 import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
+import BlockRenderer from '@/components/corp/BlockRenderer';
 import { corpColor, corpFont } from '@/components/corp/tokens';
+import type { SiteBlock } from '@/lib/siteBlocks';
 
 export const metadata: Metadata = {
   title: '学校・総合学習でのご利用',
   description: '総合学習の「町探検」「地域学習」にヒトマップを使う先生方向けのご案内です。',
 };
 
-const STEPS = [
-  {
-    title: 'クラス専用のコードを発行',
-    body: '運営が「実験回コード」をクラスごとに発行します。生徒はこのコードを使って記録すると、クラスの記録だけをまとめて振り返れます。',
-  },
-  {
-    title: '町を歩いて痕跡を記録',
-    body: '生徒はスマートフォンやタブレットで、気になったモノ・場所を写真と一言で記録します。文章が苦手な子でも、写真とタップだけで参加できます。',
-  },
-  {
-    title: 'クラスの地図として振り返る',
-    body: '記録が集まると、クラスだけの地域理解レポートができあがります。どこにみんなの関心が集まったかが一目で分かり、発表や作文のもとになります。',
-  },
-];
+export const revalidate = 60;
 
-export default function CompanySchoolPage() {
+async function fetchBlocks(): Promise<SiteBlock[]> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  try {
+    const { supabaseServer } = await import('@/lib/supabase/server');
+    const { data } = await supabaseServer
+      .from('site_blocks')
+      .select('*')
+      .eq('page', 'school')
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true });
+    return (data ?? []) as SiteBlock[];
+  } catch {
+    return [];
+  }
+}
+
+export default async function CompanySchoolPage() {
+  const blocks = await fetchBlocks();
+
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <CorpHeader />
@@ -54,80 +61,8 @@ export default function CompanySchoolPage() {
           </div>
         </section>
 
-        <section style={{ background: corpColor.white, padding: '8px 24px 72px' }}>
-          <div style={{ maxWidth: 720, margin: '0 auto' }}>
-            {STEPS.map((s, i) => (
-              <div
-                key={s.title}
-                style={{
-                  display: 'flex',
-                  gap: 20,
-                  alignItems: 'flex-start',
-                  padding: '28px 0',
-                  borderTop: `1px solid ${corpColor.line}`,
-                  marginLeft: i % 2 === 1 ? 28 : 0,
-                }}
-              >
-                <div
-                  style={{
-                    flexShrink: 0,
-                    width: 44,
-                    height: 44,
-                    borderRadius: '50%',
-                    border: `1.5px solid ${corpColor.moss}`,
-                    color: corpColor.moss,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontFamily: corpFont.mincho,
-                    fontSize: 17,
-                    fontWeight: 700,
-                  }}
-                >
-                  {i + 1}
-                </div>
-                <div>
-                  <p style={{ margin: '0 0 8px', fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink }}>
-                    {s.title}
-                  </p>
-                  <p style={{ margin: 0, fontSize: 14, color: corpColor.inkSoft, lineHeight: 1.9, fontFamily: corpFont.body, maxWidth: 500 }}>
-                    {s.body}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-            <div style={{ borderTop: `1px solid ${corpColor.line}`, padding: '28px 0 0' }}>
-              <p style={{ margin: '0 0 8px', fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink }}>
-                費用について
-              </p>
-              <p style={{ margin: '0 0 24px', fontSize: 14, color: corpColor.inkSoft, lineHeight: 1.9, fontFamily: corpFont.body }}>
-                学校・教育機関でのご利用は、個別にご相談のうえ決めさせていただいています。まずはお気軽にお問い合わせください。
-              </p>
-
-              <a
-                href="/contact"
-                style={{
-                  display: 'inline-block',
-                  padding: '15px 32px',
-                  background: corpColor.ink,
-                  color: corpColor.white,
-                  textDecoration: 'none',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  fontFamily: corpFont.body,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                学校での利用を問い合わせる
-              </a>
-
-              <p style={{ marginTop: 20, fontSize: 12, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
-                クラス専用コードの発行後、生徒はアプリの記録画面で「実験回コード」欄に入力するだけで使えます。
-              </p>
-            </div>
-          </div>
-        </section>
+        {/* 以下は運営ダッシュボード（サイトCMS）から自由に編集・追加・並び替えできる */}
+        <BlockRenderer blocks={blocks} />
       </main>
 
       <CorpFooter />

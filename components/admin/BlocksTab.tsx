@@ -3,7 +3,8 @@
 // 運営ダッシュボードに統合されたサイトCMSタブ。認証は親（/admin/dashboard）が持つ
 // authHeaders を使い、このコンポーネント自身はパスワードを持たない。
 import { useEffect, useState } from 'react';
-import { BLOCK_TYPES, SITE_PAGES, blockTypeLabel, type SiteBlock, type BlockType, type BlockCardItem, type BlockQuoteItem } from '@/lib/siteBlocks';
+import LivePreview from './LivePreview';
+import { BLOCK_TYPES, SITE_PAGES, pagePath, blockTypeLabel, type SiteBlock, type BlockType, type BlockCardItem, type BlockQuoteItem } from '@/lib/siteBlocks';
 
 interface Draft {
   id?: string;
@@ -36,6 +37,7 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -55,11 +57,11 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  async function seedHome() {
+  async function seedPage() {
     setMessage('');
-    const res = await fetch('/api/admin/blocks/seed-home', { method: 'POST', headers: authHeaders() });
+    const res = await fetch('/api/admin/blocks/seed-home', { method: 'POST', headers: jsonHeaders(), body: JSON.stringify({ page }) });
     const data = await res.json();
-    if (data.ok) { setMessage(`初期セクションを${data.inserted}件投入しました`); await load(); }
+    if (data.ok) { setMessage(`初期セクションを${data.inserted}件投入しました`); setPreviewVersion(v => v + 1); await load(); }
     else setMessage(data.error ?? '投入に失敗しました');
   }
 
@@ -73,6 +75,7 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
     await fetch('/api/admin/blocks/reorder', {
       method: 'POST', headers: jsonHeaders(), body: JSON.stringify({ order: next.map(b => b.id) }),
     });
+    setPreviewVersion(v => v + 1);
   }
 
   async function toggleVisible(b: SiteBlock) {
@@ -80,14 +83,14 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
       method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify({ is_visible: !b.is_visible }),
     });
     const data = await res.json();
-    if (data.ok) setBlocks(prev => prev.map(x => x.id === b.id ? data.block : x));
+    if (data.ok) { setBlocks(prev => prev.map(x => x.id === b.id ? data.block : x)); setPreviewVersion(v => v + 1); }
   }
 
   async function remove(id: string) {
     if (!window.confirm('このセクションを削除します。よろしいですか？')) return;
     const res = await fetch(`/api/admin/blocks/${id}`, { method: 'DELETE', headers: authHeaders() });
     const data = await res.json();
-    if (data.ok) { setMessage('削除しました'); await load(); }
+    if (data.ok) { setMessage('削除しました'); setPreviewVersion(v => v + 1); await load(); }
     else setMessage(data.error ?? '削除に失敗しました');
   }
 
@@ -136,7 +139,7 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
         ? await fetch(`/api/admin/blocks/${draft.id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(payload) })
         : await fetch('/api/admin/blocks', { method: 'POST', headers: jsonHeaders(), body: JSON.stringify(payload) });
       const data = await res.json();
-      if (data.ok) { setDraft(null); setMessage('保存しました'); await load(); }
+      if (data.ok) { setDraft(null); setMessage('保存しました'); setPreviewVersion(v => v + 1); await load(); }
       else setMessage(data.error ?? '保存に失敗しました');
     } finally {
       setSaving(false);
@@ -156,17 +159,24 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
         <select value={page} onChange={e => setPage(e.target.value)} style={{ ...inputStyle, width: 'auto' }}>
           {SITE_PAGES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
-        <a href="/" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#566246' }}>サイトを見る →</a>
-        {blocks.length === 0 && page === 'home' && !loading && (
-          <button onClick={seedHome} style={{
+        <a href={pagePath(page)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#566246' }}>サイトを見る →</a>
+        {blocks.length === 0 && !loading && (
+          <button onClick={seedPage} style={{
             padding: '9px 16px', borderRadius: 8, border: '1.5px solid #566246',
             background: '#fff', color: '#566246', fontWeight: 700, fontSize: 12, cursor: 'pointer',
           }}>初期セクションを読み込む</button>
         )}
       </div>
       <p style={{ fontSize: 11, color: '#999', margin: '0 0 16px' }}>
-        現在は「トップページ」のみ編集対象です。Hero（一番上）・感情タグ一覧・直近の投稿フィードは固定表示のため、ここには出ません。
+        {page === 'home'
+          ? 'トップページはHero（一番上）・感情タグ一覧・直近の投稿フィードが固定表示のため、ここには出ません。'
+          : 'このページの見出し文言はここで編集できます。'}
       </p>
+
+      <div style={{ marginBottom: 20 }}>
+        <LivePreview path={pagePath(page)} version={previewVersion} />
+      </div>
+
       {message && <p style={{ fontSize: 13, color: '#566246', fontWeight: 700 }}>{message}</p>}
 
       {!draft && (

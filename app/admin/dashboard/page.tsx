@@ -6,18 +6,20 @@ import type { Trace, Sponsor, Route } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import BlocksTab from '@/components/admin/BlocksTab';
+import PostsTab from '@/components/admin/PostsTab';
 
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
   ssr: false,
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'blocks' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads';
+type Tab = 'overview' | 'blocks' | 'posts' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
   overview: { label: 'ホーム', icon: '🏠', group: '', desc: '全体の状況をひと目で確認' },
-  blocks: { label: 'サイトCMS', icon: '🧩', group: 'サイト', desc: 'トップページのセクションを自由に編集' },
+  blocks: { label: 'サイトCMS', icon: '🧩', group: 'サイト', desc: 'ページのセクションを自由に編集（プレビュー付き）' },
+  posts: { label: '実績ブログ', icon: '📝', group: 'サイト', desc: 'イベント記録・参加者の声を書いて公開' },
   review: { label: '承認待ち', icon: '✅', group: '投稿・安全', desc: '全国公開の申請を承認/却下' },
   traces: { label: '投稿管理', icon: '📍', group: '投稿・安全', desc: '投稿を検索・削除・復元' },
   reports: { label: '通報', icon: '🚨', group: '投稿・安全', desc: '寄せられた通報の対応' },
@@ -40,7 +42,6 @@ const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] 
   { label: '学校向け', href: '/school', icon: '🏫', desc: '学校・教育機関向けの紹介ページ' },
   { label: '法人向け', href: '/business', icon: '🏢', desc: '法人・自治体向けの紹介ページ' },
   { label: '投稿を始める', href: '/start', icon: '📸', desc: '新規投稿フローの確認' },
-  { label: '実績ブログ管理', href: '/admin/posts', icon: '📝', desc: 'イベント記録・参加者の声を管理' },
 ];
 
 const inputStyle: React.CSSProperties = {
@@ -339,6 +340,7 @@ export default function AdminDashboardPage() {
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 20px 60px' }}>
           {tab === 'overview' && <OverviewTab authHeaders={authHeaders} setTab={setTab} badgeCounts={badgeCounts} />}
           {tab === 'blocks' && <BlocksTab authHeaders={authHeaders} />}
+          {tab === 'posts' && <PostsTab authHeaders={authHeaders} />}
           {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
           {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
           {tab === 'reports' && <ReportsTab authHeaders={authHeaders} />}

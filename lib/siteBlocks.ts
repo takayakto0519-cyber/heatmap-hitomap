@@ -42,9 +42,17 @@ export const BLOCK_TYPES: { key: BlockType; label: string; hint: string }[] = [
   { key: 'cta', label: 'CTA帯', hint: '濃色背景の行動喚起（ボタン付き）' },
 ];
 
-export const SITE_PAGES: { key: string; label: string }[] = [
-  { key: 'home', label: 'トップページ' },
+export const SITE_PAGES: { key: string; label: string; path: string }[] = [
+  { key: 'home', label: 'トップページ', path: '/' },
+  { key: 'business', label: '法人・行政の方へ', path: '/business' },
+  { key: 'school', label: '学校の方へ', path: '/school' },
+  { key: 'service', label: 'ヒトマップの使い方', path: '/service' },
+  { key: 'team', label: '運営', path: '/team' },
 ];
+
+export function pagePath(key: string): string {
+  return SITE_PAGES.find(p => p.key === key)?.path ?? '/';
+}
 
 export function blockTypeLabel(type: string): string {
   return BLOCK_TYPES.find(b => b.key === type)?.label ?? type;

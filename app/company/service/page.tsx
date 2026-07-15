@@ -2,14 +2,36 @@ import type { Metadata } from 'next';
 import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
 import ServiceFlow from '@/components/corp/ServiceFlow';
+import BlockRenderer from '@/components/corp/BlockRenderer';
 import { corpColor, corpFont } from '@/components/corp/tokens';
+import type { SiteBlock } from '@/lib/siteBlocks';
 
 export const metadata: Metadata = {
   title: 'ヒトマップの使い方',
   description: 'ヒトマップアプリの使い方と、体験の流れについて。記録・ヒートマップ・つながる・歩く、の4段階で説明します。',
 };
 
-export default function ServicePage() {
+export const revalidate = 60;
+
+async function fetchBlocks(): Promise<SiteBlock[]> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  try {
+    const { supabaseServer } = await import('@/lib/supabase/server');
+    const { data } = await supabaseServer
+      .from('site_blocks')
+      .select('*')
+      .eq('page', 'service')
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true });
+    return (data ?? []) as SiteBlock[];
+  } catch {
+    return [];
+  }
+}
+
+export default async function ServicePage() {
+  const blocks = await fetchBlocks();
+
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <CorpHeader />
@@ -50,7 +72,10 @@ export default function ServicePage() {
 
         <ServiceFlow />
 
-        <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
+        {/* 以下は運営ダッシュボード（サイトCMS）から自由に編集・追加・並び替えできる */}
+        <BlockRenderer blocks={blocks} />
+
+        <section style={{ background: corpColor.white, padding: '0 24px 72px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 16 }}>
             <a
               href="/start"
