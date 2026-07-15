@@ -31,7 +31,7 @@ export default function ServicePage() {
             </p>
             <h1
               style={{
-                margin: '0 0 24px',
+                margin: '0 0 20px',
                 fontFamily: corpFont.mincho,
                 fontSize: 'clamp(24px, 3.6vw, 32px)',
                 lineHeight: 1.8,
@@ -42,9 +42,8 @@ export default function ServicePage() {
               地図は、あなたが見つけた痕跡でできている。
             </h1>
             <p style={{ margin: 0, fontSize: 15, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body, maxWidth: 560 }}>
-              ヒトマップは、位置情報を分析するツールではありません。
-              一人ひとりが町を歩いて見つけた「誰かが生きた証」を、写真と言葉で記録していくコミュニティサービスです。
-              ログインしなくても、匿名のまま記録を始められます。
+              町を歩いて見つけた「誰かが生きた証」を、写真と一言で記録するだけ。
+              ログイン不要、匿名のまま今すぐ始められます。
             </p>
           </div>
         </section>
