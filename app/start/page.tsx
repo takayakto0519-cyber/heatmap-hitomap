@@ -136,6 +136,7 @@ export default function StartPage() {
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 12 }}>
         <a href="/company/school" style={{ fontSize: 11, color: appColor.inkGhost, textDecoration: 'none' }}>学校でのご利用</a>
+        <a href="/company/business" style={{ fontSize: 11, color: appColor.inkGhost, textDecoration: 'none' }}>法人・自治体でのご利用</a>
         <a href="/terms" style={{ fontSize: 11, color: appColor.inkGhost, textDecoration: 'none' }}>利用規約</a>
         <a href="/privacy" style={{ fontSize: 11, color: appColor.inkGhost, textDecoration: 'none' }}>プライバシーポリシー</a>
       </div>

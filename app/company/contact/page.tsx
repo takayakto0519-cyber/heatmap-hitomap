@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
 import Reveal from '@/components/corp/Reveal';
+import ContactForm from '@/components/corp/ContactForm';
 import { corpColor, corpFont } from '@/components/corp/tokens';
 
 export const metadata: Metadata = {
@@ -39,28 +40,10 @@ export default function ContactPage() {
               法人・行政・学校でのご利用、取材・提携のご相談など、内容にかかわらずご連絡ください。
             </p>
 
-            <a
-              href="mailto:hitomap.info@gmail.com"
-              className="hm-lift"
-              style={{
-                display: 'block',
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '18px',
-                background: corpColor.ink,
-                textAlign: 'center',
-                color: corpColor.white,
-                fontWeight: 700,
-                fontSize: 15,
-                fontFamily: corpFont.body,
-                textDecoration: 'none',
-                letterSpacing: '0.05em',
-              }}
-            >
-              メールでお問い合わせ
-            </a>
-            <p style={{ textAlign: 'center', fontSize: 12, color: corpColor.inkSoft, marginTop: 14, fontFamily: corpFont.body }}>
-              hitomap.info@gmail.com
+            <ContactForm />
+
+            <p style={{ textAlign: 'center', fontSize: 12, color: corpColor.inkSoft, marginTop: 24, fontFamily: corpFont.body }}>
+              またはメールで：<a href="mailto:hitomap.info@gmail.com" style={{ color: corpColor.moss }}>hitomap.info@gmail.com</a>
             </p>
           </Reveal>
         </div>

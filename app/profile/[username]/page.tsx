@@ -580,6 +580,14 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {isMe && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 32, marginBottom: 8 }}>
+          <a href="/company/business" style={{ fontSize: 11, color: '#aaa', textDecoration: 'none' }}>法人・自治体の方</a>
+          <a href="/company/school" style={{ fontSize: 11, color: '#aaa', textDecoration: 'none' }}>学校の方</a>
+          <a href="/support" style={{ fontSize: 11, color: '#aaa', textDecoration: 'none' }}>ヒトマップを支援する</a>
+        </div>
+      )}
+
       {selectedTrace && (
         <TraceDetail
           trace={selectedTrace}
