@@ -241,9 +241,24 @@ export interface BonnoSubmission {
   nickname: string | null;
   status: 'visible' | 'hidden';
   featured_at: string | null;  // スポットライト指名時刻（NULL=非指名）
-  intensity_score: number | null; // 1〜5 切実さ（AI分析で記入）
-  ai_keywords: string[] | null;   // ワードクラウド用キーワード（AI分析で記入）
+  intensity_score: number | null; // 1〜5 切実さ（廃止済みAI分析の名残。未使用）
+  ai_keywords: string[] | null;   // ワードクラウド用キーワード（廃止済みAI分析の名残。未使用）
   analyzed_at: string | null;
+  created_at: string;
+  total_bonno?: number;        // DB列ではなくAPIレスポンス上の派生値：bonno_investmentsの合計投資額
+}
+
+// ------------------------------------------------------------
+// 煩悩オークション：BONNO投資（参加者が共感した煩悩に持ち点を配分する）
+// voter_token はブラウザ側で生成されlocalStorageに保持される匿名識別子。
+// ------------------------------------------------------------
+
+export interface BonnoInvestment {
+  id: string;
+  event_slug: string;
+  submission_id: string;
+  voter_token: string;
+  amount: number;
   created_at: string;
 }
 

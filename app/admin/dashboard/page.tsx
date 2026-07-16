@@ -1586,7 +1586,8 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                   <span style={{ marginLeft: 8 }}>
                     <a href={`/events/${r.event_slug}/wall`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F', marginRight: 8 }}>投影ウォール ↗</a>
                     <a href={`/events/${r.event_slug}/console`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F', marginRight: 8 }}>運営 ↗</a>
-                    <a href={`/events/${r.event_slug}/analysis`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F' }}>分析 ↗</a>
+                    <a href={`/events/${r.event_slug}/invest`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F', marginRight: 8 }}>投資ページ ↗</a>
+                    <a href={`/events/${r.event_slug}/board`} target="_blank" rel="noopener noreferrer" style={{ color: '#B7791F' }}>投資ボード ↗</a>
                   </span>
                 )}
               </p>

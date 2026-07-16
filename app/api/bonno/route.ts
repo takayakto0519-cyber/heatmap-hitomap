@@ -139,20 +139,31 @@ export async function GET(req: NextRequest) {
 
   const rows = (data ?? []) as BonnoSubmission[];
 
+  // BONNO投資合計を集計してsubmission_idごとに付与する（投資ボード・ウォールの演出で使う）
+  const { data: investmentRows } = await supabaseServer
+    .from('bonno_investments')
+    .select('submission_id, amount')
+    .eq('event_slug', eventSlug);
+  const totalBonnoMap = new Map<string, number>();
+  for (const row of investmentRows ?? []) {
+    const submissionId = row.submission_id as string;
+    totalBonnoMap.set(submissionId, (totalBonnoMap.get(submissionId) ?? 0) + (row.amount as number));
+  }
+  const rowsWithTotal = rows.map((r) => ({ ...r, total_bonno: totalBonnoMap.get(r.id) ?? 0 }));
+
   // スポットライト＝featured_at が最も新しい visible の1件（解除は featured_at=NULL に戻すだけ）
-  const spotlight = rows
+  const spotlight = rowsWithTotal
     .filter((r) => r.status === 'visible' && r.featured_at)
     .sort((a, b) => (a.featured_at! < b.featured_at! ? 1 : -1))[0] ?? null;
 
   // 公開応答では運営用の内部情報（status等）を落とす
   const items = isAdmin
-    ? rows
-    : rows.map((r) => ({
+    ? rowsWithTotal
+    : rowsWithTotal.map((r) => ({
         id: r.id,
         text: r.text,
         nickname: r.nickname,
-        intensity_score: r.intensity_score,
-        ai_keywords: r.ai_keywords,
+        total_bonno: r.total_bonno,
         created_at: r.created_at,
       }));
 

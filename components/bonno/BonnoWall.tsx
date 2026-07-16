@@ -15,7 +15,7 @@ interface WallItem {
   id: string;
   text: string;
   nickname: string | null;
-  intensity_score: number | null;
+  total_bonno: number;
   created_at: string;
 }
 
@@ -104,10 +104,10 @@ export default function BonnoWall({ route }: { route: Route }) {
   const spotlight = spotlightId ? items.find((it) => it.id === spotlightId) ?? null : null;
   const dimmed = Boolean(spotlight || announce);
 
-  // 切実さが強い煩悩ほど大きく・長く画面に留まる
+  // BONNO投資を集めた煩悩ほど大きく画面に浮かび上がる
   const fontSizeFor = (it: WallItem) => {
     const base = it.text.length > 60 ? 22 : it.text.length > 30 ? 26 : 32;
-    const boost = it.intensity_score ? (it.intensity_score - 3) * 4 : 0;
+    const boost = Math.min(it.total_bonno ?? 0, 100) / 10;
     return base + boost;
   };
 
@@ -166,9 +166,10 @@ export default function BonnoWall({ route }: { route: Route }) {
               }}
             >
               {it.text}
-              {it.nickname && (
+              {(it.nickname || (it.total_bonno ?? 0) > 0) && (
                 <span style={{ display: 'block', fontSize: 14, color: '#8F8770', marginTop: 6 }}>
-                  — {it.nickname}
+                  {it.nickname && `— ${it.nickname}`}
+                  {(it.total_bonno ?? 0) > 0 && ` 💰${it.total_bonno}`}
                 </span>
               )}
             </p>

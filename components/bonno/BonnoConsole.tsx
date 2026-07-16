@@ -4,7 +4,7 @@
 // 煩悩オークション：運営コンソール
 // ・投稿の一覧（3秒ポーリング、hidden含む全件）
 // ・スポットライト指名/解除、非表示/戻す
-// ・AI分析の実行と全体講評の表示
+// ・BONNO投資状況の要約（総投資額・現在の1位）とBONNO投資ボードへの導線
 // ・参加用QRコード（印刷して受付に置ける）
 // パスワードは初回入力後 sessionStorage に保持し、x-admin-password ヘッダで送る。
 // ============================================================
@@ -22,9 +22,6 @@ export default function BonnoConsole({ route }: { route: Route }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [items, setItems] = useState<BonnoSubmission[]>([]);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [review, setReview] = useState<string | null>(null);
-  const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
   const [eventUrl, setEventUrl] = useState('');
 
   const load = useCallback(async (pw: string) => {
@@ -80,34 +77,6 @@ export default function BonnoConsole({ route }: { route: Route }) {
     load(password);
   };
 
-  const runAnalyze = async () => {
-    setAnalyzing(true);
-    setAnalyzeMsg(null);
-    try {
-      const res = await fetch('/api/bonno/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ event_slug: route.event_slug }),
-      });
-      const data = await res.json();
-      if (!data.ok) {
-        setAnalyzeMsg(data.error ?? '分析に失敗しました');
-      } else {
-        setAnalyzeMsg(
-          data.analyzed > 0
-            ? `${data.analyzed}件を分析しました${data.remaining ? '（未分析が残っています。もう一度実行してください）' : ''}`
-            : data.message ?? '未分析の煩悩はありません'
-        );
-        if (data.review) setReview(data.review);
-        load(password);
-      }
-    } catch {
-      setAnalyzeMsg('通信に失敗しました');
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   if (!authed) {
     return (
       <main style={{ minHeight: '100dvh', background: colors.surfaceMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -135,7 +104,11 @@ export default function BonnoConsole({ route }: { route: Route }) {
   }
 
   const visibleCount = items.filter((it) => it.status === 'visible').length;
-  const analyzedCount = items.filter((it) => it.analyzed_at).length;
+  const totalBonno = items.reduce((sum, it) => sum + (it.total_bonno ?? 0), 0);
+  const topItem = items
+    .filter((it) => it.status === 'visible')
+    .slice()
+    .sort((a, b) => (b.total_bonno ?? 0) - (a.total_bonno ?? 0))[0];
 
   return (
     <main style={{ minHeight: '100dvh', background: colors.surfaceMuted, padding: '24px 16px 80px' }}>
@@ -150,37 +123,34 @@ export default function BonnoConsole({ route }: { route: Route }) {
           <div style={{ flex: '1 1 200px', background: colors.surface, borderRadius: radii.lg, boxShadow: shadows.card, padding: '16px 18px' }}>
             <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 4px' }}>奉納された煩悩</p>
             <p style={{ fontSize: 28, fontWeight: 800, color: colors.textPrimary, margin: 0 }}>
-              {items.length}<span style={{ fontSize: 13, fontWeight: 400, color: colors.textMuted }}> 件（表示中 {visibleCount}・分析済み {analyzedCount}）</span>
+              {items.length}<span style={{ fontSize: 13, fontWeight: 400, color: colors.textMuted }}> 件（表示中 {visibleCount}）</span>
+            </p>
+            <p style={{ fontSize: 13, color: colors.textSecondary, margin: '6px 0 0' }}>
+              総投資 <strong style={{ color: colors.gold }}>{totalBonno} BONNO</strong>
+              {topItem && (topItem.total_bonno ?? 0) > 0 && (
+                <>
+                  {' ・ 現在の1位：'}
+                  <strong style={{ color: colors.gold }}>「{topItem.text.slice(0, 20)}{topItem.text.length > 20 ? '…' : ''}」</strong>
+                  {`（${topItem.total_bonno} BONNO）`}
+                </>
+              )}
             </p>
             <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
               <a href={`/events/${route.event_slug}/wall`} target="_blank" rel="noopener noreferrer"
                 style={{ fontSize: 12, fontWeight: 700, color: colors.accent, textDecoration: 'none', border: `1px solid ${colors.accent}`, borderRadius: radii.pill, padding: '6px 14px' }}>
                 投影ウォール ↗
               </a>
-              <a href={`/events/${route.event_slug}/analysis`} target="_blank" rel="noopener noreferrer"
+              <a href={`/events/${route.event_slug}/board`} target="_blank" rel="noopener noreferrer"
                 style={{ fontSize: 12, fontWeight: 700, color: colors.purple, textDecoration: 'none', border: `1px solid ${colors.purple}`, borderRadius: radii.pill, padding: '6px 14px' }}>
-                分析ダッシュボード ↗
+                BONNO投資ボード ↗
               </a>
-              <button onClick={runAnalyze} disabled={analyzing}
-                style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: analyzing ? colors.textFaint : colors.primary, border: 'none', borderRadius: radii.pill, padding: '6px 14px', cursor: analyzing ? 'default' : 'pointer' }}>
-                {analyzing ? '分析中…' : 'AI分析を実行'}
-              </button>
             </div>
-            {analyzeMsg && <p style={{ fontSize: 12, color: colors.textSecondary, margin: '10px 0 0' }}>{analyzeMsg}</p>}
           </div>
           <div style={{ background: colors.surface, borderRadius: radii.lg, boxShadow: shadows.card, padding: '14px 16px', textAlign: 'center' }}>
             {eventUrl && <QRCodeSVG value={eventUrl} size={96} fgColor={colors.textPrimary} />}
             <p style={{ fontSize: 11, fontWeight: 700, color: colors.textSecondary, margin: '6px 0 0' }}>参加用QR</p>
           </div>
         </div>
-
-        {/* AI全体講評 */}
-        {review && (
-          <div style={{ background: colors.purpleBg, border: `1px solid ${colors.purple}`, borderRadius: radii.lg, padding: '14px 18px', marginBottom: 20 }}>
-            <p style={{ fontSize: 12, fontWeight: 800, color: colors.purple, margin: '0 0 6px' }}>AIによる全体講評（下書き・外部公開前に要確認）</p>
-            <p style={{ fontSize: 14, color: colors.textPrimary, lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{review}</p>
-          </div>
-        )}
 
         {/* 投稿リスト（新着順） */}
         {items.length === 0 ? (
@@ -202,7 +172,7 @@ export default function BonnoConsole({ route }: { route: Route }) {
               <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 10px' }}>
                 {it.nickname ?? '匿名'}
                 {' ・ '}{new Date(it.created_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                {it.intensity_score && <span style={{ color: colors.gold, fontWeight: 700 }}>{' ・ '}切実さ {'●'.repeat(it.intensity_score)}{'○'.repeat(5 - it.intensity_score)}</span>}
+                {(it.total_bonno ?? 0) > 0 && <span style={{ color: colors.gold, fontWeight: 700 }}>{' ・ '}💰 {it.total_bonno} BONNO</span>}
                 {isSpot && <span style={{ color: colors.gold, fontWeight: 800 }}>{' ・ '}🔦 スポットライト中</span>}
                 {isHidden && <span style={{ color: colors.danger, fontWeight: 700 }}>{' ・ '}非表示中</span>}
               </p>

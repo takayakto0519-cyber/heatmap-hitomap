@@ -67,10 +67,28 @@ export default function BonnoEventClient({ route }: { route: Route }) {
           {route.title}
         </h1>
         {route.description && (
-          <p style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.8, margin: '0 0 24px', whiteSpace: 'pre-wrap' }}>
+          <p style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.8, margin: '0 0 16px', whiteSpace: 'pre-wrap' }}>
             {route.description}
           </p>
         )}
+
+        <a
+          href={`/events/${route.event_slug}/invest`}
+          style={{
+            display: 'block',
+            fontSize: 13,
+            fontWeight: 700,
+            color: colors.gold,
+            textDecoration: 'none',
+            border: `1px solid ${colors.gold}`,
+            borderRadius: radii.pill,
+            padding: '10px 16px',
+            textAlign: 'center',
+            marginBottom: 24,
+          }}
+        >
+          💰 他の人の煩悩にBONNOを投資する →
+        </a>
 
         {done ? (
           <div style={{
@@ -98,10 +116,26 @@ export default function BonnoEventClient({ route }: { route: Route }) {
                 fontSize: 15,
                 fontWeight: 700,
                 cursor: 'pointer',
+                marginRight: 10,
               }}
             >
               もうひとつ書く
             </button>
+            <a
+              href={`/events/${route.event_slug}/invest`}
+              style={{
+                display: 'inline-block',
+                padding: '12px 28px',
+                borderRadius: radii.pill,
+                border: `1.5px solid ${colors.gold}`,
+                color: colors.gold,
+                textDecoration: 'none',
+                fontSize: 15,
+                fontWeight: 700,
+              }}
+            >
+              💰 BONNOを投資する
+            </a>
           </div>
         ) : (
           <div style={{

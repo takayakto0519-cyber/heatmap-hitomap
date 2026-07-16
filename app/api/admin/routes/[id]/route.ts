@@ -11,7 +11,8 @@ function revalidateEventPaths(slug: string | null | undefined) {
   revalidatePath(`/events/${slug}`);
   revalidatePath(`/events/${slug}/wall`);
   revalidatePath(`/events/${slug}/console`);
-  revalidatePath(`/events/${slug}/analysis`);
+  revalidatePath(`/events/${slug}/invest`);
+  revalidatePath(`/events/${slug}/board`);
   revalidatePath('/routes');
   revalidatePath('/');
 }
