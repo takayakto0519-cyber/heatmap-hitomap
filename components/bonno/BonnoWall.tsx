@@ -5,10 +5,9 @@
 // 黒背景の全画面に、奉納された煩悩が下から立ち上り、漂い、消えていく。
 // ・2.5秒ポーリングで新着を取り込む（新着は一度中央に大きく表示してから合流）
 // ・運営コンソールのスポットライト指名で、その煩悩だけを中央特大表示
-// ・クリックで全画面、qキーで参加QRの表示/非表示
+// ・クリックで全画面
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import type { Route } from '@/lib/types';
 
 interface WallItem {
@@ -34,8 +33,6 @@ export default function BonnoWall({ route }: { route: Route }) {
   const [items, setItems] = useState<WallItem[]>([]);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [announce, setAnnounce] = useState<WallItem | null>(null);
-  const [showQr, setShowQr] = useState(true);
-  const [eventUrl, setEventUrl] = useState('');
   const knownIds = useRef<Set<string>>(new Set());
   const floatStyles = useRef<Map<string, FloatStyle>>(new Map());
   const announceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,22 +76,13 @@ export default function BonnoWall({ route }: { route: Route }) {
   }, [route.event_slug]);
 
   useEffect(() => {
-    setEventUrl(`${window.location.origin}/events/${route.event_slug}`);
     load();
     const timer = setInterval(load, POLL_MS);
     return () => {
       clearInterval(timer);
       if (announceTimer.current) clearTimeout(announceTimer.current);
     };
-  }, [load, route.event_slug]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'q' || e.key === 'Q') setShowQr((v) => !v);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [load]);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
@@ -214,28 +202,6 @@ export default function BonnoWall({ route }: { route: Route }) {
               — {(spotlight ?? announce)!.nickname}
             </p>
           )}
-        </div>
-      )}
-
-      {/* 参加QRコーナー（qキーで表示切替） */}
-      {showQr && eventUrl && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: 'absolute',
-            right: 28,
-            bottom: 28,
-            background: 'rgba(242, 235, 216, 0.95)',
-            borderRadius: 12,
-            padding: '14px 14px 10px',
-            textAlign: 'center',
-            cursor: 'default',
-          }}
-        >
-          <QRCodeSVG value={eventUrl} size={110} bgColor="transparent" fgColor="#23231F" />
-          <p style={{ fontSize: 11, fontWeight: 700, color: '#23231F', margin: '8px 0 0', letterSpacing: 1 }}>
-            あなたの煩悩を奉納する
-          </p>
         </div>
       )}
 

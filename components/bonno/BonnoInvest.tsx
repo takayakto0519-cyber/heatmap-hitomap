@@ -128,7 +128,7 @@ export default function BonnoInvest({ route }: { route: Route }) {
           気になった煩悩にBONNOを投資しよう
         </h1>
         <p style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.8, margin: '0 0 20px' }}>
-          持ち点の「BONNO」を、気になった煩悩に配ってください。1回押すごとに10 BONNO投資できます。いちばん多く集めた煩悩が「本日の最高落札煩悩」に選ばれます。
+          持ち点のBONNOを、気になった煩悩に配ってください。いちばん多く集めた煩悩が「本日の最高落札煩悩」に選ばれます。
         </p>
 
         {/* 残り予算バー */}
@@ -175,34 +175,30 @@ export default function BonnoInvest({ route }: { route: Route }) {
               padding: '14px 16px',
               marginBottom: 10,
             }}>
-              <p style={{ fontSize: 15, color: colors.textPrimary, lineHeight: 1.7, margin: '0 0 8px', whiteSpace: 'pre-wrap' }}>
+              <p style={{ fontSize: 15, color: colors.textPrimary, lineHeight: 1.7, margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>
                 {it.text}
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <p style={{ fontSize: 12, color: colors.textMuted, margin: 0 }}>
-                  {it.nickname ?? '匿名'}
-                  {' ・ 総投資 '}
-                  <strong style={{ color: colors.gold }}>{it.total_bonno} BONNO</strong>
-                  {myAmount > 0 && <span style={{ color: colors.accent }}>{`（あなたが投資：${myAmount}）`}</span>}
-                </p>
-                <button
-                  onClick={() => invest(it.id)}
-                  disabled={disabled}
-                  style={{
-                    flexShrink: 0,
-                    padding: '8px 16px',
-                    borderRadius: radii.pill,
-                    border: 'none',
-                    background: disabled ? colors.trackBg : colors.primary,
-                    color: disabled ? colors.textFaint : '#fff',
-                    fontSize: 13,
-                    fontWeight: 800,
-                    cursor: disabled ? 'default' : 'pointer',
-                  }}
-                >
-                  {pending === it.id ? '投資中…' : `+${INVEST_STEP} BONNO`}
-                </button>
-              </div>
+              <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 10px' }}>
+                💰 <strong style={{ color: colors.gold }}>{it.total_bonno} BONNO</strong>
+                {myAmount > 0 && <span style={{ color: colors.accent }}>{`　あなた：${myAmount}`}</span>}
+              </p>
+              <button
+                onClick={() => invest(it.id)}
+                disabled={disabled}
+                style={{
+                  width: '100%',
+                  padding: '10px 0',
+                  borderRadius: radii.pill,
+                  border: 'none',
+                  background: disabled ? colors.trackBg : colors.primary,
+                  color: disabled ? colors.textFaint : '#fff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  cursor: disabled ? 'default' : 'pointer',
+                }}
+              >
+                {pending === it.id ? '投資中…' : `+${INVEST_STEP} BONNO`}
+              </button>
             </div>
           );
         })}
