@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import EmotionTimeline from '@/components/profile/EmotionTimeline';
+import EnList from '@/components/profile/EnList';
 import type { Trace } from '@/lib/types';
 import { computeBadges } from '@/lib/badges';
 
@@ -521,6 +522,9 @@ export default function ProfilePage() {
           <EmotionTimeline traces={myTraces} onSelect={setSelectedTrace} />
         </div>
       )}
+
+      {/* 縁の一覧：出会った人ごとの感情の変遷。自分にしか見えない */}
+      {isMe && <EnList traces={myTraces} onSelect={setSelectedTrace} />}
 
       {(() => {
         const now = new Date();

@@ -894,7 +894,7 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
               </div>
             )}
 
-            {/* この痕跡自体が「その後」の記録である場合、元の痕跡へのリンクを出す */}
+            {/* この痕跡自体が「その後」の記録である場合、元の痕跡へのリンクと感情の変遷を出す */}
             {!editing && parentTrace && (
               <button
                 onClick={() => onNavigateTo?.(parentTrace)}
@@ -907,6 +907,18 @@ export default function TraceDetail({ trace: initial, isOwn, onClose, onUpdate, 
                 <span style={{ fontSize: 12, color: '#8E44AD', fontWeight: 700 }}>
                   🔁 「{parentTrace.title}」のその後の記録です →
                 </span>
+                {(() => {
+                  // 前回→今回の感情の変遷を一行で示す（どちらかが無ければ出さない）
+                  const prev = getEmotion((parentTrace.emotion_keys ?? [parentTrace.emotion_key])[0] ?? null);
+                  const curr = getEmotion((trace.emotion_keys ?? [trace.emotion_key])[0] ?? null);
+                  if (!prev || !curr) return null;
+                  return (
+                    <span style={{ display: 'block', marginTop: 6, fontSize: 12.5, color: '#6C3483' }}>
+                      前回 {prev.emoji}{prev.label} → 今回 {curr.emoji}{curr.label}
+                      {prev.valence < curr.valence ? '（あたたかくなりました）' : prev.valence > curr.valence ? '（想いが揺れています）' : ''}
+                    </span>
+                  );
+                })()}
               </button>
             )}
 

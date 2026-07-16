@@ -68,7 +68,7 @@ export default async function TeamPage() {
                   fontWeight: 600,
                 }}
               >
-                代表 加藤貴也が運営しています。
+                運営メンバーのご紹介
               </h1>
             </Reveal>
           </div>
