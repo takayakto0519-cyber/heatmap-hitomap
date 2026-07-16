@@ -7,12 +7,12 @@ import ReadingProgress from './ReadingProgress';
 // 「思想」ページはまだ内容を作り込み中のため、ナビゲーションからは一旦外す。
 // ページ自体は残しているので、準備ができ次第ここに追加する。
 const NAV = [
-  { href: '/service', label: 'ヒトマップ' },
-  { href: '/business', label: '法人・行政' },
-  { href: '/school', label: '学校' },
-  { href: '/works', label: '実績' },
-  { href: '/blog', label: 'ブログ' },
-  { href: '/team', label: '運営' },
+  { href: '/company/service', label: 'ヒトマップ' },
+  { href: '/company/business', label: '法人・行政' },
+  { href: '/company/school', label: '学校' },
+  { href: '/company/works', label: '実績' },
+  { href: '/company/blog', label: 'ブログ' },
+  { href: '/company/team', label: '運営' },
 ];
 
 // スマホ幅ではナビが折り返して226px超まで肥大化していた（NN/g等の推奨は48-56px）。
@@ -89,7 +89,7 @@ export default function CorpHeader() {
               </a>
             ))}
             <a
-              href="/contact"
+              href="/company/contact"
               style={{
                 fontSize: 13,
                 color: corpColor.moss,
@@ -201,7 +201,7 @@ export default function CorpHeader() {
             </a>
           ))}
           <a
-            href="/contact"
+            href="/company/contact"
             onClick={() => setOpen(false)}
             style={{ padding: '17px 4px', fontSize: 17, fontFamily: corpFont.mincho, color: corpColor.moss, textDecoration: 'none', fontWeight: 600 }}
           >

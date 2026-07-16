@@ -118,11 +118,11 @@ export default function MVVReveal({ eyebrow, items }: { eyebrow?: string | null;
   .hm-mvv-panel {
     position: sticky;
     top: 0;
-    height: 86vh;
-    min-height: 440px;
+    height: 62vh;
+    min-height: 400px;
     padding: 0;
   }
-  .hm-mvv-panel-copy { padding: 0 24px 64px; }
+  .hm-mvv-panel-copy { padding: 0 24px 56px; }
 }
 `,
         }}

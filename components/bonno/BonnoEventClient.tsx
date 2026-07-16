@@ -17,6 +17,7 @@ export default function BonnoEventClient({ route }: { route: Route }) {
   const [nickname, setNickname] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const remaining = MAX_TEXT_LENGTH - text.length;
@@ -42,6 +43,7 @@ export default function BonnoEventClient({ route }: { route: Route }) {
         return;
       }
       setDone(true);
+      setPendingApproval(data.submission?.status === 'pending');
       setText('');
     } catch {
       setError('通信に失敗しました。電波の良い場所でもう一度お試しください');
@@ -119,7 +121,9 @@ export default function BonnoEventClient({ route }: { route: Route }) {
               奉納しました
             </p>
             <p style={{ fontSize: 13, color: colors.textMuted, lineHeight: 1.8, margin: '0 0 24px' }}>
-              この煩悩は、まもなく会場の壁に浮かび上がります。書いたのが誰かは、もう誰にも分かりません。
+              {pendingApproval
+                ? 'この煩悩は、運営の確認後に会場の壁に浮かび上がります。書いたのが誰かは、もう誰にも分かりません。'
+                : 'この煩悩は、まもなく会場の壁に浮かび上がります。書いたのが誰かは、もう誰にも分かりません。'}
             </p>
             <button
               onClick={() => { setDone(false); setError(null); }}

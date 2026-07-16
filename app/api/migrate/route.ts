@@ -1,14 +1,20 @@
-﻿// POST /api/migrate — Supabase スキーマの自動マイグレーション
-// ensure_schema() 関数を RPC で呼び出してカラムを自動追加する
-import { NextResponse } from 'next/server';
+// POST /api/migrate — Supabase スキーマの自動マイグレーション（運営パスワード必須）
+// ensure_schema() 関数を RPC で呼び出してカラムを自動追加する。
+// かつては地図の初回ロードから無認証GETで自動実行していたが、スキーマ変更を
+// 誰でも起動できる状態は危険なため、運営ダッシュボードからの明示実行に限定した。
+import { NextRequest, NextResponse } from 'next/server';
+import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   if (!SUPABASE_READY) {
     return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
+  }
+  if (!checkAdmin(req)) {
+    return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
   }
   try {
     const { supabaseServer } = await import('@/lib/supabase/server');
@@ -28,9 +34,4 @@ export async function POST() {
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
-}
-
-// GET でも呼び出し可能にする（初回ロード時の自動実行用）
-export async function GET() {
-  return POST();
 }

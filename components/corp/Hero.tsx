@@ -57,7 +57,7 @@ export default function Hero() {
         </Reveal>
 
         <CharReveal
-          lines={['その色あせも、', '誰かが生きた証。']}
+          lines={['その色あせも、', '誰かが生きた証です。']}
           baseDelay={200}
           charDelay={55}
           style={{
@@ -82,8 +82,8 @@ export default function Hero() {
               maxWidth: 460,
             }}
           >
-            まちで見つけた痕跡を、写真と一言で地図に残す。
-            記録が重なると、町ごとの感情の濃淡が浮かび上がる。
+            まちで見つけた痕跡を、写真と一言で地図に残せます。
+            記録が重なると、町ごとの感情の濃淡が浮かび上がります。
             名所を見るのではなく、人に会いに行く旅がここから始まります。
           </p>
         </Reveal>
@@ -108,7 +108,7 @@ export default function Hero() {
               地図をひらく — 無料
             </a>
             <a
-              href="/service"
+              href="/company/service"
               style={{
                 fontSize: 13,
                 color: corpColor.moss,
@@ -137,7 +137,7 @@ export default function Hero() {
           {/* 個人利用者だけでなく法人・自治体の見込み客も同じ導線を通るため、
               最初の画面で行き先を分岐させる（両者に無関係な証跡を延々スクロールさせない）。 */}
           <a
-            href="/business"
+            href="/company/business"
             style={{
               fontSize: 12.5,
               color: corpColor.inkSoft,

@@ -8,6 +8,7 @@ import { categoryLabel, type SitePost } from '@/lib/sitePosts';
 export const metadata: Metadata = {
   title: '実績',
   description: 'ヒトマップが実施したイベント・導入事例の記録です。参加者の声とともに紹介します。',
+  alternates: { canonical: '/company/works' },
 };
 
 export const revalidate = 300; // 5分ごとに再生成（CMSでの更新をほどよく反映）
@@ -53,7 +54,7 @@ export default async function WorksPage() {
                 fontWeight: 600,
               }}
             >
-              歩いた記録は、ここにも残る。
+              歩いた記録は、ここにも残ります。
             </h1>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body, maxWidth: 560 }}>
               ヒトマップが実施したイベントや取り組みの記録です。参加した人の声も、そのまま載せています。
@@ -72,7 +73,7 @@ export default async function WorksPage() {
                 {posts.map((post, i) => (
                   <Reveal key={post.id} delay={Math.min(i * 80, 240)}>
                     <a
-                      href={`/works/${post.slug}`}
+                      href={`/company/works/${post.slug}`}
                       className="hm-lift"
                       style={{
                         display: 'flex',

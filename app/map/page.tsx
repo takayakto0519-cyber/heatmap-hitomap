@@ -381,7 +381,6 @@ function MapApp() {
       const emo = JSON.parse(localStorage.getItem('hitomap_my_emotions') || '[]');
       setMyEmotions(Array.isArray(emo) ? emo : []);
     } catch { /* ignore */ }
-    fetch('/api/migrate').catch(() => {});
   }, []);
 
   // 地図タブを開いたとき、まだ位置不明なら自動取得試みる。
@@ -1109,7 +1108,7 @@ function MapApp() {
                         color: '#3E3B34', fontSize: 12, lineHeight: 1.5,
                         background: n.is_read ? 'transparent' : '#E6E9DE',
                       }}>
-                        {n.type === 'crossed_paths' ? '🚶 ' : ''}{n.message}
+                        {n.type === 'crossed_paths' ? '🚶 ' : n.type === 'revisit_prompt' ? '🔁 ' : ''}{n.message}
                         <span style={{ display: 'block', fontSize: 10, color: '#A79E8A', marginTop: 2 }}>
                           {new Date(n.created_at).toLocaleString('ja-JP')}
                         </span>

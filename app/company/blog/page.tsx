@@ -8,6 +8,7 @@ import type { SitePost } from '@/lib/sitePosts';
 export const metadata: Metadata = {
   title: 'ブログ',
   description: 'ヒトマップの取り組みの背景にある考えを、じっくり書いています。',
+  alternates: { canonical: '/company/blog' },
 };
 
 export const revalidate = 300;
@@ -52,10 +53,10 @@ export default async function BlogPage() {
                 fontWeight: 600,
               }}
             >
-              実績の裏側を、じっくり書く。
+              実績の裏側を、じっくり書いています。
             </h1>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body, maxWidth: 560 }}>
-              <a href="/works" style={{ color: corpColor.moss, fontWeight: 700, textDecoration: 'none' }}>実績</a>
+              <a href="/company/works" style={{ color: corpColor.moss, fontWeight: 700, textDecoration: 'none' }}>実績</a>
               が「何をしたか」の記録なら、ここは「なぜそれをしたか」を書く場所です。
             </p>
           </div>
@@ -72,7 +73,7 @@ export default async function BlogPage() {
                 {posts.map((post, i) => (
                   <Reveal key={post.id} delay={Math.min(i * 80, 240)}>
                     <a
-                      href={`/blog/${post.slug}`}
+                      href={`/company/blog/${post.slug}`}
                       style={{
                         display: 'block',
                         textDecoration: 'none',

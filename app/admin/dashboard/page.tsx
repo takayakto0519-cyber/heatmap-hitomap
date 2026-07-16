@@ -7,13 +7,15 @@ import { EMOTIONS, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import BlocksTab from '@/components/admin/BlocksTab';
 import PostsTab from '@/components/admin/PostsTab';
+import OverviewTab from '@/components/admin/OverviewTab';
+import AttachmentTab from '@/components/admin/AttachmentTab';
 
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
   ssr: false,
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'blocks' | 'posts' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads';
+type Tab = 'overview' | 'blocks' | 'posts' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads' | 'attachment';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -30,9 +32,10 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   quests: { label: 'クエスト', icon: '🎯', group: '体験づくり', desc: 'クエストの作成・管理' },
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
+  attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
 };
 
-const TAB_GROUPS = ['サイト', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人'];
+const TAB_GROUPS = ['サイト', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究'];
 
 // ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
 const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
@@ -48,17 +51,6 @@ const inputStyle: React.CSSProperties = {
   padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd',
   fontSize: 13, outline: 'none', fontFamily: 'inherit',
 };
-
-interface Stats {
-  totalTraces: number;
-  pendingReview: number;
-  last7Days: number;
-  profileCount: number;
-  routeCount: number;
-  activeSponsors: number;
-  pendingReports: number;
-  valence: { positive: number; negative: number; neutral: number; total: number };
-}
 
 interface Report {
   id: string;
@@ -197,7 +189,13 @@ export default function AdminDashboardPage() {
 
   // ページ更新のたびにログインし直すのが煩雑だったため、タブを閉じるまではsessionStorageに保持する
   useEffect(() => {
-    const saved = sessionStorage.getItem('admin_dashboard_password');
+    // ?tab= ディープリンク（/admin/posts 等の旧URLからのリダイレクト受け口）。
+    // 不正な値は無視して overview のまま。
+    const param = new URLSearchParams(window.location.search).get('tab');
+    if (param && param in TAB_META) setTab(param as Tab);
+    // 旧・単独ページ（/admin/posts /admin/blocks）が使っていた hm-admin-pw も受け入れて、
+    // リダイレクトで来た人が再ログインせずに済むようにする
+    const saved = sessionStorage.getItem('admin_dashboard_password') ?? sessionStorage.getItem('hm-admin-pw');
     if (saved) tryUnlock(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -248,6 +246,8 @@ export default function AdminDashboardPage() {
   function goTab(id: Tab) {
     setTab(id);
     setNavOpen(false);
+    // タブをURLにも反映して、リロード・共有で同じタブに戻れるようにする
+    window.history.replaceState(null, '', id === 'overview' ? '/admin/dashboard' : `/admin/dashboard?tab=${id}`);
   }
 
   const navButtonStyle = (active: boolean, urgent: boolean): React.CSSProperties => ({
@@ -348,7 +348,16 @@ export default function AdminDashboardPage() {
         </div>
 
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 20px 60px' }}>
-          {tab === 'overview' && <OverviewTab authHeaders={authHeaders} setTab={setTab} badgeCounts={badgeCounts} />}
+          {tab === 'overview' && (
+            <OverviewTab
+              authHeaders={authHeaders}
+              goTab={id => goTab(id as Tab)}
+              badgeCounts={badgeCounts}
+              tabMeta={TAB_META}
+              tabGroups={TAB_GROUPS}
+              siteLinks={SITE_LINKS}
+            />
+          )}
           {tab === 'blocks' && <BlocksTab authHeaders={authHeaders} />}
           {tab === 'posts' && <PostsTab authHeaders={authHeaders} />}
           {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
@@ -361,6 +370,7 @@ export default function AdminDashboardPage() {
           {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
           {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
           {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
+          {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
         </div>
       </main>
     </div>
@@ -372,154 +382,6 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', ...style }}>
       {children}
-    </div>
-  );
-}
-
-// ── ホーム（概要 + クイックアクセス） ──────
-function OverviewTab({ authHeaders, setTab, badgeCounts }: {
-  authHeaders: () => HeadersInit;
-  setTab: (t: Tab) => void;
-  badgeCounts: { pendingReview: number; pendingReports: number } | null;
-}) {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [error, setError] = useState('');
-  const [exporting, setExporting] = useState<'csv' | 'geojson' | null>(null);
-
-  useEffect(() => {
-    fetch('/api/admin/stats', { headers: authHeaders() })
-      .then(r => r.json())
-      .then(d => { if (d.ok) setStats(d.stats); else setError(d.error ?? '取得に失敗しました'); })
-      .catch(() => setError('通信エラー'));
-  }, [authHeaders]);
-
-  async function exportData(format: 'csv' | 'geojson') {
-    setExporting(format);
-    try {
-      const res = await fetch(`/api/admin/export?format=${format}`, { headers: authHeaders() });
-      if (!res.ok) { setError('書き出しに失敗しました'); return; }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      a.href = url;
-      a.download = `hitomap_traces_${stamp}.${format === 'geojson' ? 'geojson' : 'csv'}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(null);
-    }
-  }
-
-  if (error) return <p style={{ color: '#E74C3C' }}>{error}</p>;
-  if (!stats) return <p style={{ color: '#999' }}>読み込み中…</p>;
-
-  // 承認待ち・未処理の通報は「対応が必要な状態」なので、0件でなければ視覚的に目立たせる
-  const items: [string, number, string, boolean][] = [
-    ['総投稿数', stats.totalTraces, '📍', false],
-    ['承認待ち', stats.pendingReview, '⏳', stats.pendingReview > 0],
-    ['直近7日の投稿', stats.last7Days, '📈', false],
-    ['登録ユーザー', stats.profileCount, '👤', false],
-    ['公開イベント', stats.routeCount, '🧭', false],
-    ['稼働中スポンサー', stats.activeSponsors, '🏷', false],
-    ['未処理の通報', stats.pendingReports, '⚠', stats.pendingReports > 0],
-  ];
-
-  return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-        {items.map(([label, value, emoji, urgent]) => (
-          <Card key={label} style={urgent ? { background: '#FFF5F3', boxShadow: '0 1px 4px rgba(229,80,57,0.15)', border: '1px solid #FFD9D0' } : undefined}>
-            <div style={{ fontSize: 22 }}>{emoji}</div>
-            <div style={{ fontSize: 26, fontWeight: 800, marginTop: 6, color: urgent ? '#E55039' : '#222' }}>{value}</div>
-            <div style={{ fontSize: 12, color: urgent ? '#E55039' : '#888', marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
-          </Card>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 20 }}>
-        <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>⚡ クイックアクセス</p>
-        {TAB_GROUPS.map(group => (
-          <div key={group} style={{ marginBottom: 14 }}>
-            <p style={{ margin: '0 0 6px', fontSize: 12, color: '#999', fontWeight: 700 }}>{group}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-              {(Object.keys(TAB_META) as Tab[]).filter(id => TAB_META[id].group === group).map(id => {
-                const count = id === 'review' ? (badgeCounts?.pendingReview ?? 0) : id === 'reports' ? (badgeCounts?.pendingReports ?? 0) : 0;
-                return (
-                  <button key={id} onClick={() => setTab(id)} style={{
-                    textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-                    border: count > 0 ? '1px solid #FFD9D0' : '1px solid #eee',
-                    background: count > 0 ? '#FFF5F3' : '#fff',
-                  }}>
-                    <div style={{ fontSize: 18 }}>{TAB_META[id].icon}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: count > 0 ? '#E55039' : '#222' }}>
-                      {TAB_META[id].label}
-                      {count > 0 && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11, background: '#E55039', color: '#fff' }}>{count}</span>}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{TAB_META[id].desc}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 8 }}>
-        <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🌐 本体サイトを見る</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-          {SITE_LINKS.map(link => (
-            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" style={{
-              textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-              border: '1px solid #eee', background: '#fff', textDecoration: 'none', color: 'inherit', display: 'block',
-            }}>
-              <div style={{ fontSize: 18 }}>{link.icon}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: '#222' }}>{link.label} ↗</div>
-              <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{link.desc}</div>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      {stats.valence.total > 0 && (
-        <Card style={{ marginTop: 16 }}>
-          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>😊 自治体向けサマリー（好悪の内訳）</p>
-          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>
-            全国公開済み投稿{stats.valence.total}件のうち、感情タグから機械的に判定した粗い内訳です。竹中工務店の「ソーシャルヒートマップ」等、自治体向け提案の際にそのまま使えます。
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#F3F9EA' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#639922' }}>{Math.round((stats.valence.positive / stats.valence.total) * 100)}%</div>
-              <div style={{ fontSize: 11, color: '#639922' }}>😊 好意的</div>
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#F5F5F5' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#888' }}>{Math.round((stats.valence.neutral / stats.valence.total) * 100)}%</div>
-              <div style={{ fontSize: 11, color: '#888' }}>😐 中立</div>
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#FCEBEB' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#E24B4A' }}>{Math.round((stats.valence.negative / stats.valence.total) * 100)}%</div>
-              <div style={{ fontSize: 11, color: '#E24B4A' }}>😟 否定的</div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      <Card style={{ marginTop: 16 }}>
-        <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>📤 データ書き出し</p>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>全国公開済みの投稿のみを対象に書き出します（審査待ち・非公開・削除済みは含みません）。</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => exportData('csv')} disabled={exporting !== null} style={{
-            flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
-            background: '#fff', color: '#555', fontWeight: 700, fontSize: 13,
-            cursor: exporting ? 'wait' : 'pointer',
-          }}>{exporting === 'csv' ? '書き出し中…' : 'CSVを書き出す'}</button>
-          <button onClick={() => exportData('geojson')} disabled={exporting !== null} style={{
-            flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #ddd',
-            background: '#fff', color: '#555', fontWeight: 700, fontSize: 13,
-            cursor: exporting ? 'wait' : 'pointer',
-          }}>{exporting === 'geojson' ? '書き出し中…' : 'GeoJSONを書き出す'}</button>
-        </div>
-      </Card>
     </div>
   );
 }
@@ -997,6 +859,7 @@ interface EventFieldsForm {
   event_meeting_info: string;
   event_photo_urls: string[];
   is_public_recommendation: boolean;
+  bonno_requires_moderation: boolean;
 }
 
 const emptyEventFields: EventFieldsForm = {
@@ -1007,6 +870,7 @@ const emptyEventFields: EventFieldsForm = {
   event_waypoints: [],
   event_fee: '', event_meeting_info: '', event_photo_urls: [],
   is_public_recommendation: false,
+  bonno_requires_moderation: false,
 };
 
 interface RelayCreateForm {
@@ -1029,6 +893,7 @@ interface RelayCreateForm {
   event_fee: string;
   event_meeting_info: string;
   event_photo_urls: string[];
+  bonno_requires_moderation: boolean;
 }
 
 const emptyRelayForm: RelayCreateForm = {
@@ -1038,6 +903,7 @@ const emptyRelayForm: RelayCreateForm = {
   event_end_lat: null, event_end_lng: null, event_end_label: '',
   event_waypoints: [],
   event_fee: '', event_meeting_info: '', event_photo_urls: [],
+  bonno_requires_moderation: false,
 };
 
 // スタート/ゴール地点ピッカー：地図タップで座標を決め、ラベルを添える（イベントページのRouteMap/TraceMapに反映される）
@@ -1295,6 +1161,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       event_fee: r.event_fee ?? '', event_meeting_info: r.event_meeting_info ?? '',
       event_photo_urls: r.event_photo_urls ?? (r.event_cover_url ? [r.event_cover_url] : []),
       is_public_recommendation: r.is_public_recommendation ?? false,
+      bonno_requires_moderation: r.bonno_requires_moderation ?? false,
     });
   }
 
@@ -1320,6 +1187,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_fee: eventFields.event_fee.trim() || null,
           event_meeting_info: eventFields.event_meeting_info.trim() || null,
           is_public_recommendation: eventFields.is_public_recommendation,
+          bonno_requires_moderation: eventFields.bonno_requires_moderation,
         }),
       });
       const data = await res.json();
@@ -1364,6 +1232,7 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           event_waypoints: relayForm.event_waypoints.length > 0 ? relayForm.event_waypoints : null,
           event_fee: relayForm.event_fee.trim() || null,
           event_meeting_info: relayForm.event_meeting_info.trim() || null,
+          bonno_requires_moderation: relayForm.bonno_requires_moderation,
         }),
       });
       const patchData = await patchRes.json();
@@ -1444,6 +1313,14 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                 color: relayForm.event_mode === 'bonno' ? '#fff' : '#888',
               }}>🔥 煩悩（会場投影型）</button>
             </div>
+            {relayForm.event_mode === 'bonno' && (
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555', cursor: 'pointer', padding: '8px 10px', background: '#FFF8EC', borderRadius: 8 }}>
+                <input type="checkbox" checked={relayForm.bonno_requires_moderation}
+                  onChange={e => setRelayForm(f => ({ ...f, bonno_requires_moderation: e.target.checked }))}
+                  style={{ marginTop: 2 }} />
+                <span>投稿を運営が確認してから壁に出す（学校・法人向けイベントでは推奨）</span>
+              </label>
+            )}
             <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>① イベント名</label>
             <input placeholder="例：ヒトマップ×山手線一周プロジェクト" value={relayForm.title}
               onChange={e => setRelayForm(f => ({ ...f, title: e.target.value }))} style={inputStyle} />
@@ -1639,6 +1516,14 @@ function RoutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                     color: eventFields.event_mode === 'bonno' ? '#fff' : '#888',
                   }}>🔥 煩悩（会場投影型）</button>
                 </div>
+                {eventFields.event_mode === 'bonno' && (
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555', cursor: 'pointer', padding: '8px 10px', background: '#FFF8EC', borderRadius: 8 }}>
+                    <input type="checkbox" checked={eventFields.bonno_requires_moderation}
+                      onChange={e => setEventFields(f => ({ ...f, bonno_requires_moderation: e.target.checked }))}
+                      style={{ marginTop: 2 }} />
+                    <span>投稿を運営が確認してから壁に出す（学校・法人向けイベントでは推奨）</span>
+                  </label>
+                )}
                 {eventFields.event_mode === 'relay' && (
                   <>
                     <label style={{ fontSize: 11, color: '#8E44AD', fontWeight: 700 }}>参加コード</label>
@@ -2447,8 +2332,8 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   return (
     <div>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: '#999' }}>
-        学校・法人からの問い合わせや契約状況をまとめる「縁のデータベース」です。<a href="/school" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>学校向けページ ↗</a>
-        {' '}・<a href="/business" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}> 法人向けページ ↗</a>
+        学校・法人からの問い合わせや契約状況をまとめる「縁のデータベース」です。<a href="/company/school" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>学校向けページ ↗</a>
+        {' '}・<a href="/company/business" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}> 法人向けページ ↗</a>
       </p>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>

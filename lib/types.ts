@@ -189,6 +189,8 @@ export interface Route {
   is_public_recommendation: boolean; // ログインユーザーが「おすすめルート」として公開申請したか
   review_status: string | null;      // null | 'pending' | 'approved' | 'rejected'（運営承認）
   highlights: string | null;         // 見どころ・おすすめポイント（自由記述）
+
+  bonno_requires_moderation: boolean; // 煩悩投稿(event_mode='bonno')を、承認するまで壁に出さないか（学校等での利用時にON推奨）
 }
 
 export interface CreateRouteRequest {
@@ -239,7 +241,7 @@ export interface BonnoSubmission {
   event_slug: string;          // routes.event_slug と対応
   text: string;                // 煩悩本文（最大100字）
   nickname: string | null;
-  status: 'visible' | 'hidden';
+  status: 'visible' | 'hidden' | 'pending'; // pending = 事前確認モードのイベントで、運営が承認するまで壁に出ない
   featured_at: string | null;  // スポットライト指名時刻（NULL=非指名）
   intensity_score: number | null; // 1〜5 切実さ（廃止済みAI分析の名残。未使用）
   ai_keywords: string[] | null;   // ワードクラウド用キーワード（廃止済みAI分析の名残。未使用）
@@ -283,6 +285,52 @@ export interface RegionAggregateResponse {
   totalPublicTraces: number; // しきい値適用前の region 全体の件数（既存のリード証拠パックと同じ粒度）
   suppressedCells: number;   // しきい値未満だったため非表示にしたセル数
   cells: RegionAggregateCell[];
+  error?: string;
+}
+
+// ------------------------------------------------------------
+// 愛着計測（縁の螺旋 地→理→心 の段階ファネル）。
+// 「出会い→感情→愛着」の過程を数えるための集計レスポンス。
+// 個人を特定できる値（user_id等）は一切含めない。個人単位の系列データは
+// 卒論_Thesis/scripts/export_attachment.py（仮名化強制）のみが扱う。
+// ------------------------------------------------------------
+
+export interface ValenceSummary {
+  positive: number;
+  negative: number;
+  neutral: number;
+  total: number;
+}
+
+export interface AttachmentFunnel {
+  ok: boolean;
+  region: string;
+  generatedAt: string;
+  suppressed: boolean;      // 地の段階が5人未満のとき true（k-匿名。regionAggregateと同じしきい値思想）
+  stages?: {
+    chi: number;   // 地：その地域に痕跡を残した人数
+    ri: number;    // 理：他者と反応・コメントを交わした人数（地の部分集合）
+    shin: number;  // 心：再訪・「その後」記録・会いたい成立のいずれかに至った人数（地の部分集合）
+  };
+  rates?: {
+    riRate: number;   // 地→理 到達率（%）
+    shinRate: number; // 地→心 到達率（%）
+  };
+  error?: string;
+}
+
+export interface EventEmotionShift {
+  ok: boolean;
+  eventSlug: string;
+  generatedAt: string;
+  suppressed: boolean;        // 参加者5人未満のとき true
+  participantCount: number;   // user_idを持つ参加者数（匿名投稿は縦断比較できないため含めない）
+  phases?: {
+    before: ValenceSummary;
+    during: ValenceSummary;
+    after: ValenceSummary;
+  };
+  repeatVisitRate?: number;   // イベント中に歩いた地域へ、イベント後に再訪した参加者の割合（%）
   error?: string;
 }
 

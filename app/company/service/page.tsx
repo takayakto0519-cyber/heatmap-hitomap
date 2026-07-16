@@ -9,6 +9,7 @@ import type { SiteBlock } from '@/lib/siteBlocks';
 export const metadata: Metadata = {
   title: 'ヒトマップの使い方',
   description: 'ヒトマップアプリの使い方と、体験の流れについて。記録・ヒートマップ・つながる・歩く、の4段階で説明します。',
+  alternates: { canonical: '/company/service' },
 };
 
 export const revalidate = 60;
@@ -61,7 +62,7 @@ export default async function ServicePage() {
                 fontWeight: 600,
               }}
             >
-              地図は、あなたが見つけた痕跡でできている。
+              地図は、あなたが見つけた痕跡でできています。
             </h1>
             <p style={{ margin: 0, fontSize: 15, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body, maxWidth: 560 }}>
               町を歩いて見つけた「誰かが生きた証」を、写真と一言で記録するだけ。

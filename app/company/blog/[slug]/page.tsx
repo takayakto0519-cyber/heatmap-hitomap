@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return {
     title: post.title,
     description: post.body.slice(0, 90),
+    alternates: { canonical: `/company/blog/${params.slug}` },
     openGraph: post.cover_url ? { images: [post.cover_url] } : undefined,
   };
 }
@@ -40,15 +41,31 @@ export default async function BlogDetailPage({ params }: { params: { slug: strin
 
   const paragraphs = post.body.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
 
+  // 検索エンジン向けの記事構造データ（Article）。共有画像は動的OG（opengraph-image.tsx）と揃える
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hitomap.com';
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    description: post.body.slice(0, 90),
+    datePublished: post.created_at,
+    dateModified: post.updated_at,
+    image: post.cover_url ?? `${siteUrl}/company/blog/${post.slug}/opengraph-image`,
+    url: `${siteUrl}/company/blog/${post.slug}`,
+    author: { '@type': 'Organization', name: 'ヒトマップ', url: siteUrl },
+    publisher: { '@type': 'Organization', name: 'ヒトマップ', logo: { '@type': 'ImageObject', url: `${siteUrl}/logo.png` } },
+  };
+
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <CorpHeader />
 
       <main style={{ flex: 1 }}>
         <article>
           <section style={{ padding: '64px 24px 36px' }}>
             <div style={{ maxWidth: 720, margin: '0 auto' }}>
-              <a href="/blog" style={{ fontSize: 12, color: corpColor.moss, textDecoration: 'none', fontFamily: corpFont.body, fontWeight: 700 }}>
+              <a href="/company/blog" style={{ fontSize: 12, color: corpColor.moss, textDecoration: 'none', fontFamily: corpFont.body, fontWeight: 700 }}>
                 ← ブログ一覧に戻る
               </a>
               <p style={{ margin: '22px 0 12px', fontSize: 11, letterSpacing: '0.12em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>

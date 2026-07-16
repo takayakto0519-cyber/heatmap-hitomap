@@ -46,6 +46,10 @@ appsscript.json
 05_広報コンテンツ_PR_Content/
 06_実行待機_Approval/
 
+# 卒業論文（個人の学術資料・研究データ。公開リポジトリに絶対に含めない）
+卒論_Thesis/
+学生課題/
+
 # その他の開発スクリプト（アプリ外）
 discord_bot.py
 report.py

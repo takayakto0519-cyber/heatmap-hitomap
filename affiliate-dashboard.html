@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazonアフィリエイト戦略室</title>
+<style>
+:root{--bg:#0a0a0a;--surface:#141414;--surface2:#1c1c1c;--border:#272727;--accent:#e8a000;--accent2:#c47d00;--text:#e8e8e8;--text2:#666;--green:#2d9c5a;--red:#9c3030;--blue:#2d5a9c;--gpts:#10a37f;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;font-size:13px;min-height:100vh;}
+
+/* ヘッダー */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.05em;}
+.logo-sub{font-size:10px;color:var(--text2);margin-top:1px;}
+.save-badge{font-size:10px;color:var(--green);opacity:0;transition:.3s;}
+.save-badge.show{opacity:1;}
+
+/* ナビゲーション — 2段構成 */
+.nav-main{display:flex;background:var(--bg);border-bottom:1px solid var(--border);padding:0 20px;align-items:center;gap:0;}
+.nav-auto{padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;color:var(--accent);border-bottom:2px solid var(--accent);white-space:nowrap;}
+.nav-divider{width:1px;height:20px;background:var(--border);margin:0 12px;}
+.nav-label{font-size:10px;color:var(--text2);white-space:nowrap;padding-right:8px;}
+.tab{padding:10px 14px;cursor:pointer;font-size:11px;color:var(--text2);border-bottom:2px solid transparent;transition:.15s;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--text);border-bottom-color:var(--border);font-weight:500;}
+
+/* コンテンツ */
+.content{padding:20px;}
+.section{display:none;}
+.section.active{display:block;}
+.section{display:none;}
+.section.active{display:block;}
+.sec-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
+.sec-title{font-size:14px;font-weight:700;}
+.sec-desc{font-size:11px;color:var(--text2);margin-top:2px;}
+.btn{padding:7px 14px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-family:inherit;transition:.15s;}
+.btn-primary{background:var(--accent);color:#000;font-weight:700;}
+.btn-primary:hover{background:var(--accent2);}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:transparent;color:#ff6b6b;border:1px solid #ff6b6b33;font-size:11px;padding:4px 8px;}
+.btn-danger:hover{background:#ff6b6b18;}
+.btn-sm{padding:4px 10px;font-size:11px;}
+.btn-blue{background:var(--blue);color:#fff;}
+.btn-blue:hover{background:#3a6ab8;}
+.btn-green{background:var(--green);color:#fff;}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px;}
+table{width:100%;border-collapse:collapse;min-width:700px;}
+th{background:var(--surface2);padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#ffffff06;}
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;}
+.b-todo{background:#2a2a2a;color:var(--text2);}
+.b-wip{background:#2a3d20;color:#7dcf5a;}
+.b-done{background:#1e3a5f;color:#6aaddf;}
+.b-live{background:#1a3a1a;color:#5acf5a;}
+.roi-bar{display:flex;align-items:center;gap:6px;}
+.roi-track{width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.roi-fill{height:100%;border-radius:3px;background:var(--accent);}
+.stat-row{display:flex;gap:12px;margin-bottom:18px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:11px 16px;flex:1;}
+.stat .lbl{font-size:10px;color:var(--text2);margin-bottom:3px;}
+.stat .val{font-size:20px;font-weight:700;color:var(--accent);}
+.modal-overlay{position:fixed;inset:0;background:#000c;z-index:200;display:flex;align-items:center;justify-content:center;}
+.modal-overlay.hidden{display:none;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:22px;width:620px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal h2{font-size:14px;margin-bottom:18px;color:var(--accent);}
+.fg{margin-bottom:12px;}
+.fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:600;}
+.fg input,.fg textarea,.fg select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:4px;font-family:inherit;font-size:12px;}
+.fg input:focus,.fg textarea:focus{outline:none;border-color:var(--accent);}
+.fg textarea{resize:vertical;min-height:72px;}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.out-panel{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:16px;margin-top:14px;}
+.out-panel h3{font-size:12px;color:var(--accent);margin-bottom:10px;}
+.out-text{font-size:12px;line-height:1.9;color:var(--text);white-space:pre-wrap;font-family:'Courier New',monospace;max-height:480px;overflow-y:auto;padding:10px;background:var(--bg);border-radius:4px;border:1px solid var(--border);}
+.ptabs{display:flex;gap:4px;margin-bottom:10px;}
+.ptab{padding:4px 12px;border-radius:3px;cursor:pointer;font-size:11px;background:var(--border);color:var(--text2);border:none;font-family:inherit;}
+.ptab.active{background:var(--accent);color:#000;font-weight:700;}
+.gap8{display:flex;gap:8px;align-items:center;}
+.tip{font-size:10px;color:var(--text2);margin-top:3px;}
+.link-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;background:#1a2a1a;color:#5acf5a;text-decoration:none;}
+.link-badge:hover{background:#2a3a2a;}
+.priority-star{color:var(--accent);font-size:13px;}
+select.sel{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:inherit;font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">ヒトマップ × Amazon アフィリエイト</div>
+    <div class="logo-sub">RSS+ML 自動選定 → GPTsで記事生成 → note投稿</div>
+  </div>
+  <div class="gap8">
+    <span class="save-badge" id="saveBadge">✓ 保存済み</span>
+    <button class="btn btn-secondary btn-sm" onclick="exportJSON()">バックアップ</button>
+    <button class="btn btn-secondary btn-sm" onclick="importJSON()">復元</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="doImport(event)">
+  </div>
+</div>
+
+<div class="nav-main">
+  <div class="nav-auto" onclick="switchTab('auto')">▶ 自動投稿システム</div>
+  <div class="nav-divider"></div>
+  <div class="nav-label">管理</div>
+  <div class="tab" id="tab-btn-kw" onclick="switchTab('kw')">キーワード</div>
+  <div class="tab" id="tab-btn-art" onclick="switchTab('art')">記事・成果</div>
+  <div class="tab" id="tab-btn-sp" onclick="switchTab('sp')">スペックデータ</div>
+  <div class="tab" id="tab-btn-out" onclick="switchTab('out')">手動生成</div>
+</div>
+
+<div class="content">
+
+<!-- ======= TAB 1: キーワード ======= -->
+<div id="tab-kw" class="section">
+  <div class="stat-row" id="statsRow"></div>
+  <div class="sec-head">
+    <div><div class="sec-title">キーワード管理</div><div class="sec-desc">優先度・ステータス・構成案を一元管理</div></div>
+    <button class="btn btn-primary" onclick="openKw()">＋ キーワード追加</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>キーワード</th><th>検索意図</th><th>想定単価</th><th>優先度ROI</th><th>ステータス</th><th>次のアクション</th><th>操作</th></tr></thead>
+      <tbody id="kwBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======= TAB 2: 記事・成果 ======= -->
+<div id="tab-art" class="section">
+  <div class="sec-head">
+    <div><div class="sec-title">記事・成果管理</div><div class="sec-desc">公開後データ・成約・売上を記録</div></div>
+    <button class="btn btn-primary" onclick="openArt()">＋ 記事追加</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>キーワード</th><th>ステータス</th><th>note</th><th>公開日</th><th>PV</th><th>クリック</th><th>成約</th><th>売上</th><th>CVR</th><th>操作</th></tr></thead>
+      <tbody id="artBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======= TAB 3: スペックデータ ======= -->
+<div id="tab-sp" class="section">
+  <div class="sec-head">
+    <div><div class="sec-title">スペック・低評価データ</div><div class="sec-desc">Amazonから収集した客観データのみ入力。感情表現・体験談禁止。</div></div>
+    <button class="btn btn-primary" onclick="openSp()">＋ データ追加</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>キーワード</th><th>モデル名</th><th>定価</th><th>重量</th><th>主要スペック</th><th>低評価の主訴</th><th>★評価</th><th>Amaリンク</th><th>操作</th></tr></thead>
+      <tbody id="spBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======= TAB 4: 出力エンジン ======= -->
+<div id="tab-out" class="section">
+  <div class="sec-head">
+    <div><div class="sec-title">出力エンジン &amp; note自動投稿</div><div class="sec-desc">スペックデータ → 完全記事生成 → note自動入力まで一気通貫</div></div>
+  </div>
+
+  <!-- STEP INDICATOR -->
+  <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+    <div style="flex:1;padding:10px 14px;background:var(--surface2);border-right:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--accent);font-weight:700;margin-bottom:2px;">STEP 1</div>
+      <div style="font-size:12px;">キーワード選択</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px;">↓スペックも入力済みにする</div>
+    </div>
+    <div style="flex:1;padding:10px 14px;background:var(--surface2);border-right:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--accent);font-weight:700;margin-bottom:2px;">STEP 2</div>
+      <div style="font-size:12px;">GPTsプロンプトを生成</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px;">↓ワンクリックで自動生成</div>
+    </div>
+    <div style="flex:1;padding:10px 14px;background:var(--surface2);border-right:1px solid var(--border);">
+      <div style="font-size:10px;color:#7dcf5a;font-weight:700;margin-bottom:2px;">STEP 3</div>
+      <div style="font-size:12px;">ChatGPTで記事生成</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px;">↓コピー→貼り付けのみ</div>
+    </div>
+    <div style="flex:1;padding:10px 14px;background:var(--surface2);">
+      <div style="font-size:10px;color:#6aaddf;font-weight:700;margin-bottom:2px;">STEP 4</div>
+      <div style="font-size:12px;">noteに投稿</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px;">↓生成記事を貼り付けて公開</div>
+    </div>
+  </div>
+
+  <div class="fg">
+    <label>STEP 1：対象キーワードを選択（スペックデータが③タブに登録済みのもの）</label>
+    <select class="sel" id="outSel" style="width:100%;padding:9px;" onchange="generateOut()">
+      <option value="">-- キーワードを選択 --</option>
+    </select>
+  </div>
+
+  <div id="outResult" style="display:none;">
+    <!-- STEP 3: ChatGPT誘導バナー -->
+    <div style="background:linear-gradient(135deg,#1a1a2a,#0f0f1a);border:1px solid #2d2d5a;border-radius:8px;padding:16px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#6aaddf;margin-bottom:3px;">STEP 3：ChatGPT / GPTsで記事生成</div>
+          <div style="font-size:11px;color:var(--text2);">下のプロンプトをコピーしてChatGPTに貼り付けると記事が完成します。note.comへの貼り付けはSTEP 4で。</div>
+        </div>
+        <div class="gap8">
+          <button class="btn btn-sm" style="background:#10a37f;color:#fff;font-weight:700;" onclick="copyAndOpenGPTs()">コピーしてChatGPTを開く</button>
+          <button class="btn btn-secondary btn-sm" onclick="openNoteManual()">noteを開く（STEP 4）</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ptabs">
+      <button class="ptab active" onclick="switchPrev('gpts',this)">GPTsプロンプト</button>
+      <button class="ptab" onclick="switchPrev('note',this)">note記事ベース</button>
+      <button class="ptab" onclick="switchPrev('x',this)">Xポスト3本</button>
+    </div>
+
+    <!-- GPTsプロンプトパネル（メイン） -->
+    <div id="pv-gpts" class="out-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <h3 style="margin:0;color:var(--accent);">▼ GPTsに貼り付けるプロンプト</h3>
+          <div style="font-size:10px;color:var(--text2);margin-top:3px;">このプロンプトをそのままGPTsに貼り付けると記事が生成されます</div>
+        </div>
+        <div class="gap8">
+          <button class="btn btn-primary btn-sm" onclick="copyAndOpenGPTs()">コピーしてChatGPTを開く</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyEl('gptsTxt')">プロンプトをコピー</button>
+        </div>
+      </div>
+      <!-- 使い方フロー -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;font-size:11px;">
+        <div style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:4px;padding:6px 12px;flex:1;text-align:center;">
+          <span style="color:#7dcf5a;font-weight:700;">① コピー</span><br><span style="color:var(--text2);">上のボタンで<br>プロンプトをコピー</span>
+        </div>
+        <div style="color:var(--text2);display:flex;align-items:center;">→</div>
+        <div style="background:#1a1a2a;border:1px solid #2d2d5a;border-radius:4px;padding:6px 12px;flex:1;text-align:center;">
+          <span style="color:#6aaddf;font-weight:700;">② GPTsに貼り付け</span><br><span style="color:var(--text2);">ChatGPT / GPTs<br>にペーストして実行</span>
+        </div>
+        <div style="color:var(--text2);display:flex;align-items:center;">→</div>
+        <div style="background:#2a1a1a;border:1px solid #5a2d2d;border-radius:4px;padding:6px 12px;flex:1;text-align:center;">
+          <span style="color:#df6a6a;font-weight:700;">③ 記事をnoteに貼り付け</span><br><span style="color:var(--text2);">生成された記事を<br>note.comに貼り付けて公開</span>
+        </div>
+      </div>
+      <div class="out-text" id="gptsTxt" style="max-height:520px;"></div>
+    </div>
+
+    <!-- note記事ベース（手動入力データから） -->
+    <div id="pv-note" class="out-panel" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">▼ note記事ベース（手動スペックデータから生成）</h3>
+        <div class="gap8">
+          <span id="noteTitle" style="font-size:10px;color:var(--text2);"></span>
+          <button class="btn btn-blue btn-sm" onclick="copyEl('noteTxt')">本文コピー</button>
+        </div>
+      </div>
+      <div class="out-text" id="noteTxt"></div>
+    </div>
+
+    <div id="pv-x" class="out-panel" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">▼ Xポスト案 3本</h3>
+        <button class="btn btn-blue btn-sm" onclick="copyEl('xTxt')">全コピー</button>
+      </div>
+      <div class="out-text" id="xTxt"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= TAB 5: 自動投稿システム（メイン画面） ======= -->
+<div id="tab-auto" class="section active">
+
+  <!-- ① 今日のアクションカード（JS描画） -->
+  <div id="autoTodayPanel"></div>
+
+  <!-- ② 生成履歴 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div style="font-size:11px;font-weight:700;color:var(--text2);">生成履歴</div>
+    <button class="btn btn-secondary btn-sm" style="font-size:10px;" onclick="loadAutoResults()">再読み込み</button>
+  </div>
+  <div id="autoHistoryList" style="margin-bottom:16px;">
+    <div style="text-align:center;padding:16px;color:var(--text2);font-size:11px;">履歴なし</div>
+  </div>
+
+  <!-- ③ セットアップ状況（折りたたみ・デフォルト閉） -->
+  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+    <div style="background:var(--surface);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="var p=document.getElementById('setupPanel');p.style.display=p.style.display==='none'?'block':'none'">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);">セットアップ状況</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="setupSummaryBadge" style="font-size:10px;padding:2px 10px;border-radius:20px;">...</span>
+        <span style="font-size:9px;color:var(--text2);">▼</span>
+      </div>
+    </div>
+    <div id="setupPanel" style="background:var(--bg);padding:14px 16px;display:none;">
+      <div style="display:grid;gap:7px;margin-bottom:14px;">
+
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border-radius:6px;border:1px solid #1a3a1a;">
+          <span>✅</span>
+          <div><div style="font-size:11px;font-weight:600;">Pythonライブラリ</div><div style="font-size:10px;color:var(--text2);">feedparser / scikit-learn / playwright インストール済み</div></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border-radius:6px;border:1px solid #1a3a1a;">
+          <span>✅</span>
+          <div><div style="font-size:11px;font-weight:600;">Playwright Chromium</div><div style="font-size:10px;color:var(--text2);">note.com自動入力ブラウザ 準備完了</div></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border-radius:6px;border:1px solid #1a3a1a;">
+          <span>✅</span>
+          <div><div style="font-size:11px;font-weight:600;">.env 設定済み</div><div style="font-size:10px;color:var(--text2);">NOTE_PASSWORD・AMAZON_ASSOCIATE_TAG（hitomap-22）</div></div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:var(--surface);border-radius:6px;border:1px solid #2a2a3a;">
+          <span style="margin-top:1px;">🔒</span>
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:600;color:#6aaddf;">タスクスケジューラ（管理者権限が必要）</div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:7px;">PowerShellを管理者として実行し、下記をコピペ実行</div>
+            <div style="display:flex;gap:6px;">
+              <code style="background:var(--bg);border:1px solid var(--border);padding:5px 8px;border-radius:3px;font-size:10px;flex:1;overflow:auto;word-break:break-all;">powershell -Command "& 'C:\Users\takaya\OneDrive - 東京農業大学\デスクトップ\ヒトマップ\affiliate-auto\register_task.ps1'"</code>
+              <button class="btn btn-secondary btn-sm" style="white-space:nowrap;" onclick="copyCmd('powershell -Command \"& \'C:\\Users\\takaya\\OneDrive - 東京農業大学\\デスクトップ\\ヒトマップ\\affiliate-auto\\register_task.ps1\'\"')">コピー</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:10px 12px;">
+        <div style="font-size:10px;font-weight:700;margin-bottom:6px;color:var(--text2);">手動テスト実行</div>
+        <div style="display:flex;gap:6px;">
+          <code style="background:var(--bg);border:1px solid var(--border);padding:5px 10px;border-radius:3px;font-size:11px;flex:1;" id="testCmd">cd "C:\Users\takaya\OneDrive - 東京農業大学\デスクトップ\ヒトマップ\affiliate-auto" &amp;&amp; python main.py</code>
+          <button class="btn btn-primary btn-sm" id="testCmdBtn" onclick="copyTestCmd()">コピー</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<!-- ======= MODAL: キーワード ======= -->
+<div class="modal-overlay hidden" id="m-kw">
+<div class="modal">
+  <h2>キーワード 追加 / 編集</h2>
+  <input type="hidden" id="kw-id">
+  <div class="fg"><label>キーワード *</label><input id="kw-kw" placeholder="ワーケーション リュック 疲れない 比較"></div>
+  <div class="fg-row">
+    <div class="fg"><label>検索意図</label><input id="kw-intent" placeholder="買い替え検討・失敗回避"></div>
+    <div class="fg"><label>想定単価（例：30000）</label><input id="kw-price" type="number" placeholder="30000"></div>
+  </div>
+  <div class="fg-row">
+    <div class="fg">
+      <label>ステータス</label>
+      <select id="kw-status" class="sel" style="width:100%;"><option>未着手</option><option>調査中</option><option>構成完了</option><option>執筆中</option><option>公開済み</option></select>
+    </div>
+    <div class="fg"><label>Amazonアソシエイト手数料率（%）</label><input id="kw-rate" type="number" placeholder="3" value="3"></div>
+  </div>
+  <div class="fg"><label>note構成案（論理の骨格）</label><textarea id="kw-note" placeholder="1. 導入：&#10;2. 比較：&#10;3. 結論："></textarea></div>
+  <div class="fg"><label>Xポスト案 ①（スペックの限界を突く）</label><textarea id="kw-x1"></textarea></div>
+  <div class="fg"><label>Xポスト案 ②（用途の再定義）</label><textarea id="kw-x2"></textarea></div>
+  <div class="fg"><label>Xポスト案 ③（物理法則から正解を提示）</label><textarea id="kw-x3"></textarea></div>
+  <div class="form-actions">
+    <button class="btn btn-secondary" onclick="closeModal('m-kw')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveKw()">保存</button>
+  </div>
+</div>
+</div>
+
+<!-- ======= MODAL: 記事 ======= -->
+<div class="modal-overlay hidden" id="m-art">
+<div class="modal">
+  <h2>記事データ 追加 / 編集</h2>
+  <input type="hidden" id="art-id">
+  <div class="fg"><label>キーワード</label><select id="art-kw" class="sel" style="width:100%;"></select></div>
+  <div class="fg-row">
+    <div class="fg"><label>ステータス</label><select id="art-status" class="sel" style="width:100%;"><option>未着手</option><option>調査中</option><option>構成完了</option><option>執筆中</option><option>公開済み</option></select></div>
+    <div class="fg"><label>公開日</label><input id="art-date" type="date"></div>
+  </div>
+  <div class="fg"><label>note URL</label><input id="art-url" placeholder="https://note.com/..."></div>
+  <div class="fg-row">
+    <div class="fg"><label>PV</label><input id="art-pv" type="number" placeholder="0"></div>
+    <div class="fg"><label>クリック数</label><input id="art-click" type="number" placeholder="0"></div>
+    <div class="fg"><label>成約数</label><input id="art-conv" type="number" placeholder="0"></div>
+    <div class="fg"><label>売上（円）</label><input id="art-sales" type="number" placeholder="0"></div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-secondary" onclick="closeModal('m-art')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveArt()">保存</button>
+  </div>
+</div>
+</div>
+
+<!-- ======= MODAL: スペック ======= -->
+<div class="modal-overlay hidden" id="m-sp">
+<div class="modal">
+  <h2>スペック・低評価データ 追加 / 編集</h2>
+  <input type="hidden" id="sp-id">
+  <div class="fg"><label>対象キーワード</label><select id="sp-kw" class="sel" style="width:100%;"></select></div>
+  <div class="fg-row">
+    <div class="fg"><label>モデル名 *</label><input id="sp-model" placeholder="Aer Travel Pack 3"></div>
+    <div class="fg"><label>定価（円）</label><input id="sp-price" type="number" placeholder="38000"></div>
+  </div>
+  <div class="fg-row">
+    <div class="fg"><label>重量</label><input id="sp-weight" placeholder="1.36kg"></div>
+    <div class="fg"><label>Amazon評価（★）</label><input id="sp-rating" placeholder="4.1"></div>
+  </div>
+  <div class="fg"><label>主要スペック（事実のみ・1行1項目）</label><textarea id="sp-spec" placeholder="腰ベルト：なし&#10;背面設計：パッド付き&#10;PC室：独立あり&#10;容量：33L"></textarea></div>
+  <div class="fg"><label>低評価の主訴（Amazonレビューの実文言）</label><textarea id="sp-bad" placeholder="「肩だけに荷重が集中し2時間で限界」&#10;「腰サポートなし」"></textarea></div>
+  <div class="fg"><label>Amazonアフィリエイトリンク</label><input id="sp-link" placeholder="https://amzn.to/..."></div>
+  <div class="form-actions">
+    <button class="btn btn-secondary" onclick="closeModal('m-sp')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveSp()">保存</button>
+  </div>
+</div>
+</div>
+
+<!-- 自動生成データ（affiliate-auto/main.py が毎朝更新） -->
+<script src="./auto_data.js" onerror="window._autoData=null;"></script>
+
+<script>
+// ─────────────────────────────────────────────
+// STORE
+// ─────────────────────────────────────────────
+const KEY = 'aff_v2';
+let D = { kws: [], arts: [], sps: [] };
+
+function load() { try { const s = localStorage.getItem(KEY); if (s) D = JSON.parse(s); } catch(e){} }
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(D));
+  const b = document.getElementById('saveBadge');
+  b.classList.add('show');
+  clearTimeout(b._t);
+  b._t = setTimeout(() => b.classList.remove('show'), 2000);
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ─────────────────────────────────────────────
+// DEFAULT DATA
+// ─────────────────────────────────────────────
+function initDefaults() {
+  if (D.kws.length) return;
+  D.kws = [
+    { id:uid(), kw:'ワーケーション リュック 疲れない 比較', intent:'買い替え検討・失敗回避', price:32000, rate:3, status:'調査中',
+      note:'1. 導入：「疲れ」は気力ではなく荷重分散の物理問題\n2. 比較：3モデルを腰ベルト・重心・PC室・重量の4軸で評価\n3. 結論：街歩き主目的は「軽量＋PC室独立」が必然。Aer Travel Pack 3が条件一致。アフィリエイトリンクへ誘導',
+      x1:'ワーケーション用リュック、2万円台を買って失敗する人の共通点。登山向けの腰ベルト設計を街歩きに持ち込むこと。腰ベルトは舗装路では邪魔になる構造だ。→詳細はnoteで',
+      x2:'知らない街を5時間歩く。必要なリュックの条件は軽さではなく「重心が背中の高い位置にあるか」だけだ。低評価レビューの8割は、重心の話をしている。→3モデル比較をnoteに書いた',
+      x3:'リュックの肩紐の幅が4cm以下のものは、長時間歩行で神経を圧迫する。これは感想ではなく構造の話だ。Amazonの低評価に「しびれ」が出てきたら即除外。→選ぶ基準をnoteにまとめた' },
+    { id:uid(), kw:'新幹線 作業 PCスタンド 安定性', intent:'作業効率改善', price:9000, rate:3, status:'未着手', note:'', x1:'', x2:'', x3:'' },
+    { id:uid(), kw:'ノイズキャンセリング イヤホン 耳栓代わり 寿命', intent:'長期コスパ判断', price:35000, rate:3, status:'未着手', note:'', x1:'', x2:'', x3:'' },
+    { id:uid(), kw:'ホテル Wi-Fi 遅い 対策 ルーター', intent:'問題解決型', price:18000, rate:3, status:'未着手', note:'', x1:'', x2:'', x3:'' },
+    { id:uid(), kw:'知らない街 散策 歩きやすい 靴', intent:'買い替え検討', price:28000, rate:3, status:'未着手', note:'', x1:'', x2:'', x3:'' },
+  ];
+  D.sps = [
+    { id:uid(), kw:'ワーケーション リュック 疲れない 比較', model:'Aer Travel Pack 3', price:38000, weight:'1.36kg', spec:'腰ベルト：なし\n背面設計：パッド付き\nPC室：独立あり\n容量：33L', bad:'「肩だけに荷重が集中し2時間で限界」\n「腰サポートなし」', rating:'4.1', link:'' },
+    { id:uid(), kw:'ワーケーション リュック 疲れない 比較', model:'Osprey Farpoint 40', price:30000, weight:'1.53kg', spec:'腰ベルト：あり\n背面長：固定式\nPC室：なし\n容量：40L', bad:'「街歩きでベルトが邪魔」\n「背面長が固定で合わない」', rating:'4.0', link:'' },
+    { id:uid(), kw:'ワーケーション リュック 疲れない 比較', model:'Thule Subterra 30L', price:25000, weight:'1.2kg', spec:'腰ベルト：なし\n背面設計：シンプル\nPC室：独立あり\n容量：30L', bad:'「実容量が少なく出張に使えない」\n「型崩れしやすい」', rating:'3.9', link:'' },
+  ];
+  D.arts = [
+    { id:uid(), kw:'ワーケーション リュック 疲れない 比較', status:'調査中', url:'', date:'', pv:'', click:'', conv:'', sales:'' },
+  ];
+  save();
+}
+
+// ─────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────
+function switchTab(name) {
+  // セクション切り替え
+  ['kw','art','sp','out','auto'].forEach(n => {
+    document.getElementById('tab-'+n).classList.toggle('active', n===name);
+  });
+  // 管理タブのアクティブ状態
+  ['kw','art','sp','out'].forEach(n => {
+    const btn = document.getElementById('tab-btn-'+n);
+    if (btn) btn.classList.toggle('active', n===name);
+  });
+  if (name==='out') fillOutSel();
+  if (name==='auto') loadAutoResults();
+  renderAll();
+}
+
+// ─────────────────────────────────────────────
+// ROI SCORE
+// ─────────────────────────────────────────────
+function roiScore(kw) {
+  const p = kw.price || 0;
+  const r = kw.rate || 3;
+  return Math.round(p * r / 100);
+}
+function roiPct(kw) {
+  const all = D.kws.map(k => roiScore(k));
+  const max = Math.max(...all, 1);
+  return Math.round(roiScore(kw) / max * 100);
+}
+
+// ─────────────────────────────────────────────
+// RENDER: KEYWORDS
+// ─────────────────────────────────────────────
+const SC = { '未着手':'b-todo','調査中':'b-wip','構成完了':'b-done','執筆中':'b-wip','公開済み':'b-live' };
+const NEXT = { '未着手':'Amazonでスペック収集', '調査中':'スペック入力 → ④出力', '構成完了':'note執筆開始', '執筆中':'note公開 → ②に記録', '公開済み':'数字を記録・次KW着手' };
+
+function renderKW() {
+  const body = document.getElementById('kwBody');
+  body.innerHTML = '';
+  const sorted = [...D.kws].sort((a,b) => roiScore(b)-roiScore(a));
+  sorted.forEach((kw, i) => {
+    const score = roiScore(kw);
+    const pct = roiPct(kw);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--text2);font-weight:700;">${i+1}</td>
+      <td style="font-weight:600;max-width:190px;">${esc(kw.kw)}</td>
+      <td style="color:var(--text2);font-size:11px;">${esc(kw.intent)}</td>
+      <td style="color:var(--accent);">¥${(kw.price||0).toLocaleString()}</td>
+      <td>
+        <div class="roi-bar">
+          <div class="roi-track"><div class="roi-fill" style="width:${pct}%"></div></div>
+          <span style="font-size:10px;color:var(--text2);">¥${score.toLocaleString()}/件</span>
+        </div>
+      </td>
+      <td><span class="badge ${SC[kw.status]||'b-todo'}">${esc(kw.status)}</span></td>
+      <td style="font-size:11px;color:var(--text2);">${NEXT[kw.status]||''}</td>
+      <td>
+        <div class="gap8">
+          <button class="btn btn-secondary btn-sm" onclick="editKw('${kw.id}')">編集</button>
+          <button class="btn btn-danger" onclick="delKw('${kw.id}')">削除</button>
+        </div>
+      </td>`;
+    body.appendChild(tr);
+  });
+
+  // Stats
+  const row = document.getElementById('statsRow');
+  const live = D.kws.filter(k=>k.status==='公開済み').length;
+  const wip = D.kws.filter(k=>['調査中','構成完了','執筆中'].includes(k.status)).length;
+  const totalSales = D.arts.reduce((s,a)=>s+(parseInt(a.sales)||0),0);
+  const topKw = sorted[0];
+  row.innerHTML = `
+    <div class="stat"><div class="lbl">総KW数</div><div class="val">${D.kws.length}</div></div>
+    <div class="stat"><div class="lbl">進行中</div><div class="val">${wip}</div></div>
+    <div class="stat"><div class="lbl">公開済み</div><div class="val">${live}</div></div>
+    <div class="stat"><div class="lbl">累計売上</div><div class="val">${totalSales?'¥'+totalSales.toLocaleString():'—'}</div></div>
+    <div class="stat"><div class="lbl">最高ROI KW</div><div class="val" style="font-size:13px;">${topKw?esc(topKw.kw.slice(0,12))+'…':'—'}</div></div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// RENDER: ARTICLES
+// ─────────────────────────────────────────────
+function renderArt() {
+  const body = document.getElementById('artBody');
+  body.innerHTML = '';
+  if (!D.arts.length) { body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text2);">記事データなし</td></tr>'; return; }
+  D.arts.forEach(a => {
+    const cvr = (parseInt(a.click)||0)>0 ? ((parseInt(a.conv)||0)/(parseInt(a.click)||1)*100).toFixed(1)+'%' : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:11px;max-width:160px;">${esc(a.kw)}</td>
+      <td><span class="badge ${SC[a.status]||'b-todo'}">${esc(a.status)}</span></td>
+      <td>${a.url?`<a href="${esc(a.url)}" target="_blank" class="link-badge">開く</a>`:'—'}</td>
+      <td style="color:var(--text2);">${a.date||'—'}</td>
+      <td>${a.pv||'—'}</td><td>${a.click||'—'}</td><td>${a.conv||'—'}</td>
+      <td style="color:var(--accent);">${a.sales?'¥'+parseInt(a.sales).toLocaleString():'—'}</td>
+      <td>${cvr}</td>
+      <td><div class="gap8">
+        <button class="btn btn-secondary btn-sm" onclick="editArt('${a.id}')">編集</button>
+        <button class="btn btn-danger" onclick="delArt('${a.id}')">削除</button>
+      </div></td>`;
+    body.appendChild(tr);
+  });
+}
+
+// ─────────────────────────────────────────────
+// RENDER: SPECS
+// ─────────────────────────────────────────────
+function renderSp() {
+  const body = document.getElementById('spBody');
+  body.innerHTML = '';
+  if (!D.sps.length) { body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text2);">スペックデータなし</td></tr>'; return; }
+  D.sps.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:11px;max-width:140px;">${esc(s.kw)}</td>
+      <td style="font-weight:600;">${esc(s.model)}</td>
+      <td style="color:var(--accent);">${s.price?'¥'+parseInt(s.price).toLocaleString():'—'}</td>
+      <td>${esc(s.weight)}</td>
+      <td style="white-space:pre-line;font-size:11px;max-width:160px;">${esc(s.spec)}</td>
+      <td style="white-space:pre-line;font-size:11px;max-width:160px;color:#ff9999;">${esc(s.bad)}</td>
+      <td>${esc(s.rating)}</td>
+      <td>${s.link?`<a href="${esc(s.link)}" target="_blank" class="link-badge">リンク</a>`:'—'}</td>
+      <td><div class="gap8">
+        <button class="btn btn-secondary btn-sm" onclick="editSp('${s.id}')">編集</button>
+        <button class="btn btn-danger" onclick="delSp('${s.id}')">削除</button>
+      </div></td>`;
+    body.appendChild(tr);
+  });
+}
+
+function renderAll() { renderKW(); renderArt(); renderSp(); }
+
+// ─────────────────────────────────────────────
+// MODALS
+// ─────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.add('hidden'); }));
+
+function openKw(id=null) {
+  const kw = id ? D.kws.find(k=>k.id===id) : null;
+  document.getElementById('kw-id').value = kw?.id||'';
+  document.getElementById('kw-kw').value = kw?.kw||'';
+  document.getElementById('kw-intent').value = kw?.intent||'';
+  document.getElementById('kw-price').value = kw?.price||'';
+  document.getElementById('kw-rate').value = kw?.rate||3;
+  document.getElementById('kw-status').value = kw?.status||'未着手';
+  document.getElementById('kw-note').value = kw?.note||'';
+  document.getElementById('kw-x1').value = kw?.x1||'';
+  document.getElementById('kw-x2').value = kw?.x2||'';
+  document.getElementById('kw-x3').value = kw?.x3||'';
+  document.getElementById('m-kw').classList.remove('hidden');
+}
+function editKw(id) { openKw(id); }
+function saveKw() {
+  const id = document.getElementById('kw-id').value || uid();
+  const kw = { id, kw:document.getElementById('kw-kw').value.trim(), intent:document.getElementById('kw-intent').value.trim(),
+    price:parseInt(document.getElementById('kw-price').value)||0, rate:parseFloat(document.getElementById('kw-rate').value)||3,
+    status:document.getElementById('kw-status').value, note:document.getElementById('kw-note').value.trim(),
+    x1:document.getElementById('kw-x1').value.trim(), x2:document.getElementById('kw-x2').value.trim(), x3:document.getElementById('kw-x3').value.trim() };
+  if(!kw.kw){alert('キーワードを入力してください');return;}
+  const i = D.kws.findIndex(k=>k.id===id);
+  if(i>=0) D.kws[i]=kw; else D.kws.push(kw);
+  save(); renderAll(); closeModal('m-kw');
+}
+function delKw(id) { if(!confirm('削除しますか？'))return; D.kws=D.kws.filter(k=>k.id!==id); save(); renderAll(); }
+
+function openArt(id=null) {
+  const sel = document.getElementById('art-kw');
+  sel.innerHTML = D.kws.map(k=>`<option>${esc(k.kw)}</option>`).join('');
+  const a = id ? D.arts.find(x=>x.id===id) : null;
+  document.getElementById('art-id').value = a?.id||'';
+  if(a) sel.value = a.kw;
+  document.getElementById('art-status').value = a?.status||'未着手';
+  document.getElementById('art-url').value = a?.url||'';
+  document.getElementById('art-date').value = a?.date||'';
+  document.getElementById('art-pv').value = a?.pv||'';
+  document.getElementById('art-click').value = a?.click||'';
+  document.getElementById('art-conv').value = a?.conv||'';
+  document.getElementById('art-sales').value = a?.sales||'';
+  document.getElementById('m-art').classList.remove('hidden');
+}
+function editArt(id) { openArt(id); }
+function saveArt() {
+  const id = document.getElementById('art-id').value||uid();
+  const a = { id, kw:document.getElementById('art-kw').value, status:document.getElementById('art-status').value,
+    url:document.getElementById('art-url').value.trim(), date:document.getElementById('art-date').value,
+    pv:document.getElementById('art-pv').value, click:document.getElementById('art-click').value,
+    conv:document.getElementById('art-conv').value, sales:document.getElementById('art-sales').value };
+  const i = D.arts.findIndex(x=>x.id===id);
+  if(i>=0) D.arts[i]=a; else D.arts.push(a);
+  save(); renderAll(); closeModal('m-art');
+}
+function delArt(id) { if(!confirm('削除しますか？'))return; D.arts=D.arts.filter(a=>a.id!==id); save(); renderAll(); }
+
+function openSp(id=null) {
+  const sel = document.getElementById('sp-kw');
+  sel.innerHTML = D.kws.map(k=>`<option>${esc(k.kw)}</option>`).join('');
+  const s = id ? D.sps.find(x=>x.id===id) : null;
+  document.getElementById('sp-id').value = s?.id||'';
+  if(s) sel.value = s.kw;
+  document.getElementById('sp-model').value = s?.model||'';
+  document.getElementById('sp-price').value = s?.price||'';
+  document.getElementById('sp-weight').value = s?.weight||'';
+  document.getElementById('sp-rating').value = s?.rating||'';
+  document.getElementById('sp-spec').value = s?.spec||'';
+  document.getElementById('sp-bad').value = s?.bad||'';
+  document.getElementById('sp-link').value = s?.link||'';
+  document.getElementById('m-sp').classList.remove('hidden');
+}
+function editSp(id) { openSp(id); }
+function saveSp() {
+  const id = document.getElementById('sp-id').value||uid();
+  const s = { id, kw:document.getElementById('sp-kw').value, model:document.getElementById('sp-model').value.trim(),
+    price:parseInt(document.getElementById('sp-price').value)||0, weight:document.getElementById('sp-weight').value.trim(),
+    rating:document.getElementById('sp-rating').value.trim(), spec:document.getElementById('sp-spec').value.trim(),
+    bad:document.getElementById('sp-bad').value.trim(), link:document.getElementById('sp-link').value.trim() };
+  if(!s.model){alert('モデル名を入力してください');return;}
+  const i = D.sps.findIndex(x=>x.id===id);
+  if(i>=0) D.sps[i]=s; else D.sps.push(s);
+  save(); renderAll(); closeModal('m-sp');
+}
+function delSp(id) { if(!confirm('削除しますか？'))return; D.sps=D.sps.filter(s=>s.id!==id); save(); renderAll(); }
+
+// ─────────────────────────────────────────────
+// OUTPUT ENGINE
+// ─────────────────────────────────────────────
+function fillOutSel() {
+  const sel = document.getElementById('outSel');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- キーワードを選択 --</option>' + D.kws.map(k=>`<option>${esc(k.kw)}</option>`).join('');
+  if(cur) sel.value = cur;
+}
+
+// 生成済み記事を一時保存（MCP連携用）
+window._pendingNote = { title: '', body: '' };
+
+function generateOut() {
+  const kwName = document.getElementById('outSel').value;
+  if (!kwName) { document.getElementById('outResult').style.display='none'; return; }
+  document.getElementById('outResult').style.display='block';
+
+  const kw = D.kws.find(k=>k.kw===kwName);
+  const sps = D.sps.filter(s=>s.kw===kwName);
+  if (!kw) return;
+
+  const models = sps.map(s=>s.model).join('、') || '（未登録）';
+  const commissionEst = Math.round((kw.price||0)*(kw.rate||3)/100);
+  const today = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+
+  // ── タイトル生成 ──
+  const noteTitle = kwName;
+  document.getElementById('noteTitle').textContent = `タイトル：${noteTitle}`;
+
+  // ── スペック比較テーブル生成 ──
+  const bestModel = sps.sort((a,b)=>(b.rating||0)-(a.rating||0))[0];
+  const spBlocks = sps.map((s,i) => {
+    const specLines = s.spec.split('\n').map(l=>`・${l.trim()}`).filter(Boolean).join('\n');
+    const badLines = s.bad.split('\n').map(l=>`・${l.trim()}`).filter(Boolean).join('\n');
+    const linkLine = s.link ? `\n▶ Amazon商品ページ：${s.link}` : '';
+    return `■ ${i+1}位：${s.model}（¥${(s.price||0).toLocaleString()}）
+
+【スペック事実】
+${specLines}
+
+【Amazonユーザーが実際に報告した不満】
+${badLines}
+
+【Amazon評価】★${s.rating||'未確認'}${linkLine}`;
+  }).join('\n\n────────────────────\n\n');
+
+  // ── note本文（完全版・未購入前提・客観分析型）──
+  const noteBody =
+`【注記】本記事は公開スペックデータおよびAmazonユーザーレビューの客観的分析に基づいています。筆者による実機購入・使用を前提とするものではありません。${today}時点の情報です。
+
+---
+
+## なぜ「${kwName.split(' ').slice(0,2).join(' ')}」で失敗するのか
+
+「${kwName.split(' ')[0]}」で検索する人が本当に知りたいのは、感想ではない。
+
+どのスペックが、自分の使い方に対して物理的に正解なのか。その一点だ。
+
+この記事では体験談・感情的表現を一切使わない。Amazonの公開スペックと、実際に購入したユーザーが残した低評価レビューの事実だけを根拠に、論理で答えを導く。
+
+---
+
+## 比較対象：${models}
+
+${spBlocks}
+
+---
+
+## 論理的証明：なぜこのスペックが必然か
+
+${kw.note || '（この欄は①キーワード管理タブの「note構成案」に入力した内容が表示されます）'}
+
+---
+
+## 結論：どの条件の人に、どのモデルが必然か
+
+上記のスペック比較と低評価データから導かれる結論は以下のとおりだ。
+
+${sps.map(s=>`**${s.model}が必然な人**：${s.spec.split('\n')[0]}を優先する人。ただし低評価に記録された「${(s.bad.split('\n')[0]||'').replace(/「|」/g,'')}」という問題は事前に理解しておく必要がある。`).join('\n\n')}
+
+感情で選ぶな。スペックで選べ。
+
+---
+
+## Amazonリンク（参考）
+
+${sps.map(s=>s.link?`・${s.model}：${s.link}`:`・${s.model}：（リンク未登録）`).join('\n')}
+
+---
+
+*本記事はAmazonアソシエイトプログラムに参加しています。商品リンクからご購入いただいた場合、筆者に紹介料が発生します（商品価格への影響はありません）。*`;
+
+  // ── Xポスト ──
+  const xBody =
+`【投稿①】${kw.x1||'（①キーワード管理タブから入力）'}
+
+→ note記事へ誘導：「${noteTitle}」
+
+━━━━━━━━━━━━━
+
+【投稿②】（①の3〜5日後に投稿）
+${kw.x2||'（未入力）'}
+
+━━━━━━━━━━━━━
+
+【投稿③】（①の10日後に投稿）
+${kw.x3||'（未入力）'}
+
+━━━━━━━━━━━━━
+【投稿戦略】
+・①公開日に投稿 → 記事への初動流入
+・②3〜5日後 → アルゴリズムへの再プッシュ
+・③10日後 → ロングテール検索への対応`;
+
+  // 一時保存
+  window._pendingNote = { title: noteTitle, body: noteBody };
+
+  document.getElementById('noteTxt').textContent = noteBody;
+  document.getElementById('xTxt').textContent = xBody;
+
+  // ── GPTsプロンプト生成 ──
+  const gptsPrompt = buildGPTsPrompt(kwName, kw, sps, today);
+  document.getElementById('gptsTxt').textContent = gptsPrompt;
+}
+
+function buildGPTsPrompt(kwName, kw, sps, today) {
+  const productBlock = sps.length ? sps.map((s, i) => {
+    const specLines = s.spec.split('\n').filter(Boolean).map(l => `  - ${l.trim()}`).join('\n');
+    const badLines  = s.bad.split('\n').filter(Boolean).map(l => `  - ${l.trim()}`).join('\n');
+    const linkLine  = s.link ? `\n- AmazonURL（そのまま使用）: ${s.link}` : '';
+    return `### 商品${i+1}: ${s.model}（¥${(s.price||0).toLocaleString()}）
+- Amazon評価: ⭐${s.rating || '—'}
+- スペック:\n${specLines}
+- 低評価レビュー実例:\n${badLines}${linkLine}`;
+  }).join('\n\n') : '（スペックデータ未登録 — ③スペックタブから入力してください）';
+
+  const noteHint = kw.note ? `\n## 加藤からの構成メモ\n${kw.note}` : '';
+  const kw0 = kwName.split(' ')[0];
+
+  return `# note記事執筆依頼 — ${today}
+
+## あなたの役割
+未購入者として、Amazon上の客観データ（スペック・低評価レビュー）だけを根拠に、
+「この商品がこの人に必然である」と論理的に証明するnote記事を書いてください。
+
+## 絶対ルール
+- 実際に買った・使ったという表現は一切使わない
+- 感情的な褒め言葉（すごい・最高・おすすめ）は使わない
+- 根拠は「Amazonスペック」「購入者の低評価レビュー」「物理的事実」のみ
+- 記事冒頭に「本記事はAmazon公開情報の客観分析です。実機レビューではありません」の免責を入れる
+- Amazonリンクは商品データにある実URLをそのまま使う（変更不可）
+
+## 今日のキーワード
+**${kwName}**
+
+## 対象商品データ（Amazonスペック・低評価）
+${productBlock}
+${noteHint}
+
+---
+
+## 記事構成：PASONA型（この順番で書く）
+
+### 【0. 結論ファースト（冒頭1文）】
+スマホ読者は3秒で離脱する。最初の1文で「誰向けの記事か」を断言する。
+例：「${kw0}選びで失敗する人は、全員スペックではなく"シーン"を見ていない。」
+
+### 【免責（2行以内）】
+「本記事はAmazon公開情報の客観分析です。実機レビューではありません。」
+
+### 【1. P：Problem（問題）】
+「${kw0}」を買おうとしている人が実際にやらかす失敗シーンを1つ描写。
+- 数値で語る（「2時間で肩が限界」「新幹線3時間で集中力が切れる」）
+- 場所・時間・体の状態まで具体的に書く
+
+### 【2. A：Agitation（深掘り）】
+その失敗がなぜ起きるかを構造で説明する。感情ではなく物理・設計の話にする。
+低評価レビューの実例を1〜2件引用して「他の人も同じ失敗をした事実」を示す。
+
+### 【3. S：Solution（解決策の提示）】
+「スペックと低評価の両方を見れば、自分に合う1台が論理的に絞れる」と提示。
+この記事で何が分かるかを3行以内で明示する。
+
+### 【4. 比較表（Markdown表）】
+| 商品名 | 価格 | 評価 | 向く人 | 向かない人 | Amazonリンク |
+上記の商品データを使って作成。「向く人/向かない人」列が最重要。
+
+### 【5. O：Offer（商品別詳細）】
+各商品を以下の順で書く（各300〜400字）：
+① スペックの客観事実（数値のみ）
+② 低評価レビューが示す「向かない人の条件」
+③ 逆算で「向く人の条件」を断言
+
+### 【6. 予算別の結論】
+- 1万円台 → ○○（Amazonリンク）
+- 3万円台 → ○○（Amazonリンク）
+- 妥協したくない → ○○（Amazonリンク）
+
+### 【7. N：Narrowing（あなた向け判定マトリクス）】
+これが最重要。「あなたが〇〇なら、答えはこれだ」と明言する。
+> ✅ **${kw0}を毎日使う人** → [商品名]（理由1文）
+> ✅ **週1〜2回の使用** → [商品名]（理由1文）
+> ❌ **[条件]の人には全商品が不向き**（代替案1文）
+
+### 【8. 買い替えサイン】
+「今の${kw0}をいつ買い替えるべきか」の判断基準を3つ書く。
+これがあるとCVRが上がる。
+
+### 【9. FAQ（3問）】
+よくある疑問を想定して回答（根拠つきで20〜30字）。
+
+### 【10. A：Action（今すぐ動く理由）】
+「なぜ今選ぶべきか」を1文で。最後のCTA：「[条件]の人はこちら → [Amazonリンク]」
+
+### 【11. アフィリエイト開示】
+「本記事にはAmazonアソシエイトリンクが含まれます」
+
+---
+
+## noteタイトル案（3パターン出力）
+- 数字入り型：「〇つのポイントで選ぶ」
+- 失敗回避型：「〇〇で失敗する人の共通点」
+- 断言型：「〇〇を買う前に知っておくべき1つの事実」
+
+## 文字数目安
+3000〜4000字（note で読まれる上限付近）
+
+## 出力形式
+note.comにそのまま貼り付けられるMarkdown形式で出力してください。`;
+}
+
+// ── noteに自動投稿 ──
+async function postToNote() {
+  const { title, body } = window._pendingNote || {};
+  if (!title || !body) { alert('先にキーワードを選択して記事を生成してください'); return; }
+
+  const st = document.getElementById('postStatus');
+  st.style.display='block';
+  st.style.background='#1a2a3a';
+  st.style.color='#6aaddf';
+  st.textContent = '⏳ note.comを開いています...';
+
+  // タイトルと本文をクリップボード＋windowストレージへ
+  try { await navigator.clipboard.writeText(body); } catch(e){}
+
+  // note新規記事ページを開く
+  const w = window.open('https://note.com/notes/new', '_blank');
+
+  st.style.background='#2a3a1a';
+  st.style.color='#7dcf5a';
+  st.innerHTML = `✓ note.comを開きました。<br>
+<strong>次の操作：</strong><br>
+① noteにログイン済みか確認<br>
+② タイトル欄に「<code style="background:#111;padding:2px 4px;border-radius:2px;">${title}</code>」を貼り付け<br>
+③ 本文欄にCtrl+Vで貼り付け（クリップボードに本文コピー済み）<br>
+④「公開」ボタンをクリック`;
+}
+
+function openNoteManual() {
+  window.open('https://note.com/notes/new', '_blank');
+}
+
+function switchPrev(name, btn) {
+  ['gpts','note','x'].forEach(n => {
+    const el = document.getElementById('pv-'+n);
+    if (el) el.style.display = n===name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function copyAndOpenGPTs() {
+  const txt = document.getElementById('gptsTxt').textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    window.open('https://chatgpt.com/', '_blank');
+  });
+}
+
+function copyEl(id) {
+  const txt = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✓ コピーしました';
+    setTimeout(()=>btn.textContent=orig, 2000);
+  });
+}
+
+// ─────────────────────────────────────────────
+// BACKUP / RESTORE
+// ─────────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(D,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `affiliate_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+function importJSON() { document.getElementById('importFile').click(); }
+function doImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (imported.kws || imported.arts || imported.sps) {
+        D = imported;
+        save(); renderAll(); alert('復元しました');
+      } else { alert('ファイル形式が正しくありません'); }
+    } catch(err) { alert('読み込みエラー'); }
+  };
+  r.readAsText(file);
+  e.target.value = '';
+}
+
+// ─────────────────────────────────────────────
+// AUTO SYSTEM TAB
+// ─────────────────────────────────────────────
+let _autoActiveIdx = 0; // 現在選択中のKWインデックス
+
+function loadAutoResults() {
+  const todayPanel  = document.getElementById('autoTodayPanel');
+  const historyList = document.getElementById('autoHistoryList');
+
+  // 5件リスト（新形式）または後方互換
+  const list = window._autoDataList || (window._autoData ? [window._autoData] : []);
+
+  if (!list.length) {
+    todayPanel.innerHTML = `
+      <div style="border:1px dashed var(--border);border-radius:10px;padding:32px;text-align:center;margin-bottom:16px;">
+        <div style="font-size:24px;margin-bottom:10px;opacity:.3;">⏸</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px;">まだ自動生成が実行されていません</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:18px;">下のセットアップ欄からテスト実行できます</div>
+        <button onclick="document.getElementById('setupPanel').style.display='block';window.scrollTo(0,document.body.scrollHeight)" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+          セットアップを確認する ↓
+        </button>
+      </div>`;
+    historyList.innerHTML = '<div style="padding:10px;color:var(--text2);font-size:11px;text-align:center;">まだ履歴がありません</div>';
+    return;
+  }
+
+  const isToday = list[0].date && list[0].date.startsWith(new Date().toISOString().slice(0,10));
+  const dateLabel = (list[0].date || '').slice(0,16);
+
+  // ── ① KWタブ + ヒーローカード ──
+  todayPanel.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--surface) 0%,#1a1a0e 100%);border:1px solid var(--accent);border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+
+      <!-- ヘッダー -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:10px;color:var(--text2);">📅 ${dateLabel}</span>
+        ${isToday ? '<span style="font-size:10px;background:#1a3a1a;color:#7dcf5a;padding:2px 10px;border-radius:20px;font-weight:700;">TODAY</span>' : ''}
+        <span style="font-size:10px;color:var(--text2);margin-left:auto;">${list.length}件のプロンプト生成済み</span>
+        <button onclick="loadAutoResults()" style="background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:inherit;">🔄</button>
+      </div>
+
+      <!-- KWタブ -->
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;" id="kwTabRow">
+        ${list.map((d,i) => `
+          <button id="kwTab_${i}" onclick="switchKwTab(${i})" style="
+            padding:5px 14px;border-radius:4px;border:1px solid ${i===0?'var(--accent)':'var(--border)'};
+            background:${i===0?'var(--accent)':'transparent'};color:${i===0?'#000':'var(--text2)'};
+            font-size:12px;font-weight:${i===0?'700':'400'};cursor:pointer;font-family:inherit;
+            white-space:nowrap;transition:.15s;">
+            ${esc(d.keyword)}
+            ${(d.quality&&d.quality.reviewed>0)?'<span style="font-size:9px;opacity:.7;margin-left:3px;">✓</span>':''}
+          </button>`).join('')}
+      </div>
+
+      <!-- 選択中KWの詳細 -->
+      <div id="kwDetail"></div>
+    </div>`;
+
+  switchKwTab(0);
+
+  // ── ② 履歴 ──
+  historyList.innerHTML = '<div style="padding:10px;color:var(--text2);font-size:11px;text-align:center;">まだ履歴がありません</div>';
+}
+
+function switchKwTab(idx) {
+  const list = window._autoDataList || (window._autoData ? [window._autoData] : []);
+  if (!list[idx]) return;
+  _autoActiveIdx = idx;
+
+  // タブのスタイル更新
+  list.forEach((_, i) => {
+    const btn = document.getElementById('kwTab_' + i);
+    if (!btn) return;
+    const active = i === idx;
+    btn.style.background    = active ? 'var(--accent)' : 'transparent';
+    btn.style.borderColor   = active ? 'var(--accent)' : 'var(--border)';
+    btn.style.color         = active ? '#000' : 'var(--text2)';
+    btn.style.fontWeight    = active ? '700' : '400';
+  });
+
+  const d = list[idx];
+  const detail = document.getElementById('kwDetail');
+  if (!detail) return;
+
+  const qualityBadge = d.quality && d.quality.reviewed > 0
+    ? `<span style="font-size:10px;background:#1a3a1a;color:#7dcf5a;padding:1px 7px;border-radius:10px;">レビュー${d.quality.reviewed}件✓</span>`
+    : `<span style="font-size:10px;background:#2a2a10;color:var(--accent);padding:1px 7px;border-radius:10px;">⚠ レビューなし</span>`;
+
+  detail.innerHTML = `
+    <!-- KW表示 -->
+    <div style="font-size:10px;color:var(--text2);font-weight:600;letter-spacing:.1em;margin-bottom:3px;">KEYWORD ${idx+1}/5</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;">
+      <div style="font-size:28px;font-weight:700;color:var(--accent);line-height:1;">${esc(d.keyword)}</div>
+      ${qualityBadge}
+      <span style="font-size:11px;color:var(--text2);">商品${d.products||0}件</span>
+    </div>
+
+    <!-- メインCTA -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <button onclick="kwPromptCopyAndOpen(${idx})" style="background:var(--gpts);color:#fff;border:none;border-radius:6px;padding:11px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex:1;min-width:180px;">
+        ⚡ コピーして ChatGPT を開く
+      </button>
+      <button onclick="openNoteManual()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:11px 16px;font-size:12px;cursor:pointer;font-family:inherit;">
+        📝 noteを開く
+      </button>
+    </div>
+
+    <!-- サブ -->
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      <button onclick="kwPromptCopy(${idx}, this)" style="background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:3px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;">
+        プロンプトだけコピー
+      </button>
+      <button onclick="kwCopyAll()" style="background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:3px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit;">
+        📋 全5件まとめてコピー
+      </button>
+      <span style="font-size:10px;color:var(--text2);">${(d.tags||[]).slice(0,4).map(t=>`<span style="background:var(--surface2);padding:1px 5px;border-radius:8px;margin-right:2px;">${esc(t)}</span>`).join('')}</span>
+    </div>
+
+    <!-- プロンプトプレビュー -->
+    <details>
+      <summary style="font-size:11px;color:var(--text2);cursor:pointer;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+        <span>プロンプトを確認する（${d.prompt ? (d.prompt.length+'文字') : '未生成'}）</span>
+        <span style="font-size:9px;">▼</span>
+      </summary>
+      <div id="promptBox_${idx}" style="margin-top:5px;font-size:11px;line-height:1.8;white-space:pre-wrap;font-family:'Courier New',monospace;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px;max-height:320px;overflow-y:auto;">${esc(d.prompt||'')}</div>
+    </details>`;
+}
+
+function kwPromptCopyAndOpen(idx) {
+  const list = window._autoDataList || [window._autoData];
+  const d = list[idx];
+  if (!d || !d.prompt) return;
+  navigator.clipboard.writeText(d.prompt).then(() => window.open('https://chatgpt.com/', '_blank'));
+}
+
+function kwPromptCopy(idx, btn) {
+  const list = window._autoDataList || [window._autoData];
+  const d = list[idx];
+  if (!d || !d.prompt) return;
+  navigator.clipboard.writeText(d.prompt).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ コピー済み';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function kwCopyAll() {
+  const list = window._autoDataList || [window._autoData];
+  const all = list.map((d, i) =>
+    `===== ${i+1}/${list.length}: ${d.keyword} =====\n\n${d.prompt||''}`
+  ).join('\n\n' + '='.repeat(40) + '\n\n');
+  navigator.clipboard.writeText(all).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = `✓ ${list.length}件コピー済み`;
+    setTimeout(() => btn.textContent = orig, 2500);
+  });
+}
+
+function copyCmd(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✓ コピー';
+    setTimeout(() => btn.textContent = orig, 1800);
+  });
+}
+
+function copyTestCmd() {
+  const raw = 'cd "C:\\Users\\takaya\\OneDrive - 東京農業大学\\デスクトップ\\ヒトマップ\\affiliate-auto" && python main.py';
+  navigator.clipboard.writeText(raw).then(() => {
+    const btn = document.getElementById('testCmdBtn');
+    btn.textContent = '✓ コピー済み';
+    btn.style.background = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'コピー'; btn.style.background = ''; }, 2500);
+  });
+}
+
+function autoPromptCopy() {
+  const el = document.getElementById('autoPromptText');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✓ コピー完了';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function autoPromptCopyAndOpen() {
+  const el = document.getElementById('autoPromptText');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    window.open('https://chatgpt.com/', '_blank');
+  });
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+load();
+initDefaults();
+renderAll();
+loadAutoResults();
+
+// セットアップバッジ：Python/Playwright/env 設定済み、タスクスケジューラのみ残り
+(function() {
+  const badge = document.getElementById('setupSummaryBadge');
+  if (!badge) return;
+  badge.textContent = '✅ ほぼ完了 — タスク登録のみ残り';
+  badge.style.background = '#1a2a3a';
+  badge.style.color = '#6aaddf';
+})();
+</script>
+</body>
+</html>

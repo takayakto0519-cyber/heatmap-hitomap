@@ -34,7 +34,7 @@ export default function MobileCTABar() {
         }}
       >
         <a
-          href="/business"
+          href="/company/business"
           style={{
             flex: '0 0 auto',
             fontSize: 11.5,

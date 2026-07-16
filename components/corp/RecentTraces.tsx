@@ -45,7 +45,7 @@ export default function RecentTraces() {
             color: corpColor.ink,
           }}
         >
-          誰かが今日も、まちを歩いて記録している。
+          誰かが今日も、まちを歩いて記録しています。
         </h2>
       </div>
 

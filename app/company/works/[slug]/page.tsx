@@ -31,6 +31,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return {
     title: post.title,
     description: post.body.slice(0, 90),
+    alternates: { canonical: `/company/works/${params.slug}` },
     openGraph: post.cover_url ? { images: [post.cover_url] } : undefined,
   };
 }
@@ -41,15 +42,31 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
 
   const paragraphs = post.body.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
 
+  // 検索エンジン向けの記事構造データ（Article）。共有画像は動的OG（opengraph-image.tsx）と揃える
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hitomap.com';
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    description: post.body.slice(0, 90),
+    datePublished: post.created_at,
+    dateModified: post.updated_at,
+    image: post.cover_url ?? `${siteUrl}/company/works/${post.slug}/opengraph-image`,
+    url: `${siteUrl}/company/works/${post.slug}`,
+    author: { '@type': 'Organization', name: 'ヒトマップ', url: siteUrl },
+    publisher: { '@type': 'Organization', name: 'ヒトマップ', logo: { '@type': 'ImageObject', url: `${siteUrl}/logo.png` } },
+  };
+
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <CorpHeader />
 
       <main style={{ flex: 1 }}>
         <article>
           <section style={{ padding: '64px 24px 36px' }}>
             <div style={{ maxWidth: 720, margin: '0 auto' }}>
-              <a href="/works" style={{ fontSize: 12, color: corpColor.moss, textDecoration: 'none', fontFamily: corpFont.body, fontWeight: 700 }}>
+              <a href="/company/works" style={{ fontSize: 12, color: corpColor.moss, textDecoration: 'none', fontFamily: corpFont.body, fontWeight: 700 }}>
                 ← 実績一覧に戻る
               </a>
               <p style={{ margin: '22px 0 12px', fontSize: 11, letterSpacing: '0.12em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
@@ -100,7 +117,7 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
 
               {post.related_slug && (
                 <a
-                  href={`/blog/${post.related_slug}`}
+                  href={`/company/blog/${post.related_slug}`}
                   className="hm-lift"
                   style={{
                     display: 'inline-block', margin: '0 0 32px', padding: '14px 24px',
@@ -167,7 +184,7 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
                   同じような取り組みをご検討中の学校・法人・行政の方は、お気軽にご相談ください。
                 </p>
                 <a
-                  href="/contact"
+                  href="/company/contact"
                   className="hm-lift"
                   style={{
                     display: 'inline-block',

@@ -7,22 +7,22 @@ const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
     heading: 'サービス',
     links: [
       { href: '/start', label: '地図をひらく' },
-      { href: '/service', label: '使い方' },
-      { href: '/school', label: '学校でのご利用' },
+      { href: '/company/service', label: '使い方' },
+      { href: '/company/school', label: '学校でのご利用' },
     ],
   },
   {
     heading: '法人・行政',
     links: [
-      { href: '/business', label: '法人・行政の方へ' },
-      { href: '/works', label: '実績' },
-      { href: '/contact', label: 'お問い合わせ' },
+      { href: '/company/business', label: '法人・行政の方へ' },
+      { href: '/company/works', label: '実績' },
+      { href: '/company/contact', label: 'お問い合わせ' },
     ],
   },
   {
     heading: '運営',
     links: [
-      { href: '/team', label: '運営メンバー' },
+      { href: '/company/team', label: '運営メンバー' },
       { href: '/login', label: 'ログイン / 新規登録' },
     ],
   },

@@ -29,7 +29,7 @@ export default function CtaBand() {
             まず、ひとつの町から。
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: corpColor.line, fontFamily: corpFont.body, lineHeight: 1.9 }}>
-            痕跡は、町の縮尺でこそ生きた証になる。登録なしで、今日から歩けます。
+            痕跡は、町の縮尺でこそ生きた証になります。登録なしで、今日から歩けます。
           </p>
         </div>
         <a

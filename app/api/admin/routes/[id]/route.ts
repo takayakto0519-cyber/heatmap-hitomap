@@ -39,6 +39,7 @@ interface RouteAdminUpdateBody {
   event_meeting_info?: string | null;
   event_photo_urls?: string[] | null;
   is_public_recommendation?: boolean;
+  bonno_requires_moderation?: boolean;
 }
 
 const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
@@ -49,7 +50,7 @@ const ALLOWED_FIELDS: (keyof RouteAdminUpdateBody)[] = [
   'event_end_lat', 'event_end_lng', 'event_end_label',
   'event_waypoints',
   'event_fee', 'event_meeting_info', 'event_photo_urls',
-  'is_public_recommendation',
+  'is_public_recommendation', 'bonno_requires_moderation',
 ];
 
 // PATCH /api/admin/routes/[id] — 協賛・イベント公開情報の設定（手動、決済は伴わない。パスワード必須）

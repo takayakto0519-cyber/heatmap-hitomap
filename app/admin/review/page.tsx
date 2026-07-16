@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 export default function AdminReviewRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/admin/dashboard');
+    router.replace('/admin/dashboard?tab=review');
   }, [router]);
   return null;
 }

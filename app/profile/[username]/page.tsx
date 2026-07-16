@@ -14,6 +14,30 @@ const TraceMap = dynamic(() => import('@/components/map/TraceMap'), { ssr: false
 const BIO_MAX_LENGTH = 300;
 const APPOINTMENT_PURPOSE_MAX_LENGTH = 300;
 
+// 自己紹介を1つの空欄ではなく3つの短い問いに分けて、書き出しやすくする。
+// 保存時はこの3つを空行区切りで結合し、これまで通り単一のbio文字列としてDBに入れる。
+const BIO_QUESTIONS = [
+  {
+    key: 'moved',
+    label: 'どんな痕跡に心が動く？',
+    placeholder: '例）古い商店の看板の文字が好きです。書いた人の手癖が残っているから。',
+    traceField: 'why' as const,
+  },
+  {
+    key: 'why_started',
+    label: 'なぜヒトマップを始めた？',
+    placeholder: '例）浦河町を歩いてから、モノに残った時間を探すのが習慣になりました。',
+    traceField: 'self_reflection' as const,
+  },
+  {
+    key: 'next',
+    label: 'これからどんな町を歩いてみたい？',
+    placeholder: '例）まだ歩いていない、海沿いの小さな町。',
+    traceField: null,
+  },
+] as const;
+const BIO_PART_MAX = 100;
+
 interface Profile {
   id: string;
   username: string;
@@ -68,7 +92,7 @@ export default function ProfilePage() {
 
   const [editing, setEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
-  const [editBio, setEditBio] = useState('');
+  const [bioAnswers, setBioAnswers] = useState<string[]>(['', '', '']);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
@@ -158,9 +182,32 @@ export default function ProfilePage() {
   function startEdit() {
     if (!profile) return;
     setEditDisplayName(profile.display_name ?? '');
-    setEditBio(profile.bio ?? '');
+    // 既存のbioは単一の自由文なので、空行で区切って3つの問いへの回答としてベストエフォートで復元する。
+    // 区切りがなければ最初の問いにそのまま入れ、残りは空欄にする。
+    const parts = (profile.bio ?? '').split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+    setBioAnswers([parts[0] ?? '', parts[1] ?? '', parts[2] ?? '']);
     setEditError('');
     setEditing(true);
+  }
+
+  // 自分の痕跡投稿から、その問いに合う書き出し候補を1つ拾う（感情の強度が高いものを優先）。
+  // 該当データがなければ null（無理に作らない）。
+  function bioSuggestion(traceField: 'why' | 'self_reflection' | null): string | null {
+    if (!traceField || myTraces.length === 0) return null;
+    const candidates = [...myTraces]
+      .filter(t => t[traceField]?.trim())
+      .sort((a, b) => (b.intensity ?? 0) - (a.intensity ?? 0));
+    return candidates[0]?.[traceField]?.trim() || null;
+  }
+
+  function applyBioSuggestion(index: number, suggestion: string) {
+    setBioAnswers(prev => {
+      const next = [...prev];
+      const current = next[index].trim();
+      const combined = current ? `${current} ${suggestion}` : suggestion;
+      next[index] = combined.slice(0, BIO_PART_MAX);
+      return next;
+    });
   }
 
   async function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -190,9 +237,10 @@ export default function ProfilePage() {
     setSaving(true);
     setEditError('');
     try {
+      const joinedBio = bioAnswers.map(s => s.trim()).filter(Boolean).join('\n\n').slice(0, BIO_MAX_LENGTH);
       const res = await fetch('/api/profile', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: editDisplayName.trim() || null, bio: editBio.trim() || null }),
+        body: JSON.stringify({ display_name: editDisplayName.trim() || null, bio: joinedBio || null }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -291,14 +339,45 @@ export default function ProfilePage() {
               style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13 }} />
             <label style={{ fontSize: 11, color: '#666', fontWeight: 700 }}>自己紹介</label>
             <p style={{ margin: 0, fontSize: 11, color: '#999', lineHeight: 1.6 }}>
-              例：どんな痕跡に心が動くタイプか／なぜヒトマップを始めたか／これからどんな町を歩いてみたいか
+              3つの問いに答えると、自己紹介文になります。埋められる分だけでかまいません。
             </p>
-            <textarea value={editBio} onChange={e => setEditBio(e.target.value.slice(0, BIO_MAX_LENGTH))} rows={6}
-              placeholder={'例）\n古い商店の看板の文字が好きです。書いた人の手癖が残っているから。\n浦河町を歩いてから、モノに残った時間を探すのが習慣になりました。'}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit', resize: 'vertical' }} />
-            <p style={{ margin: 0, fontSize: 11, color: editBio.length >= BIO_MAX_LENGTH ? '#E55039' : '#bbb', textAlign: 'right' }}>
-              {editBio.length} / {BIO_MAX_LENGTH}
-            </p>
+            {BIO_QUESTIONS.map((q, i) => {
+              const suggestion = bioSuggestion(q.traceField);
+              return (
+                <div key={q.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: i === 0 ? 0 : 6 }}>
+                  <label style={{ fontSize: 12, color: '#555', fontWeight: 700 }}>{q.label}</label>
+                  <textarea
+                    value={bioAnswers[i]}
+                    onChange={e => setBioAnswers(prev => {
+                      const next = [...prev];
+                      next[i] = e.target.value.slice(0, BIO_PART_MAX);
+                      return next;
+                    })}
+                    rows={2}
+                    placeholder={q.placeholder}
+                    style={{ padding: '9px 11px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit', resize: 'vertical' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    {suggestion ? (
+                      <button
+                        type="button"
+                        onClick={() => applyBioSuggestion(i, suggestion)}
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 20,
+                          border: '1px solid #38ADA9', background: '#fff', color: '#38ADA9',
+                          fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        📍 自分の痕跡から書き出す
+                      </button>
+                    ) : <span />}
+                    <p style={{ margin: 0, fontSize: 11, color: bioAnswers[i].length >= BIO_PART_MAX ? '#E55039' : '#bbb' }}>
+                      {bioAnswers[i].length} / {BIO_PART_MAX}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={saveProfile} disabled={saving} style={{
                 flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',

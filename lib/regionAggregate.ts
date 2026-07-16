@@ -104,3 +104,51 @@ export async function computeRegionAggregate(
     cells,
   };
 }
+
+// ============================================================
+// 地域ページ・SEO用の一文サマリー
+//
+// グリッド集計（computeRegionAggregate）とは別に、地域全体の
+// 件数・感情内訳だけを軽く取る。グリッドのしきい値抑制は「特定の
+// 場所に人が集まっている」ことを隠すための仕組みで、地域全体1個の
+// 割合を出すだけならその心配がないため、しきい値なしで集計する。
+// ============================================================
+export interface RegionSummary {
+  region: string;
+  totalPublicTraces: number;
+  valence: { positive: number; negative: number; neutral: number; total: number };
+}
+
+export async function computeRegionSummary(
+  supabaseServer: SupabaseClient,
+  region: string
+): Promise<RegionSummary> {
+  const { data } = await supabaseServer
+    .from('traces')
+    .select('emotion_key')
+    .eq('is_deleted', false)
+    .eq('visibility', 'public')
+    .eq('region', region);
+
+  const rows = (data ?? []) as { emotion_key: string | null }[];
+  return {
+    region,
+    totalPublicTraces: rows.length,
+    valence: summarizeValence(rows.map((r) => r.emotion_key)),
+  };
+}
+
+// 「痕跡◯件、うち◯%が好意的な感情」という一文を作る。
+// 件数が少なすぎる（3件未満）場合は割合を出さず、正直に「まだ記録が少ない」と伝える
+// （誇張しない・少数から個人を特定できるような断定はしない、という原則を守る）。
+export function regionSummaryText(summary: RegionSummary): string {
+  const { region, totalPublicTraces, valence } = summary;
+  if (totalPublicTraces === 0) {
+    return `${region}には、まだ公開されている痕跡がありません。最初の一件を残すのは、あなたかもしれません。`;
+  }
+  if (totalPublicTraces < 3) {
+    return `${region}には、これまでに${totalPublicTraces}件の痕跡が記録されています。まだ記録は少なく、これから増えていきます。`;
+  }
+  const positiveRatio = Math.round((valence.positive / valence.total) * 100);
+  return `${region}には、これまでに${totalPublicTraces}件の痕跡が記録されています。そのうち${positiveRatio}%が、ときめきや懐かしさといった好意的な感情とともに残されたものです。`;
+}

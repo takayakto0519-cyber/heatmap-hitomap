@@ -104,6 +104,8 @@ export default function BonnoConsole({ route }: { route: Route }) {
   }
 
   const visibleCount = items.filter((it) => it.status === 'visible').length;
+  const pendingItems = items.filter((it) => it.status === 'pending');
+  const otherItems = items.filter((it) => it.status !== 'pending');
   const totalBonno = items.reduce((sum, it) => sum + (it.total_bonno ?? 0), 0);
   const topItem = items
     .filter((it) => it.status === 'visible')
@@ -152,10 +154,45 @@ export default function BonnoConsole({ route }: { route: Route }) {
           </div>
         </div>
 
+        {/* 承認待ち（事前確認モードのイベントのみ発生。壁にはまだ出ていない） */}
+        {pendingItems.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 13, fontWeight: 800, color: colors.gold, margin: '0 0 8px' }}>
+              ⏳ 承認待ち {pendingItems.length}件（まだ壁に出ていません）
+            </p>
+            {pendingItems.map((it) => (
+              <div key={it.id} style={{
+                background: colors.surface,
+                borderRadius: radii.md,
+                boxShadow: shadows.card,
+                padding: '14px 16px',
+                marginBottom: 10,
+                border: `2px solid ${colors.gold}`,
+              }}>
+                <p style={{ fontSize: 15, color: colors.textPrimary, lineHeight: 1.7, margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{it.text}</p>
+                <p style={{ fontSize: 12, color: colors.textMuted, margin: '0 0 10px' }}>
+                  {it.nickname ?? '匿名'}
+                  {' ・ '}{new Date(it.created_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={() => act(it.id, 'show')}
+                    style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: radii.pill, border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer' }}>
+                    ✓ 承認して壁に出す
+                  </button>
+                  <button onClick={() => act(it.id, 'hide')}
+                    style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: radii.pill, border: `1px solid ${colors.danger}`, background: 'transparent', color: colors.danger, cursor: 'pointer' }}>
+                    却下する
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* 投稿リスト（新着順） */}
-        {items.length === 0 ? (
-          <p style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', padding: '40px 0' }}>まだ投稿はありません</p>
-        ) : items.map((it) => {
+        {otherItems.length === 0 ? (
+          pendingItems.length === 0 && <p style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', padding: '40px 0' }}>まだ投稿はありません</p>
+        ) : otherItems.map((it) => {
           const isSpot = it.id === spotlightId;
           const isHidden = it.status === 'hidden';
           return (

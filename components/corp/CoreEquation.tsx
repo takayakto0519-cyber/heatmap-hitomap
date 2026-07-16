@@ -1,9 +1,9 @@
 import { corpColor, corpFont } from './tokens';
 
 const MVV = [
-  { label: 'MISSION', ja: '人の生き方を通して、地域を伝える。' },
-  { label: 'VISION', ja: 'まちに残る痕跡と感情から、人と人をつなぐ。' },
-  { label: 'VALUE', ja: '人を消費せず、関係を育てる。' },
+  { label: 'MISSION', ja: '人の生き方を通して、地域をお伝えします。' },
+  { label: 'VISION', ja: 'まちに残る痕跡と感情から、人と人をつなぎます。' },
+  { label: 'VALUE', ja: '人を消費せず、関係を育てます。' },
 ];
 
 // ページ内で一番強く主張したい箇所（MVV）なので、地の墨色を反転させた帯で

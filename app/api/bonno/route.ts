@@ -95,12 +95,15 @@ export async function POST(req: NextRequest) {
     // 実在する煩悩イベントにだけ投稿を受け付ける
     const { data: route } = await supabaseServer
       .from('routes')
-      .select('id, event_mode, is_deleted')
+      .select('id, event_mode, is_deleted, bonno_requires_moderation')
       .eq('event_slug', eventSlug)
       .maybeSingle();
     if (!route || route.is_deleted || route.event_mode !== 'bonno') {
       return NextResponse.json({ ok: false, error: 'このイベントは見つかりません' }, { status: 404 });
     }
+
+    // 事前確認モードのイベントは pending で受け、運営コンソールで承認するまで壁・投資ボードに出さない
+    const initialStatus = route.bonno_requires_moderation ? 'pending' : 'visible';
 
     const { data, error } = await supabaseServer
       .from('bonno_submissions')
@@ -108,7 +111,7 @@ export async function POST(req: NextRequest) {
         event_slug: eventSlug,
         text,
         nickname: body.nickname?.trim().slice(0, MAX_NICKNAME_LENGTH) || null,
-        status: 'visible',
+        status: initialStatus,
       })
       .select()
       .single();
