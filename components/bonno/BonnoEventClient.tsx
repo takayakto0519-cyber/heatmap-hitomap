@@ -84,10 +84,26 @@ export default function BonnoEventClient({ route }: { route: Route }) {
             borderRadius: radii.pill,
             padding: '10px 16px',
             textAlign: 'center',
-            marginBottom: 24,
+            marginBottom: 10,
           }}
         >
           💰 他の人の煩悩にBONNOを投資する →
+        </a>
+
+        <a
+          href={`/events/${route.event_slug}/wall`}
+          style={{
+            display: 'block',
+            fontSize: 12,
+            fontWeight: 700,
+            color: colors.accent,
+            textDecoration: 'none',
+            textAlign: 'center',
+            padding: '4px 16px',
+            marginBottom: 24,
+          }}
+        >
+          みんなの煩悩が浮かぶ壁を見る →
         </a>
 
         {done ? (
