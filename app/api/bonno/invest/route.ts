@@ -12,7 +12,7 @@ const SUPABASE_READY = Boolean(
 );
 
 // 1参加者あたりの持ち点。1タップの配分単位は10 BONNO固定（参加者側UIと対応）。
-export const BONNO_BUDGET = 100;
+const BONNO_BUDGET = 100;
 
 async function getServerClient() {
   const { supabaseServer } = await import('@/lib/supabase/server');
