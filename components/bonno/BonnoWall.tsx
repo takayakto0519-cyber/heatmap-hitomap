@@ -6,6 +6,8 @@
 // ・2.5秒ポーリングで新着を取り込む（新着は一度中央に大きく表示してから合流）
 // ・運営コンソールのスポットライト指名で、その煩悩だけを中央特大表示
 // ・クリックで全画面
+// ・スマホ幅（プロジェクターではなく参加者が自分の端末で開いた場合）は、
+//   浮遊演出だと文字が重なって読めないため、読みやすい縦一覧表示に切り替える
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from '@/lib/types';
@@ -33,10 +35,18 @@ export default function BonnoWall({ route }: { route: Route }) {
   const [items, setItems] = useState<WallItem[]>([]);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [announce, setAnnounce] = useState<WallItem | null>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
   const knownIds = useRef<Set<string>>(new Set());
   const floatStyles = useRef<Map<string, FloatStyle>>(new Map());
   const announceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstLoad = useRef(true);
+
+  useEffect(() => {
+    const check = () => setIsNarrow(window.innerWidth < 700);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const styleFor = (id: string): FloatStyle => {
     let s = floatStyles.current.get(id);
@@ -130,40 +140,68 @@ export default function BonnoWall({ route }: { route: Route }) {
         }
       `}</style>
 
-      {/* 漂う煩悩の群れ */}
-      <div style={{ position: 'absolute', inset: 0, opacity: dimmed ? 0.08 : 1, transition: 'opacity 1.2s ease' }}>
-        {items.map((it) => {
-          const s = styleFor(it.id);
-          return (
-            <p
-              key={it.id}
-              style={{
-                position: 'absolute',
-                left: `${s.left}%`,
-                top: 0,
-                maxWidth: '38vw',
-                margin: 0,
-                color: '#E8E0CC',
-                fontSize: fontSizeFor(it),
-                lineHeight: 1.6,
-                letterSpacing: 1,
-                whiteSpace: 'pre-wrap',
-                animation: `bonnoRise ${s.duration}s linear ${s.delay}s infinite`,
-                ['--drift' as string]: `${s.drift}px`,
-                willChange: 'transform, opacity',
-              }}
-            >
-              {it.text}
+      {/* 漂う煩悩の群れ：スマホ幅では重なって読めないため、読みやすい縦一覧に切り替える */}
+      {isNarrow ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: dimmed ? 0.08 : 1,
+            transition: 'opacity 1.2s ease',
+            overflowY: 'auto',
+            padding: '28px 20px 60px',
+          }}
+        >
+          {items.slice().reverse().map((it) => (
+            <div key={it.id} style={{ marginBottom: 22, paddingBottom: 22, borderBottom: '1px solid rgba(232, 224, 204, 0.12)' }}>
+              <p style={{ margin: 0, color: '#E8E0CC', fontSize: 18, lineHeight: 1.8, letterSpacing: 0.5, whiteSpace: 'pre-wrap' }}>
+                {it.text}
+              </p>
               {(it.nickname || (it.total_bonno ?? 0) > 0) && (
-                <span style={{ display: 'block', fontSize: 14, color: '#8F8770', marginTop: 6 }}>
+                <p style={{ margin: '8px 0 0', fontSize: 13, color: '#8F8770' }}>
                   {it.nickname && `— ${it.nickname}`}
                   {(it.total_bonno ?? 0) > 0 && ` 💰${it.total_bonno}`}
-                </span>
+                </p>
               )}
-            </p>
-          );
-        })}
-      </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, opacity: dimmed ? 0.08 : 1, transition: 'opacity 1.2s ease' }}>
+          {items.map((it) => {
+            const s = styleFor(it.id);
+            return (
+              <p
+                key={it.id}
+                style={{
+                  position: 'absolute',
+                  left: `${s.left}%`,
+                  top: 0,
+                  maxWidth: '38vw',
+                  margin: 0,
+                  color: '#E8E0CC',
+                  fontSize: fontSizeFor(it),
+                  lineHeight: 1.6,
+                  letterSpacing: 1,
+                  whiteSpace: 'pre-wrap',
+                  animation: `bonnoRise ${s.duration}s linear ${s.delay}s infinite`,
+                  ['--drift' as string]: `${s.drift}px`,
+                  willChange: 'transform, opacity',
+                }}
+              >
+                {it.text}
+                {(it.nickname || (it.total_bonno ?? 0) > 0) && (
+                  <span style={{ display: 'block', fontSize: 14, color: '#8F8770', marginTop: 6 }}>
+                    {it.nickname && `— ${it.nickname}`}
+                    {(it.total_bonno ?? 0) > 0 && ` 💰${it.total_bonno}`}
+                  </span>
+                )}
+              </p>
+            );
+          })}
+        </div>
+      )}
 
       {/* 中央特大表示：スポットライト（運営指名）が最優先、次に新着のお披露目 */}
       {(spotlight ?? announce) && (

@@ -4,7 +4,8 @@
 // 煩悩オークション：BONNO投資ボード（投影用・黒背景）
 // total_bonno（BONNO投資合計）の降順でランキング表示する。
 // 1位には「本日の最高落札煩悩」ラベルを表示する（AI分析による「切実さ」は廃止済み）。
-// 2.5秒ポーリングで、投資が進むほどランキングがライブに動く。
+// 複数日にまたがる開催を想定し、期間タブ（今日／一週間／総合）で表示を切り替えられる。
+// デフォルトは一週間。2.5秒ポーリングで、投資が進むほどランキングがライブに動く。
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Route } from '@/lib/types';
@@ -17,20 +18,29 @@ interface BoardItem {
   created_at: string;
 }
 
+type Period = 'today' | 'week' | 'all';
+
 const POLL_MS = 2500;
+const PERIOD_LABELS: Record<Period, string> = { today: '今日', week: '一週間', all: '総合' };
+const TOP_LABELS: Record<Period, string> = {
+  today: '🏆 本日の最高落札煩悩',
+  week: '🏆 今週の最高落札煩悩',
+  all: '🏆 歴代最高落札煩悩',
+};
 
 export default function BonnoBoard({ route }: { route: Route }) {
   const [items, setItems] = useState<BoardItem[]>([]);
+  const [period, setPeriod] = useState<Period>('week');
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/bonno?event_slug=${encodeURIComponent(route.event_slug ?? '')}`);
+      const res = await fetch(`/api/bonno?event_slug=${encodeURIComponent(route.event_slug ?? '')}&period=${period}`);
       const data = await res.json();
       if (data.ok) setItems(data.items as BoardItem[]);
     } catch {
       // 瞬断は次のポーリングで回復
     }
-  }, [route.event_slug]);
+  }, [route.event_slug, period]);
 
   useEffect(() => {
     load();
@@ -58,9 +68,32 @@ export default function BonnoBoard({ route }: { route: Route }) {
       <h1 style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 700, margin: '0 0 8px', letterSpacing: 2 }}>
         {route.title}
       </h1>
-      <p style={{ fontSize: 14, color: '#8F8770', margin: '0 0 40px' }}>
+      <p style={{ fontSize: 14, color: '#8F8770', margin: '0 0 20px' }}>
         奉納 {items.length} 件 ・ 総投資 {totalBonno} BONNO
       </p>
+
+      {/* 期間タブ：複数日開催を想定し、今日／一週間／総合を切り替えられる */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 40 }}>
+        {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: 2,
+              padding: '8px 20px',
+              borderRadius: 999,
+              border: `1px solid ${period === p ? '#D6C8A0' : 'rgba(232, 224, 204, 0.25)'}`,
+              background: period === p ? 'rgba(214, 200, 160, 0.14)' : 'transparent',
+              color: period === p ? '#F2EBD8' : '#8F8770',
+              cursor: 'pointer',
+            }}
+          >
+            {PERIOD_LABELS[p]}
+          </button>
+        ))}
+      </div>
 
       {ranked.length === 0 || totalBonno === 0 ? (
         <p style={{ color: '#5C574A', fontSize: 18, letterSpacing: 4, textAlign: 'center', padding: '80px 0' }}>
@@ -80,7 +113,7 @@ export default function BonnoBoard({ route }: { route: Route }) {
               background: 'rgba(214, 200, 160, 0.06)',
             }}>
               <p style={{ fontSize: 15, letterSpacing: 5, color: '#D6C8A0', margin: '0 0 20px' }}>
-                🏆 本日の最高落札煩悩
+                {TOP_LABELS[period]}
               </p>
               <p style={{
                 fontSize: 'clamp(24px, 3.6vw, 44px)',

@@ -45,6 +45,21 @@ async function getServerClient() {
   return supabaseServer;
 }
 
+// 複数日にまたがる開催を想定し、投稿を期間で絞り込めるようにする（投資ボードの「今日/一週間/総合」切り替え用）。
+// 「今日」はJST（日本のイベント運用前提）の暦日で区切る。
+function jstStartOfTodayUTC(): string {
+  const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const jstWallClock = new Date(Date.now() + JST_OFFSET_MS);
+  jstWallClock.setUTCHours(0, 0, 0, 0);
+  return new Date(jstWallClock.getTime() - JST_OFFSET_MS).toISOString();
+}
+
+function periodCutoff(period: string | null): string | null {
+  if (period === 'today') return jstStartOfTodayUTC();
+  if (period === 'week') return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  return null; // 'all' または未指定は絞り込みなし
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!SUPABASE_READY) {
@@ -124,6 +139,9 @@ export async function GET(req: NextRequest) {
   // （数えると会場IPが15分ロックされ、正しいパスワードの運営コンソールまで締め出される）
   const isAdmin = req.headers.get('x-admin-password') ? checkAdmin(req) : false;
 
+  const period = req.nextUrl.searchParams.get('period'); // 'today' | 'week' | 'all' | null（未指定は絞り込みなし＝従来通り）
+  const cutoff = periodCutoff(period);
+
   let query = supabaseServer
     .from('bonno_submissions')
     .select('*')
@@ -131,6 +149,7 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: true })
     .limit(500);
   if (!isAdmin) query = query.eq('status', 'visible');
+  if (cutoff) query = query.gte('created_at', cutoff);
 
   const { data, error } = await query;
   if (error) {
