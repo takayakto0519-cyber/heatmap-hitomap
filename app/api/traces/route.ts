@@ -14,6 +14,7 @@ import { SAMPLE_TRACES } from '@/lib/sampleTraces';
 import { getCurrentUserId } from '@/lib/supabase/requestClient';
 import { notifyDiscord, notifyDiscordError } from '@/lib/discord';
 import { haversine } from '@/lib/geo';
+import { isRateLimited } from '@/lib/rateLimit';
 
 const CROSSED_PATHS_RADIUS_M = 50;
 
@@ -83,6 +84,14 @@ async function reverseGeocodeRegion(lat: number, lon: number): Promise<string | 
 
 export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceResponse>> {
   try {
+    // まち歩き中の連続投稿は自然な使い方なので窓は緩め（1分間に12件まで）。スクリプト連投だけを弾く
+    if (isRateLimited(req, 'traces', 60_000, 12)) {
+      return NextResponse.json(
+        { ok: false, error: '投稿が続きすぎています。少し時間をおいてから再度お試しください' },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as CreateTraceRequest;
 
     // 最低限のバリデーション（入力負荷を下げるため必須は title と座標のみ）

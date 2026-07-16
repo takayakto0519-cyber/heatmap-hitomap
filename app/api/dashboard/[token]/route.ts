@@ -4,6 +4,7 @@
 // 個別トレースの座標・写真・自由記述は一切含まれない。
 import { NextRequest, NextResponse } from 'next/server';
 import { computeRegionAggregate } from '@/lib/regionAggregate';
+import { computeAttachmentFunnel } from '@/lib/attachment';
 import type { DashboardAccess, DashboardResponse } from '@/lib/types';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -37,11 +38,15 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     .update({ last_accessed_at: new Date().toISOString() })
     .eq('id', typedAccess.id);
 
-  const aggregate = await computeRegionAggregate(supabaseServer, typedAccess.region);
+  const [aggregate, funnel] = await Promise.all([
+    computeRegionAggregate(supabaseServer, typedAccess.region),
+    computeAttachmentFunnel(supabaseServer, typedAccess.region),
+  ]);
 
   return NextResponse.json<DashboardResponse>({
     ok: true,
     label: typedAccess.label,
     aggregate,
+    funnel,
   });
 }

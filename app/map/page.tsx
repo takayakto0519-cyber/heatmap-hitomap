@@ -2031,7 +2031,7 @@ function MapApp() {
                       </div>
                     </section>
 
-                    {/* 人・もの・こと */}
+                    {/* 人・もの・こと（ヒトマップの本義＝人との出会いの記録。「人」を選んだら出会いの中身を促す） */}
                     <section>
                       <label style={labelStyle}>👤 人・もの・こと？</label>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -2048,6 +2048,19 @@ function MapApp() {
                           </button>
                         ))}
                       </div>
+                      {traceTypeKey === 'person' && (
+                        <div style={{ marginTop: 10, padding: '12px', borderRadius: 10, background: '#F7F0FA', border: '1.5px solid #D7BDE2' }}>
+                          <p style={{ fontSize: 12.5, color: '#6C3483', margin: '0 0 8px', fontWeight: 700 }}>
+                            🤝 人との出会いは、この町とあなたを結ぶいちばん強い縁になります
+                          </p>
+                          <p style={{ fontSize: 12, color: '#726C5E', margin: '0 0 4px' }}>誰と出会いましたか？</p>
+                          <input type="text" value={companionTag} onChange={e => setCompanionTag(e.target.value)}
+                            placeholder="例: 八百屋のおばあちゃん、宿のご主人" style={inputStyle} />
+                          <p style={{ fontSize: 11, color: '#8C8579', margin: '6px 0 0' }}>
+                            もらった言葉や交わした話は「🔍 もっと深く」の欄に残しておくと、後で読み返したとき宝物になります
+                          </p>
+                        </div>
+                      )}
                     </section>
 
                     {/* 過去の記憶：正確な日付を思い出せなくても、だいたいの年でOKにする（ご年配の方の思い出も記録しやすいように） */}
@@ -2136,11 +2149,14 @@ function MapApp() {
                         placeholder="匿名でもOK" style={inputStyle} />
                     </section>
 
-                    <section>
-                      <label style={labelStyle}>🧑‍🤝‍🧑 誰と一緒に見つけた？（任意）</label>
-                      <input type="text" value={companionTag} onChange={e => setCompanionTag(e.target.value)}
-                        placeholder="例: 田中さん、地元の人と2人で" style={inputStyle} />
-                    </section>
+                    {/* 「人」を選んだ場合は上の出会い欄で入力済みのため二重表示しない */}
+                    {traceTypeKey !== 'person' && (
+                      <section>
+                        <label style={labelStyle}>🧑‍🤝‍🧑 誰と一緒に見つけた？（任意）</label>
+                        <input type="text" value={companionTag} onChange={e => setCompanionTag(e.target.value)}
+                          placeholder="例: 田中さん、地元の人と2人で" style={inputStyle} />
+                      </section>
+                    )}
 
                     <section style={{ padding: '10px', background: '#F8F9FA', borderRadius: 10, marginBottom: 0 }}>
                       <label style={{ ...labelStyle, fontSize: 12, color: '#726C5E', marginBottom: 4 }}>🔖 実験回コード（グループ共通）</label>

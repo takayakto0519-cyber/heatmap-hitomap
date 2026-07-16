@@ -8,6 +8,7 @@ import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
 import RegionTimeline from '@/components/region/RegionTimeline';
 import Storytellers from '@/components/region/Storytellers';
+import AfterStories from '@/components/region/AfterStories';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), {
   ssr: false,
@@ -101,6 +102,7 @@ export default function RegionPage() {
         {!loading && traces.length > 0 && (
           <>
             <RegionTimeline traces={traces} onTraceClick={setSelectedTrace} />
+            <AfterStories traces={traces} onTraceClick={setSelectedTrace} />
             <Storytellers traces={traces} />
           </>
         )}

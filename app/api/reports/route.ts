@@ -2,10 +2,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRequestClient, getCurrentUserId } from '@/lib/supabase/requestClient';
 import { notifyDiscord } from '@/lib/discord';
+import { isRateLimited } from '@/lib/rateLimit';
 
 const REASONS = ['inappropriate', 'spam', 'personal_info', 'private_property', 'copyright', 'other'] as const;
 
 export async function POST(req: NextRequest) {
+  // 通報の連投（Discord通知の洪水・通報テーブルの水増し）を防ぐ。正当な通報が10分に5件を超えることはまず無い
+  if (isRateLimited(req, 'reports', 10 * 60_000, 5)) {
+    return NextResponse.json({ ok: false, error: '通報が続きすぎています。しばらくしてから再度お試しください' }, { status: 429 });
+  }
+
   const body = await req.json().catch(() => ({})) as {
     trace_id?: string; reason?: string; note?: string; reporter_session?: string;
   };

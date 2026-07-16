@@ -6,6 +6,7 @@
 // 読み書きは必ずこのRoute Handlerを通る。
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server';
+import { isRateLimited } from '@/lib/rateLimit';
 
 const SUPABASE_READY = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -31,6 +32,12 @@ async function spentBy(voterToken: string, eventSlug: string): Promise<number> {
 
 export async function POST(req: NextRequest) {
   try {
+    // 予算はvoter_tokenごとに上限があるが、token自体は誰でも量産できるためIP側でも縛る。
+    // 会場Wi-Fi（NAT）では大勢が同じIPになるため、大幅に余裕を持たせた値（毎分120回）にする
+    if (isRateLimited(req, 'bonno-invest', 60_000, 120)) {
+      return NextResponse.json({ ok: false, error: '操作が集中しています。少し待ってからお試しください' }, { status: 429 });
+    }
+
     if (!SUPABASE_READY) {
       return NextResponse.json(
         { ok: false, error: 'Supabase未設定（ローカル確認モード）。.env.localにキーを設定してください' },

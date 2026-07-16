@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { corpColor, corpFont } from '@/components/corp/tokens';
 import { computeRegionAggregate } from '@/lib/regionAggregate';
+import { computeAttachmentFunnel } from '@/lib/attachment';
 import type { DashboardAccess } from '@/lib/types';
 
 export const dynamic = 'force-dynamic'; // 常に最新の集計を返す（キャッシュしない）
@@ -27,15 +28,20 @@ async function loadDashboard(token: string) {
     .update({ last_accessed_at: new Date().toISOString() })
     .eq('id', typedAccess.id);
 
-  const aggregate = await computeRegionAggregate(supabaseServer, typedAccess.region);
-  return { access: typedAccess, aggregate };
+  // 感情の内訳（従来）に加えて、愛着ファネル（地・理・心）も併せて取得する。
+  // どちらも件数・割合のみで個人を特定できる値は含まない。
+  const [aggregate, funnel] = await Promise.all([
+    computeRegionAggregate(supabaseServer, typedAccess.region),
+    computeAttachmentFunnel(supabaseServer, typedAccess.region),
+  ]);
+  return { access: typedAccess, aggregate, funnel };
 }
 
 export default async function CustomerDashboardPage({ params }: { params: { token: string } }) {
   const data = await loadDashboard(params.token);
   if (!data) notFound();
 
-  const { access, aggregate } = data;
+  const { access, aggregate, funnel } = data;
   const totalShown = aggregate.cells.reduce((sum, c) => sum + c.count, 0);
   const valence = aggregate.cells.reduce(
     (acc, c) => ({
@@ -88,6 +94,44 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
                   <span style={{ width: 40, fontSize: 12, color: corpColor.ink, textAlign: 'right', flexShrink: 0 }}>{pct(n as number)}%</span>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* 愛着ファネル（地・理・心）——関係人口の「質」を段階で示す。5人未満は抑制 */}
+        <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px', marginBottom: 24 }}>
+          <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>地域への愛着の段階</p>
+          <p style={{ margin: '0 0 20px', fontSize: 12, color: corpColor.inkSoft, lineHeight: 1.8 }}>
+            訪れた人が「記録する」→「人とつながる」→「再び足を運ぶ」へと進んだ人数です。
+            訪問者数だけでは見えない、関係の深まりを示します。
+          </p>
+          {funnel.suppressed || !funnel.ok || !funnel.stages ? (
+            <p style={{ margin: 0, fontSize: 13, color: corpColor.inkSoft, lineHeight: 1.9 }}>
+              現時点では、公開のしきい値（記録した人が5人以上）を満たしていません。
+              記録が積み重なると、ここに段階別の人数が表示されます。
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                ['記録した', funnel.stages.chi, 'この地域に記録を残した人'],
+                ['つながった', funnel.stages.ri, 'そのうち、他の人と反応・コメントを交わした人'],
+                ['結ばれた', funnel.stages.shin, 'そのうち、再訪・その後の記録・対面の約束に至った人'],
+              ].map(([label, n, hint], i) => {
+                const base = funnel.stages!.chi;
+                const width = base > 0 ? Math.round(((n as number) / base) * 100) : 0;
+                return (
+                  <div key={label as string}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: corpColor.ink }}>{i + 1}. {label}</span>
+                      <span style={{ fontSize: 12, color: corpColor.ink }}>{n}人{i > 0 ? `（${width}%）` : ''}</span>
+                    </div>
+                    <div style={{ height: 8, background: corpColor.groundDeep }}>
+                      <div style={{ width: `${width}%`, height: '100%', background: corpColor.moss, opacity: 1 - i * 0.25 }} />
+                    </div>
+                    <p style={{ margin: '4px 0 0', fontSize: 11, color: corpColor.inkSoft }}>{hint}</p>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

@@ -361,6 +361,7 @@ export interface DashboardResponse {
   ok: boolean;
   label: string | null;
   aggregate?: RegionAggregateResponse;
+  funnel?: AttachmentFunnel; // 愛着ファネル（地・理・心）。件数と割合のみ
   error?: string;
 }
 
