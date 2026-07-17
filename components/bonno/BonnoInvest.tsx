@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from '@/lib/types';
 import { colors, radii } from '@/lib/theme';
+import { getOrCreateVoterToken } from '@/lib/bonnoVoter';
 
 interface InvestItem {
   id: string;
@@ -20,19 +21,6 @@ interface InvestItem {
 
 const POLL_MS = 2500;
 const INVEST_STEP = 10;
-
-function voterTokenKey(eventSlug: string) {
-  return `bonno_voter_token_${eventSlug}`;
-}
-
-function getOrCreateVoterToken(eventSlug: string): string {
-  const key = voterTokenKey(eventSlug);
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
-  const created = crypto.randomUUID();
-  localStorage.setItem(key, created);
-  return created;
-}
 
 export default function BonnoInvest({ route }: { route: Route }) {
   const eventSlug = route.event_slug ?? '';

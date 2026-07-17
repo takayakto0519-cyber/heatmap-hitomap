@@ -8,9 +8,12 @@
 // ・クリックで全画面
 // ・スマホ幅（プロジェクターではなく参加者が自分の端末で開いた場合）は、
 //   浮遊演出だと文字が重なって読めないため、読みやすい縦一覧表示に切り替える
+// ・煩悩をタップすると中央に大きく表示され、そのままBONNOを投資できる
+//   （投資ページ(BonnoInvest)と同じvoter_token・予算ロジックを使う）
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Route } from '@/lib/types';
+import { getOrCreateVoterToken } from '@/lib/bonnoVoter';
 
 interface WallItem {
   id: string;
@@ -30,12 +33,19 @@ interface FloatStyle {
 
 const POLL_MS = 2500;
 const ANNOUNCE_MS = 5000;
+const INVEST_STEP = 10;
 
 export default function BonnoWall({ route }: { route: Route }) {
+  const eventSlug = route.event_slug ?? '';
   const [items, setItems] = useState<WallItem[]>([]);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [announce, setAnnounce] = useState<WallItem | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [voterToken, setVoterToken] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(0);
+  const [investPending, setInvestPending] = useState(false);
+  const [investError, setInvestError] = useState<string | null>(null);
   const knownIds = useRef<Set<string>>(new Set());
   const floatStyles = useRef<Map<string, FloatStyle>>(new Map());
   const announceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,6 +57,43 @@ export default function BonnoWall({ route }: { route: Route }) {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  useEffect(() => {
+    const token = getOrCreateVoterToken(eventSlug);
+    setVoterToken(token);
+    fetch(`/api/bonno/invest?event_slug=${encodeURIComponent(eventSlug)}&voter_token=${encodeURIComponent(token)}`)
+      .then((res) => res.json())
+      .then((data) => { if (data.ok) setRemaining(data.remaining); })
+      .catch(() => {});
+  }, [eventSlug]);
+
+  const invest = async (id: string) => {
+    if (!voterToken || investPending) return;
+    if (remaining < INVEST_STEP) {
+      setInvestError('残り予算が足りません');
+      return;
+    }
+    setInvestPending(true);
+    setInvestError(null);
+    try {
+      const res = await fetch('/api/bonno/invest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_slug: eventSlug, submission_id: id, voter_token: voterToken, amount: INVEST_STEP }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setInvestError(data.error ?? '投資に失敗しました');
+        return;
+      }
+      setRemaining(data.remaining);
+      setItems((prev) => prev.map((it) => it.id === id ? { ...it, total_bonno: data.submission_total } : it));
+    } catch {
+      setInvestError('通信に失敗しました');
+    } finally {
+      setInvestPending(false);
+    }
+  };
 
   const styleFor = (id: string): FloatStyle => {
     let s = floatStyles.current.get(id);
@@ -64,7 +111,7 @@ export default function BonnoWall({ route }: { route: Route }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/bonno?event_slug=${encodeURIComponent(route.event_slug ?? '')}`);
+      const res = await fetch(`/api/bonno?event_slug=${encodeURIComponent(eventSlug)}`);
       const data = await res.json();
       if (!data.ok) return;
       const list = data.items as WallItem[];
@@ -83,7 +130,7 @@ export default function BonnoWall({ route }: { route: Route }) {
     } catch {
       // 会場Wi-Fiの瞬断でも演出を止めない（次のポーリングで回復する）
     }
-  }, [route.event_slug]);
+  }, [eventSlug]);
 
   useEffect(() => {
     load();
@@ -100,7 +147,8 @@ export default function BonnoWall({ route }: { route: Route }) {
   };
 
   const spotlight = spotlightId ? items.find((it) => it.id === spotlightId) ?? null : null;
-  const dimmed = Boolean(spotlight || announce);
+  const selected = selectedId ? items.find((it) => it.id === selectedId) ?? null : null;
+  const dimmed = Boolean(spotlight || announce || selected);
 
   // BONNO投資を集めた煩悩ほど大きく画面に浮かび上がる
   const fontSizeFor = (it: WallItem) => {
@@ -154,7 +202,11 @@ export default function BonnoWall({ route }: { route: Route }) {
           }}
         >
           {items.slice().reverse().map((it) => (
-            <div key={it.id} style={{ marginBottom: 22, paddingBottom: 22, borderBottom: '1px solid rgba(232, 224, 204, 0.12)' }}>
+            <div
+              key={it.id}
+              onClick={(e) => { e.stopPropagation(); setSelectedId(it.id); }}
+              style={{ marginBottom: 22, paddingBottom: 22, borderBottom: '1px solid rgba(232, 224, 204, 0.12)', cursor: 'pointer' }}
+            >
               <p style={{ margin: 0, color: '#E8E0CC', fontSize: 18, lineHeight: 1.8, letterSpacing: 0.5, whiteSpace: 'pre-wrap' }}>
                 {it.text}
               </p>
@@ -174,6 +226,7 @@ export default function BonnoWall({ route }: { route: Route }) {
             return (
               <p
                 key={it.id}
+                onClick={(e) => { e.stopPropagation(); setSelectedId(it.id); }}
                 style={{
                   position: 'absolute',
                   left: `${s.left}%`,
@@ -185,6 +238,7 @@ export default function BonnoWall({ route }: { route: Route }) {
                   lineHeight: 1.6,
                   letterSpacing: 1,
                   whiteSpace: 'pre-wrap',
+                  cursor: 'pointer',
                   animation: `bonnoRise ${s.duration}s linear ${s.delay}s infinite`,
                   ['--drift' as string]: `${s.drift}px`,
                   willChange: 'transform, opacity',
@@ -240,6 +294,65 @@ export default function BonnoWall({ route }: { route: Route }) {
               — {(spotlight ?? announce)!.nickname}
             </p>
           )}
+        </div>
+      )}
+
+      {/* タップされた煩悩の拡大表示＋その場でBONNO投資（スポットライト・新着お披露目がないときのみ） */}
+      {selected && !spotlight && !announce && (
+        <div
+          onClick={(e) => { e.stopPropagation(); setSelectedId(null); }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 8vw',
+            textAlign: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <p style={{
+            margin: '0 0 24px',
+            color: '#F2EBD8',
+            fontSize: 'clamp(28px, 4.5vw, 64px)',
+            lineHeight: 1.7,
+            letterSpacing: 2,
+            whiteSpace: 'pre-wrap',
+          }}>
+            {selected.text}
+          </p>
+          {selected.nickname && (
+            <p style={{ fontSize: 'clamp(14px, 1.6vw, 22px)', color: '#A89E82', margin: '0 0 20px', letterSpacing: 2 }}>
+              — {selected.nickname}
+            </p>
+          )}
+          <p style={{ fontSize: 16, color: '#D6C8A0', margin: '0 0 20px', letterSpacing: 2 }}>
+            💰 {selected.total_bonno} BONNO
+          </p>
+          <button
+            onClick={(e) => { e.stopPropagation(); invest(selected.id); }}
+            disabled={investPending || remaining < INVEST_STEP}
+            style={{
+              padding: '12px 32px',
+              borderRadius: 999,
+              border: 'none',
+              background: investPending || remaining < INVEST_STEP ? 'rgba(232, 224, 204, 0.2)' : '#D6C8A0',
+              color: investPending || remaining < INVEST_STEP ? '#8F8770' : '#23231F',
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: investPending || remaining < INVEST_STEP ? 'default' : 'pointer',
+            }}
+          >
+            {investPending ? '投資中…' : `+${INVEST_STEP} BONNOを投資`}
+          </button>
+          {investError && (
+            <p style={{ fontSize: 13, color: '#D46A5C', margin: '16px 0 0' }}>{investError}</p>
+          )}
+          <p style={{ fontSize: 12, color: '#5C574A', margin: '20px 0 0', letterSpacing: 2 }}>
+            残り予算 {remaining} BONNO ・ タップして閉じる
+          </p>
         </div>
       )}
 
