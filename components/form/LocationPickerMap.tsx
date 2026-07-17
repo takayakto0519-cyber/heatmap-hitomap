@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
+import { GSI_TILE_URL, GSI_ATTRIBUTION, GSI_MAX_ZOOM } from '@/lib/mapTiles';
 
 const icon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -45,10 +46,7 @@ export default function LocationPickerMap({ lat, lng, onChange }: Props) {
       style={{ height: 220, width: '100%', borderRadius: 12 }}
       scrollWheelZoom={false}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer attribution={GSI_ATTRIBUTION} url={GSI_TILE_URL} maxZoom={GSI_MAX_ZOOM} />
       <CenterUpdater lat={lat} lng={lng} />
       <ClickHandler onMove={onChange} />
       <Marker position={[lat, lng]} icon={icon} />

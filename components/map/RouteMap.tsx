@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 import type { Trace } from '@/lib/types';
+import { GSI_TILE_URL, GSI_ATTRIBUTION, GSI_MAX_ZOOM } from '@/lib/mapTiles';
 
 function numberedIcon(n: number, visited: boolean) {
   const bg = visited ? '#bbb' : '#8E44AD';
@@ -66,10 +67,7 @@ export default function RouteMap({ traces, visitedIds = [], startPoint, endPoint
 
   return (
     <MapContainer center={fallback} zoom={15} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer attribution={GSI_ATTRIBUTION} url={GSI_TILE_URL} maxZoom={GSI_MAX_ZOOM} />
       <FitToRoute positions={fitPositions} />
       <Polyline positions={positions} pathOptions={{ color: '#8E44AD', weight: 3, dashArray: '6 8' }} />
       {eventLine.length >= 2 && (

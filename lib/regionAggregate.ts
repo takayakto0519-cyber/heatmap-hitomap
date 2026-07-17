@@ -8,7 +8,7 @@
 // ============================================================
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { summarizeValence } from '@/lib/emotions';
-import type { RegionAggregateCell, RegionAggregateResponse } from '@/lib/types';
+import type { RegionAggregateCell, RegionAggregateResponse, MapBbox } from '@/lib/types';
 
 export const DEFAULT_GRID_SIZE_DEG = 0.01; // 目安で約1km四方
 export const DEFAULT_THRESHOLD = 5;        // このしきい値未満の件数のセルは表示しない
@@ -34,16 +34,26 @@ export async function computeRegionAggregate(
   supabaseServer: SupabaseClient,
   region: string,
   gridSizeDeg: number = DEFAULT_GRID_SIZE_DEG,
-  threshold: number = DEFAULT_THRESHOLD
+  threshold: number = DEFAULT_THRESHOLD,
+  bbox?: MapBbox | null
 ): Promise<RegionAggregateResponse> {
   // 集計にのみ使う列を明示的に選択する。title/why/interpretation/photo_url等は
   // 一切 select しない（顧客向けレイヤーで個別の生データが漏れる経路を作らないため）。
-  const { data, error } = await supabaseServer
+  let query = supabaseServer
     .from('traces')
     .select('latitude, longitude, emotion_key')
     .eq('is_deleted', false)
-    .eq('visibility', 'public')
-    .eq('region', region);
+    .eq('visibility', 'public');
+
+  // bboxが指定されていれば、region文字列の完全一致ではなく地図上の範囲で絞り込む
+  // （行政区域の表記ゆれ・大字/丁目単位のばらつきに左右されない）
+  query = bbox
+    ? query
+        .gte('latitude', bbox.minLat).lte('latitude', bbox.maxLat)
+        .gte('longitude', bbox.minLng).lte('longitude', bbox.maxLng)
+    : query.eq('region', region);
+
+  const { data, error } = await query;
 
   if (error) {
     return {
@@ -121,14 +131,22 @@ export interface RegionSummary {
 
 export async function computeRegionSummary(
   supabaseServer: SupabaseClient,
-  region: string
+  region: string,
+  bbox?: MapBbox | null
 ): Promise<RegionSummary> {
-  const { data } = await supabaseServer
+  let query = supabaseServer
     .from('traces')
     .select('emotion_key')
     .eq('is_deleted', false)
-    .eq('visibility', 'public')
-    .eq('region', region);
+    .eq('visibility', 'public');
+
+  query = bbox
+    ? query
+        .gte('latitude', bbox.minLat).lte('latitude', bbox.maxLat)
+        .gte('longitude', bbox.minLng).lte('longitude', bbox.maxLng)
+    : query.eq('region', region);
+
+  const { data } = await query;
 
   const rows = (data ?? []) as { emotion_key: string | null }[];
   return {

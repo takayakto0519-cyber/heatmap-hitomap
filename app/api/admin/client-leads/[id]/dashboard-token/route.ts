@@ -17,9 +17,28 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
   }
 
   const { id } = context.params;
-  const body = await req.json().catch(() => ({})) as { region?: string; label?: string };
+  const body = await req.json().catch(() => ({})) as {
+    region?: string; label?: string;
+    bbox_min_lat?: number; bbox_max_lat?: number; bbox_min_lng?: number; bbox_max_lng?: number;
+  };
   if (!body.region) {
     return NextResponse.json<IssueDashboardTokenResponse>({ ok: false, error: 'region は必須です' }, { status: 400 });
+  }
+
+  // bboxは4値すべて揃っている場合のみ有効にする（片方だけの中途半端な範囲指定を防ぐ）
+  const bboxFields = [body.bbox_min_lat, body.bbox_max_lat, body.bbox_min_lng, body.bbox_max_lng];
+  const hasBbox = bboxFields.every((v) => typeof v === 'number' && Number.isFinite(v));
+  if (bboxFields.some((v) => v !== undefined) && !hasBbox) {
+    return NextResponse.json<IssueDashboardTokenResponse>(
+      { ok: false, error: '地図範囲を指定する場合は北端・南端・東端・西端をすべて入力してください' },
+      { status: 400 }
+    );
+  }
+  if (hasBbox && (body.bbox_min_lat! >= body.bbox_max_lat! || body.bbox_min_lng! >= body.bbox_max_lng!)) {
+    return NextResponse.json<IssueDashboardTokenResponse>(
+      { ok: false, error: '地図範囲の指定が不正です（南端は北端より小さく、西端は東端より小さくしてください）' },
+      { status: 400 }
+    );
   }
 
   const { supabaseServer } = await import('@/lib/supabase/server');
@@ -35,6 +54,10 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
 
   let access = existing as DashboardAccess | null;
 
+  // 既存トークンの範囲指定が今回の指定と食い違う場合は使い回さず、新規発行に進む
+  // （範囲を変えたい＝実質的に別のダッシュボードとして扱う）
+  if (access && hasBbox !== (access.bbox_min_lat !== null)) access = null;
+
   if (!access) {
     const { data, error } = await supabaseServer
       .from('dashboard_access')
@@ -43,6 +66,10 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
         token: randomUUID(),
         region: body.region,
         label: body.label ?? null,
+        bbox_min_lat: hasBbox ? body.bbox_min_lat : null,
+        bbox_max_lat: hasBbox ? body.bbox_max_lat : null,
+        bbox_min_lng: hasBbox ? body.bbox_min_lng : null,
+        bbox_max_lng: hasBbox ? body.bbox_max_lng : null,
       })
       .select()
       .single();

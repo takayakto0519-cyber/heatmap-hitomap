@@ -5,7 +5,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { computeRegionAggregate } from '@/lib/regionAggregate';
 import { computeAttachmentFunnel } from '@/lib/attachment';
-import type { DashboardAccess, DashboardResponse } from '@/lib/types';
+import type { DashboardAccess, DashboardResponse, MapBbox } from '@/lib/types';
+
+function bboxOf(access: DashboardAccess): MapBbox | null {
+  if (access.bbox_min_lat === null || access.bbox_max_lat === null || access.bbox_min_lng === null || access.bbox_max_lng === null) {
+    return null;
+  }
+  return { minLat: access.bbox_min_lat, maxLat: access.bbox_max_lat, minLng: access.bbox_min_lng, maxLng: access.bbox_max_lng };
+}
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -38,9 +45,10 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     .update({ last_accessed_at: new Date().toISOString() })
     .eq('id', typedAccess.id);
 
+  const bbox = bboxOf(typedAccess);
   const [aggregate, funnel] = await Promise.all([
-    computeRegionAggregate(supabaseServer, typedAccess.region),
-    computeAttachmentFunnel(supabaseServer, typedAccess.region),
+    computeRegionAggregate(supabaseServer, typedAccess.region, undefined, undefined, bbox),
+    computeAttachmentFunnel(supabaseServer, typedAccess.region, bbox),
   ]);
 
   return NextResponse.json<DashboardResponse>({

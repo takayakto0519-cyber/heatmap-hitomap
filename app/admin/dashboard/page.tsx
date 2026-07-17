@@ -2210,6 +2210,49 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [proposalDraft, setProposalDraft] = useState<Record<string, string>>({});
   const [proposalError, setProposalError] = useState<Record<string, string>>({});
 
+  // 自治体・法人向け集計ダッシュボードの専用URL発行（地図範囲でも絞り込める）
+  const [dashOpen, setDashOpen] = useState<Record<string, boolean>>({});
+  const [dashForm, setDashForm] = useState<Record<string, {
+    region: string; label: string; useBbox: boolean;
+    minLat: string; maxLat: string; minLng: string; maxLng: string;
+  }>>({});
+  const [dashLoading, setDashLoading] = useState<Record<string, boolean>>({});
+  const [dashResult, setDashResult] = useState<Record<string, string>>({});
+  const [dashError, setDashError] = useState<Record<string, string>>({});
+
+  function dashFormFor(id: string) {
+    return dashForm[id] ?? { region: '', label: '', useBbox: false, minLat: '', maxLat: '', minLng: '', maxLng: '' };
+  }
+
+  async function issueDashboardToken(id: string) {
+    const f = dashFormFor(id);
+    if (!f.region.trim()) { setDashError(prev => ({ ...prev, [id]: '対象の地域名（regionに保存されている表記）を入力してください' })); return; }
+    setDashLoading(prev => ({ ...prev, [id]: true }));
+    setDashError(prev => ({ ...prev, [id]: '' }));
+    try {
+      const body: Record<string, unknown> = { region: f.region.trim(), label: f.label.trim() || undefined };
+      if (f.useBbox) {
+        const nums = { bbox_min_lat: Number(f.minLat), bbox_max_lat: Number(f.maxLat), bbox_min_lng: Number(f.minLng), bbox_max_lng: Number(f.maxLng) };
+        if (Object.values(nums).some((n) => !Number.isFinite(n))) {
+          setDashError(prev => ({ ...prev, [id]: '地図範囲は数値で入力してください' }));
+          setDashLoading(prev => ({ ...prev, [id]: false }));
+          return;
+        }
+        Object.assign(body, nums);
+      }
+      const res = await fetch(`/api/admin/client-leads/${id}/dashboard-token`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) setDashResult(prev => ({ ...prev, [id]: data.url }));
+      else setDashError(prev => ({ ...prev, [id]: data.error ?? '発行に失敗しました' }));
+    } catch {
+      setDashError(prev => ({ ...prev, [id]: '通信エラー' }));
+    } finally {
+      setDashLoading(prev => ({ ...prev, [id]: false }));
+    }
+  }
+
   const load = useCallback(() => {
     setLoading(true);
     fetch('/api/admin/client-leads', { headers: authHeaders() })
@@ -2496,6 +2539,75 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                         background: '#fff', color: '#888', cursor: 'pointer',
                       }}>閉じる</button>
                     </div>
+                  </div>
+                )}
+
+                <button type="button" onClick={() => setDashOpen(prev => ({ ...prev, [l.id]: !prev[l.id] }))} style={{
+                  marginTop: 8, marginLeft: 8, padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  border: '1.5px solid #4A69BD', background: dashOpen[l.id] ? '#4A69BD' : '#EEF1FB',
+                  color: dashOpen[l.id] ? '#fff' : '#4A69BD',
+                }}>🗺 集計ダッシュボードURLを発行</button>
+
+                {dashOpen[l.id] && (
+                  <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: '#EEF1FB', border: '1px solid #DCE3F5' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: 11, color: '#4A69BD', lineHeight: 1.7 }}>
+                      Supabaseアカウント不要のトークン付きURLを発行します。既定では地域名（regionカラムと完全一致）で集計しますが、
+                      地図範囲（緯度経度）を指定するとそちらを優先し、region表記のばらつきに左右されず対象エリアを絞り込めます。
+                    </p>
+                    <input
+                      placeholder="対象の地域名 *（例：大阪府浪速区）"
+                      value={dashFormFor(l.id).region}
+                      onChange={e => setDashForm(prev => ({ ...prev, [l.id]: { ...dashFormFor(l.id), region: e.target.value } }))}
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 6 }}
+                    />
+                    <input
+                      placeholder="表示名（任意・例：〇〇市役所様）"
+                      value={dashFormFor(l.id).label}
+                      onChange={e => setDashForm(prev => ({ ...prev, [l.id]: { ...dashFormFor(l.id), label: e.target.value } }))}
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 6 }}
+                    />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#4A69BD', marginBottom: 6, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={dashFormFor(l.id).useBbox}
+                        onChange={e => setDashForm(prev => ({ ...prev, [l.id]: { ...dashFormFor(l.id), useBbox: e.target.checked } }))}
+                      />
+                      地図範囲（緯度経度）で絞り込む
+                    </label>
+                    {dashFormFor(l.id).useBbox && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                        {([
+                          ['maxLat', '北端の緯度'], ['minLat', '南端の緯度'],
+                          ['minLng', '西端の経度'], ['maxLng', '東端の経度'],
+                        ] as const).map(([key, label]) => (
+                          <input
+                            key={key}
+                            placeholder={label}
+                            inputMode="decimal"
+                            value={dashFormFor(l.id)[key]}
+                            onChange={e => setDashForm(prev => ({ ...prev, [l.id]: { ...dashFormFor(l.id), [key]: e.target.value } }))}
+                            style={{ ...inputStyle, boxSizing: 'border-box' }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <button type="button" onClick={() => issueDashboardToken(l.id)} disabled={dashLoading[l.id]} style={{
+                      padding: '7px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700,
+                      background: dashLoading[l.id] ? '#ddd' : '#4A69BD', color: '#fff',
+                      cursor: dashLoading[l.id] ? 'wait' : 'pointer',
+                    }}>{dashLoading[l.id] ? '発行中…' : 'URLを発行する'}</button>
+
+                    {dashError[l.id] && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E55039' }}>{dashError[l.id]}</p>}
+
+                    {dashResult[l.id] && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <code style={{ fontSize: 11, background: '#fff', padding: '6px 8px', borderRadius: 6, wordBreak: 'break-all' }}>{dashResult[l.id]}</code>
+                        <button type="button" onClick={() => navigator.clipboard.writeText(dashResult[l.id])} style={{
+                          padding: '5px 10px', borderRadius: 8, border: '1px solid #4A69BD', fontSize: 11, fontWeight: 700,
+                          background: '#fff', color: '#4A69BD', cursor: 'pointer',
+                        }}>コピー</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>

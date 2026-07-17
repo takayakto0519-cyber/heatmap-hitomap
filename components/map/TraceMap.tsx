@@ -26,6 +26,7 @@ function FlyToHandler({ pos, zoom = 17, bounds }: {
 import { getEmotionColor, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
+import { GSI_TILE_URL, GSI_ATTRIBUTION, GSI_MAX_ZOOM } from '@/lib/mapTiles';
 
 // ログイン時、自分の投稿と他人の投稿を枠線の色で見分けられるようにする
 const SELF_PIN_COLOR = '#4A90E2';
@@ -248,10 +249,7 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       style={{ height: '100%', width: '100%' }}
       scrollWheelZoom
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer attribution={GSI_ATTRIBUTION} url={GSI_TILE_URL} maxZoom={GSI_MAX_ZOOM} />
       <LocateControl onLocate={onLocate} />
       <FlyToHandler pos={flyTo} zoom={flyToZoom} bounds={fitBounds} />
       <ZoomTracker onZoom={setCurrentZoom} />

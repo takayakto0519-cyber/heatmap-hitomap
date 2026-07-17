@@ -19,7 +19,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { summarizeValence } from '@/lib/emotions';
 import { phaseOf } from '@/lib/emotionShift';
-import type { AttachmentFunnel, EventEmotionShift, ValenceSummary } from '@/lib/types';
+import type { AttachmentFunnel, EventEmotionShift, ValenceSummary, MapBbox } from '@/lib/types';
 
 const SUPPRESS_THRESHOLD = 5; // regionAggregateのk-匿名しきい値と同じ思想
 
@@ -44,17 +44,24 @@ function dateKey(iso: string): string {
 
 export async function computeAttachmentFunnel(
   supabaseServer: SupabaseClient,
-  region: string
+  region: string,
+  bbox?: MapBbox | null
 ): Promise<AttachmentFunnel> {
   const generatedAt = new Date().toISOString();
 
   // ① 地域の痕跡（削除済みを除く・ユーザー紐付きのみ。匿名投稿は縦断できないため対象外）
-  const { data: traceRows, error } = await supabaseServer
+  // bboxが指定されていれば region完全一致の代わりに地図上の範囲で絞り込む（regionAggregate.tsと同じ思想）
+  let traceQuery = supabaseServer
     .from('traces')
     .select('id, user_id, created_at, revisit_of')
-    .eq('region', region)
     .eq('is_deleted', false)
     .not('user_id', 'is', null);
+  traceQuery = bbox
+    ? traceQuery
+        .gte('latitude', bbox.minLat).lte('latitude', bbox.maxLat)
+        .gte('longitude', bbox.minLng).lte('longitude', bbox.maxLng)
+    : traceQuery.eq('region', region);
+  const { data: traceRows, error } = await traceQuery;
 
   if (error) {
     return { ok: false, region, generatedAt, suppressed: false, error: error.message };

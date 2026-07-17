@@ -2,7 +2,14 @@ import { notFound } from 'next/navigation';
 import { corpColor, corpFont } from '@/components/corp/tokens';
 import { computeRegionAggregate } from '@/lib/regionAggregate';
 import { computeAttachmentFunnel } from '@/lib/attachment';
-import type { DashboardAccess } from '@/lib/types';
+import type { DashboardAccess, MapBbox } from '@/lib/types';
+
+function bboxOf(access: DashboardAccess): MapBbox | null {
+  if (access.bbox_min_lat === null || access.bbox_max_lat === null || access.bbox_min_lng === null || access.bbox_max_lng === null) {
+    return null;
+  }
+  return { minLat: access.bbox_min_lat, maxLat: access.bbox_max_lat, minLng: access.bbox_min_lng, maxLng: access.bbox_max_lng };
+}
 
 export const dynamic = 'force-dynamic'; // 常に最新の集計を返す（キャッシュしない）
 
@@ -30,18 +37,19 @@ async function loadDashboard(token: string) {
 
   // 感情の内訳（従来）に加えて、愛着ファネル（地・理・心）も併せて取得する。
   // どちらも件数・割合のみで個人を特定できる値は含まない。
+  const bbox = bboxOf(typedAccess);
   const [aggregate, funnel] = await Promise.all([
-    computeRegionAggregate(supabaseServer, typedAccess.region),
-    computeAttachmentFunnel(supabaseServer, typedAccess.region),
+    computeRegionAggregate(supabaseServer, typedAccess.region, undefined, undefined, bbox),
+    computeAttachmentFunnel(supabaseServer, typedAccess.region, bbox),
   ]);
-  return { access: typedAccess, aggregate, funnel };
+  return { access: typedAccess, aggregate, funnel, bbox };
 }
 
 export default async function CustomerDashboardPage({ params }: { params: { token: string } }) {
   const data = await loadDashboard(params.token);
   if (!data) notFound();
 
-  const { access, aggregate, funnel } = data;
+  const { access, aggregate, funnel, bbox } = data;
   const totalShown = aggregate.cells.reduce((sum, c) => sum + c.count, 0);
   const valence = aggregate.cells.reduce(
     (acc, c) => ({
@@ -70,6 +78,7 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
         </h1>
         <p style={{ margin: '0 0 40px', fontSize: 13, color: corpColor.inkSoft }}>
           生成日時：{new Date(aggregate.generatedAt).toLocaleString('ja-JP')}
+          {bbox && '　・　指定された地図範囲で集計しています'}
         </p>
 
         <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px', marginBottom: 24 }}>

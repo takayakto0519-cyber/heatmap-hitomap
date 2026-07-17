@@ -367,6 +367,15 @@ export interface MyEventShiftResponse {
 // 持たない自治体・法人顧客に、トークン付きURLで集計データだけを見せる。
 // ------------------------------------------------------------
 
+// 地図上で囲った矩形範囲。region文字列の表記ゆれに左右されず、自治体の
+// ダッシュボード表示範囲を緯度経度で直接指定したい場合に使う（regionAggregate.ts参照）。
+export interface MapBbox {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
 export interface DashboardAccess {
   id: string;
   client_lead_id: string | null;
@@ -376,6 +385,11 @@ export interface DashboardAccess {
   is_active: boolean;
   created_at: string;
   last_accessed_at: string | null;
+  // 設定されていれば region完全一致の代わりにこの範囲で集計する（自治体の実際の行政区域に地図上で合わせたい場合）
+  bbox_min_lat: number | null;
+  bbox_max_lat: number | null;
+  bbox_min_lng: number | null;
+  bbox_max_lng: number | null;
 }
 
 export interface IssueDashboardTokenResponse {
