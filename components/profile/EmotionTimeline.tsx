@@ -69,12 +69,25 @@ export default function EmotionTimeline({ traces, onSelect }: Props) {
         </p>
       ) : (
         <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
-          <svg width={width} height={trackHeight} style={{ display: 'block' }}>
+          {/* 軌跡が左から右へ描かれるアニメーション。地域を切り替えるたびに描き直す（keyで再マウント） */}
+          <style>{`
+            @keyframes emotion-line-draw {
+              from { stroke-dashoffset: 1; }
+              to { stroke-dashoffset: 0; }
+            }
+            @keyframes emotion-dot-in {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+          `}</style>
+          <svg key={regionFilter ?? 'all'} width={width} height={trackHeight} style={{ display: 'block' }}>
             <line x1={0} y1={trackHeight / 2} x2={width} y2={trackHeight / 2} stroke="#eee" strokeWidth={1} />
             <polyline
               fill="none"
               stroke="#C9A0A8"
               strokeWidth={1.5}
+              pathLength={1}
+              style={{ strokeDasharray: 1, animation: 'emotion-line-draw 1s ease-out both' }}
               points={sorted.map((t, i) => `${i * pointGap + pointGap / 2},${trackHeight / 2 - valenceY(t) * 34}`).join(' ')}
             />
             {sorted.map((t, i) => {
@@ -85,7 +98,10 @@ export default function EmotionTimeline({ traces, onSelect }: Props) {
               return (
                 <g key={t.id} onClick={() => onSelect?.(t)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
                   <title>{`${t.title}（${new Date(t.created_at).toLocaleDateString('ja-JP')}）${emotion ? ' ・ ' + emotion.label : ''}${t.region ? ' ・ ' + t.region : ''}`}</title>
-                  <circle cx={cx} cy={cy} r={5} fill={emotion?.color ?? '#ccc'} stroke="#fff" strokeWidth={1.5} />
+                  <circle
+                    cx={cx} cy={cy} r={5} fill={emotion?.color ?? '#ccc'} stroke="#fff" strokeWidth={1.5}
+                    style={{ animation: 'emotion-dot-in 0.3s ease-out both', animationDelay: `${Math.min(i * (1 / Math.max(sorted.length - 1, 1)), 1)}s` }}
+                  />
                 </g>
               );
             })}

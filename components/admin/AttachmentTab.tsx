@@ -41,16 +41,23 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13, outline: 'none', fontFamily: 'inherit', flex: 1,
 };
 
-function StageBar({ label, count, total, color, hint }: { label: string; count: number; total: number; color: string; hint: string }) {
+// 地→理→心の順にバーが伸びる（0.2秒ずつ遅らせ、段階が絞り込まれていく様子を見せる）
+function StageBar({ label, count, total, color, hint, delay = 0 }: { label: string; count: number; total: number; color: string; hint: string; delay?: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div style={{ marginBottom: 14 }}>
+      <style>{`
+        @keyframes stage-bar-grow { from { width: 0; } }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
         <span style={{ fontWeight: 700 }}>{label}</span>
         <span style={{ color: '#888' }}>{count}人 {total > 0 ? `（${pct}%）` : ''}</span>
       </div>
       <div style={{ height: 10, borderRadius: 6, background: '#f0f0f0', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 6, transition: 'width 0.3s' }} />
+        <div style={{
+          height: '100%', width: `${pct}%`, background: color, borderRadius: 6,
+          animation: 'stage-bar-grow 0.6s ease-out both', animationDelay: `${delay}s`,
+        }} />
       </div>
       <p style={{ margin: '4px 0 0', fontSize: 11, color: '#aaa' }}>{hint}</p>
     </div>
@@ -168,10 +175,10 @@ export default function AttachmentTab({ authHeaders }: { authHeaders: () => Head
           </p>
         )}
         {funnel && funnel.ok && !funnel.suppressed && funnel.stages && funnel.rates && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 16 }} key={funnel.region + funnel.generatedAt}>
             <StageBar label="① 地（記録した）" count={funnel.stages.chi} total={funnel.stages.chi} color="#38ADA9" hint="この地域に痕跡を残した人数（基準）" />
-            <StageBar label="② 理（つながった）" count={funnel.stages.ri} total={funnel.stages.chi} color="#4A69BD" hint={`地の人のうち他者と反応・コメントを交わした割合＝${funnel.rates.riRate}%`} />
-            <StageBar label="③ 心（結ばれた）" count={funnel.stages.shin} total={funnel.stages.chi} color="#E5A139" hint={`地の人のうち再訪・その後記録・会いたい成立に至った割合＝${funnel.rates.shinRate}%`} />
+            <StageBar label="② 理（つながった）" count={funnel.stages.ri} total={funnel.stages.chi} color="#4A69BD" hint={`地の人のうち他者と反応・コメントを交わした割合＝${funnel.rates.riRate}%`} delay={0.2} />
+            <StageBar label="③ 心（結ばれた）" count={funnel.stages.shin} total={funnel.stages.chi} color="#E5A139" hint={`地の人のうち再訪・その後記録・会いたい成立に至った割合＝${funnel.rates.shinRate}%`} delay={0.4} />
           </div>
         )}
         {funnel && !funnel.ok && (

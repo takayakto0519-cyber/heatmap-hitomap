@@ -99,6 +99,13 @@ export default function EnList({ traces, onSelect }: Props) {
 
   return (
     <div style={{ marginTop: 20, background: '#fff', borderRadius: 14, padding: 16, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+      {/* 絵文字の川の流れ込みアニメーション */}
+      <style>{`
+        @keyframes en-river-in {
+          from { opacity: 0; transform: translateY(5px) scale(0.7); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
       <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>🤝 縁の一覧（{bonds.length}人）</h2>
       <p style={{ margin: '0 0 12px', fontSize: 11, color: '#999' }}>
         出会った人ごとに、感情がどう変わってきたかを辿れます。この一覧はあなたにしか見えません。
@@ -127,10 +134,20 @@ export default function EnList({ traces, onSelect }: Props) {
                 <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
                   {bond.traces.length}回 ・ 最後は{fmt(bond.lastAt)}
                 </div>
-                {/* 絵文字の川：時間順の感情。長すぎる場合は直近を残す */}
+                {/* 絵文字の川：時間順の感情が左から順に流れ込む（感情が積み重なった時間を動きで伝える） */}
                 {river.length > 0 && (
                   <div style={{ fontSize: 17, letterSpacing: 3, marginTop: 6 }}>
-                    {river.length > 14 ? '…' : ''}{river.slice(-14).join('')}
+                    {river.length > 14 ? '…' : ''}
+                    {river.slice(-14).map((emoji, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          display: 'inline-block',
+                          animation: 'en-river-in 0.4s ease-out both',
+                          animationDelay: `${i * 0.1}s`,
+                        }}
+                      >{emoji}</span>
+                    ))}
                   </div>
                 )}
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: '#8A6B3F', lineHeight: 1.7 }}>{storyLine(bond)}</p>

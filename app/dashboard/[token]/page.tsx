@@ -112,6 +112,10 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 記録した→つながった→結ばれた の順にバーが伸びる（段階の絞り込みを動きで示す） */}
+              <style>{`
+                @keyframes funnel-bar-grow { from { width: 0; } }
+              `}</style>
               {[
                 ['記録した', funnel.stages.chi, 'この地域に記録を残した人'],
                 ['つながった', funnel.stages.ri, 'そのうち、他の人と反応・コメントを交わした人'],
@@ -126,7 +130,10 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
                       <span style={{ fontSize: 12, color: corpColor.ink }}>{n}人{i > 0 ? `（${width}%）` : ''}</span>
                     </div>
                     <div style={{ height: 8, background: corpColor.groundDeep }}>
-                      <div style={{ width: `${width}%`, height: '100%', background: corpColor.moss, opacity: 1 - i * 0.25 }} />
+                      <div style={{
+                        width: `${width}%`, height: '100%', background: corpColor.moss, opacity: 1 - i * 0.25,
+                        animation: 'funnel-bar-grow 0.6s ease-out both', animationDelay: `${i * 0.2}s`,
+                      }} />
                     </div>
                     <p style={{ margin: '4px 0 0', fontSize: 11, color: corpColor.inkSoft }}>{hint}</p>
                   </div>
