@@ -77,7 +77,7 @@ export interface TraceInput {
   latitude: number;
   longitude: number;
 
-  title: string;
+  title?: string;   // 未入力ならサーバー側で「✨ときめきの記録・7/17」形式に自動生成される
   why?: string;
   interpretation?: string;
   self_reflection?: string;
@@ -331,6 +331,34 @@ export interface EventEmotionShift {
     after: ValenceSummary;
   };
   repeatVisitRate?: number;   // イベント中に歩いた地域へ、イベント後に再訪した参加者の割合（%）
+  error?: string;
+}
+
+// ------------------------------------------------------------
+// 本人限定「イベント前後のわたしの感情」（/api/events/[slug]/my-shift）。
+// 認証必須で、返すのはリクエスト本人の記録のみ（他人のデータは一切含めない）。
+// 集団の匿名集計（EventEmotionShift）とはプライバシー階層が異なるため型も分ける。
+// ------------------------------------------------------------
+
+/** 本人の記録の最小限フィールド（前後比較の表示に必要な分だけ） */
+export interface MyShiftTrace {
+  id: string;
+  title: string;
+  created_at: string;
+  emotion_key: string | null;
+  emotion_keys: string[] | null;
+  intensity: number | null;
+}
+
+export interface MyEventShiftResponse {
+  ok: boolean;
+  participated: boolean;      // このイベントの参加者でなければ false（phases は返さない）
+  eventTitle?: string;
+  phases?: {
+    before: MyShiftTrace[];
+    during: MyShiftTrace[];
+    after: MyShiftTrace[];
+  };
   error?: string;
 }
 

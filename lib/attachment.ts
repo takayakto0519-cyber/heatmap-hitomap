@@ -18,6 +18,7 @@
 // ============================================================
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { summarizeValence } from '@/lib/emotions';
+import { phaseOf } from '@/lib/emotionShift';
 import type { AttachmentFunnel, EventEmotionShift, ValenceSummary } from '@/lib/types';
 
 const SUPPRESS_THRESHOLD = 5; // regionAggregateのk-匿名しきい値と同じ思想
@@ -204,7 +205,7 @@ export async function computeEventEmotionShift(
   const afterRegions = new Map<string, Set<string>>();  // user_id → イベント後に歩いた地域
 
   for (const t of allTraces) {
-    const phase = t.created_at < start ? 'before' : t.created_at <= end ? 'during' : 'after';
+    const phase = phaseOf(t.created_at, start, end);
     phaseKeys[phase].push(...emotionsOf(t));
     if (t.region) {
       const map = phase === 'during' ? duringRegions : phase === 'after' ? afterRegions : null;

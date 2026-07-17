@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import EmotionPicker from '@/components/form/EmotionPicker';
-import IntensityPicker from '@/components/form/IntensityPicker';
 import FaceEmotionSuggest from '@/components/form/FaceEmotionSuggest';
 import type { CreateTraceResponse } from '@/lib/types';
 
@@ -90,6 +89,7 @@ export default function PostPage() {
   const [wantRevisit, setWantRevisit] = useState(false);
   const [wantToShare, setWantToShare] = useState(false);
   const [nickname, setNickname] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [uploadProgress, setUploadProgress] = useState('');
@@ -136,6 +136,8 @@ export default function PostPage() {
         if (d.wantToShare) setWantToShare(Boolean(d.wantToShare));
         if (d.nickname) setNickname(d.nickname as string);
         if (d.activeDraftId) setActiveDraftId(d.activeDraftId as string);
+        // 折りたたみ内の項目が書きかけなら、復元時に開いた状態にする
+        if (d.why || d.interpretation || d.selfReflection || d.nickname || d.wantRevisit || d.wantToShare) setShowAdvanced(true);
         setRestoredNotice(true);
       }
     } catch {
@@ -265,7 +267,6 @@ export default function PostPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setSubmitError('タイトルを入力してください'); return; }
     if (!lat || !lng) { setSubmitError('位置情報を取得してください'); return; }
     if (!locationConfirmed) { setSubmitError('地図をタップして、実際の場所にピンを合わせてください'); return; }
 
@@ -283,7 +284,8 @@ export default function PostPage() {
           photo_urls: photoUrls.length > 0 ? photoUrls : null,
           latitude: lat,
           longitude: lng,
-          title: title.trim(),
+          title: title.trim() || null, // 空欄ならサーバー側で「✨ときめきの記録・7/17」形式に自動生成
+
           why: why.trim() || null,
           interpretation: interpretation.trim() || null,
           self_reflection: selfReflection.trim() || null,
@@ -312,7 +314,7 @@ export default function PostPage() {
     }
   }
 
-  const canSubmit = Boolean(title.trim() && lat && lng && locationConfirmed && !submitting);
+  const canSubmit = Boolean(lat && lng && locationConfirmed && !submitting);
   const statusText = uploadProgress || (submitting ? '記録中…' : '記録する →');
 
   return (
@@ -483,76 +485,88 @@ export default function PostPage() {
             )}
           </section>
 
-          {/* ③ 感情タグ */}
+          {/* ③ 感情タグ（1タップで強度3が入り、そのまま投稿できる） */}
           <section style={sectionStyle}>
-            <label style={labelStyle}>✨ なにを感じた？（複数選べます）</label>
-            <EmotionPicker value={emotionKeys} onChange={setEmotionKeys} />
+            <label style={labelStyle}>✨ なにを感じた？（1タップでOK・複数選べます）</label>
+            <EmotionPicker
+              value={emotionKeys} onChange={setEmotionKeys}
+              intensity={intensity} onIntensityChange={setIntensity}
+            />
             <FaceEmotionSuggest
               selectedKeys={emotionKeys}
               onAdd={(key) => setEmotionKeys((prev) => prev.includes(key) ? prev : [...prev, key])}
             />
           </section>
 
-          {/* ④ 強度 */}
+          {/* ④ タイトル（任意。空欄なら感情＋日付から自動生成される） */}
           <section style={sectionStyle}>
-            <label style={labelStyle}>💫 どのくらい強く？</label>
-            <IntensityPicker value={intensity} onChange={setIntensity} />
-          </section>
-
-          {/* ⑤ タイトル（必須） */}
-          <section style={sectionStyle}>
-            <label style={labelStyle}>
-              📝 何を見つけた？ <span style={{ color: '#E55039' }}>*</span>
-            </label>
+            <label style={labelStyle}>📝 何を見つけた？（任意）</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="例：修理された木の椅子"
-              style={inputStyle} required />
+              placeholder="空欄なら自動でタイトルが付きます"
+              style={inputStyle} />
           </section>
 
-          {/* ⑥ 3つの問い（任意） */}
+          {/* ⑤ くわしく記録する（任意・折りたたみ）。気軽さ優先で長文項目はここに格納する */}
           <section style={sectionStyle}>
-            <label style={labelStyle}>💬 言葉にしてみる（任意）</label>
-            <p style={{ ...hintStyle, marginBottom: 6, color: '#666' }}>なぜ気になった？</p>
-            <textarea value={why} onChange={(e) => setWhy(e.target.value)}
-              placeholder="直感でOK。うまく書かなくていい。"
-              rows={3} style={{ ...inputStyle, marginBottom: 14 }} />
-            <p style={{ ...hintStyle, marginBottom: 6, color: '#666' }}>誰のどんな暮らし・想いが見えた？</p>
-            <textarea value={interpretation} onChange={(e) => setInterpretation(e.target.value)}
-              placeholder="このものを使っていた人を想像してみる"
-              rows={3} style={{ ...inputStyle, marginBottom: 14 }} />
-            <p style={{ ...hintStyle, marginBottom: 6, color: '#666' }}>自分のどんな記憶・感情とつながった？</p>
-            <textarea value={selfReflection} onChange={(e) => setSelfReflection(e.target.value)}
-              placeholder="なぜ自分はこれに反応したのか"
-              rows={3} style={inputStyle} />
-          </section>
+            <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 10,
+                border: '1.5px dashed #ccc', background: showAdvanced ? '#f5f5f5' : '#fafafa',
+                color: '#777', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}>
+              {showAdvanced ? '− とじる' : '＋ くわしく記録する（任意）'}
+            </button>
 
-          {/* ⑦ 2択トグル */}
-          <section style={sectionStyle}>
-            <div style={{ display: 'flex', gap: 12 }}>
-              {[
-                { label: '🔁 また来たい', val: wantRevisit, toggle: () => setWantRevisit(!wantRevisit) },
-                { label: '🗣 誰かに話したい', val: wantToShare, toggle: () => setWantToShare(!wantToShare) },
-              ].map(({ label, val, toggle }) => (
-                <button key={label} type="button" onClick={toggle}
-                  style={{
-                    flex: 1, padding: '13px 8px', borderRadius: 10, fontSize: 14,
-                    border: `2px solid ${val ? '#38ADA9' : '#ddd'}`,
-                    background: val ? '#E8F8F7' : '#fff',
-                    color: val ? '#38ADA9' : '#999',
-                    fontWeight: val ? 700 : 400, cursor: 'pointer',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </section>
+            {showAdvanced && (
+              <div style={{ marginTop: 20 }}>
+                {/* 3つの問い */}
+                <div style={sectionStyle}>
+                  <label style={labelStyle}>💬 言葉にしてみる</label>
+                  <p style={{ ...hintStyle, marginBottom: 6, color: '#666' }}>なぜ気になった？</p>
+                  <textarea value={why} onChange={(e) => setWhy(e.target.value)}
+                    placeholder="直感でOK。うまく書かなくていい。"
+                    rows={3} style={{ ...inputStyle, marginBottom: 14 }} />
+                  <p style={{ ...hintStyle, marginBottom: 6, color: '#666' }}>誰のどんな暮らし・想いが見えた？</p>
+                  <textarea value={interpretation} onChange={(e) => setInterpretation(e.target.value)}
+                    placeholder="このものを使っていた人を想像してみる"
+                    rows={3} style={{ ...inputStyle, marginBottom: 14 }} />
+                  <p style={{ ...hintStyle, marginBottom: 6, color: '#666' }}>自分のどんな記憶・感情とつながった？</p>
+                  <textarea value={selfReflection} onChange={(e) => setSelfReflection(e.target.value)}
+                    placeholder="なぜ自分はこれに反応したのか"
+                    rows={3} style={inputStyle} />
+                </div>
 
-          {/* ⑧ ニックネーム */}
-          <section style={sectionStyle}>
-            <label style={labelStyle}>👤 ニックネーム（任意）</label>
-            <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
-              placeholder="匿名でもOK" style={inputStyle} />
+                {/* 2択トグル */}
+                <div style={sectionStyle}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    {[
+                      { label: '🔁 また来たい', val: wantRevisit, toggle: () => setWantRevisit(!wantRevisit) },
+                      { label: '🗣 誰かに話したい', val: wantToShare, toggle: () => setWantToShare(!wantToShare) },
+                    ].map(({ label, val, toggle }) => (
+                      <button key={label} type="button" onClick={toggle}
+                        style={{
+                          flex: 1, padding: '13px 8px', borderRadius: 10, fontSize: 14,
+                          border: `2px solid ${val ? '#38ADA9' : '#ddd'}`,
+                          background: val ? '#E8F8F7' : '#fff',
+                          color: val ? '#38ADA9' : '#999',
+                          fontWeight: val ? 700 : 400, cursor: 'pointer',
+                          WebkitTapHighlightColor: 'transparent',
+                        }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ニックネーム */}
+                <div style={{ marginBottom: 0 }}>
+                  <label style={labelStyle}>👤 ニックネーム（任意）</label>
+                  <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+                    placeholder="匿名でもOK" style={inputStyle} />
+                </div>
+              </div>
+            )}
           </section>
         </form>
       </main>

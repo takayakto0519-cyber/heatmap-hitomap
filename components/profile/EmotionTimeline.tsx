@@ -4,7 +4,7 @@
 // 「動線」そのもの（GPS移動軌跡）ではなく、その人がどんな感情の出会いを重ねてきたかの物語を可視化する。
 // 地域チップで絞り込むと「この町であなたの感情がどう変わってきたか」＝地域愛着の軌跡が読める。
 import { useState } from 'react';
-import { getEmotion } from '@/lib/emotions';
+import { getEmotion, getValenceGradientColor } from '@/lib/emotions';
 import type { Trace } from '@/lib/types';
 
 interface Props {
@@ -81,25 +81,37 @@ export default function EmotionTimeline({ traces, onSelect }: Props) {
             }
           `}</style>
           <svg key={regionFilter ?? 'all'} width={width} height={trackHeight} style={{ display: 'block' }}>
+            {/* マイナス域（ゼロ線の下）に薄赤の帯を敷き、「沈む＝赤域へ」が直感的に読めるようにする */}
+            <rect x={0} y={trackHeight / 2} width={width} height={trackHeight / 2} fill="#E24B4A" opacity={0.05} />
             <line x1={0} y1={trackHeight / 2} x2={width} y2={trackHeight / 2} stroke="#eee" strokeWidth={1} />
-            <polyline
-              fill="none"
-              stroke="#C9A0A8"
-              strokeWidth={1.5}
-              pathLength={1}
-              style={{ strokeDasharray: 1, animation: 'emotion-line-draw 1s ease-out both' }}
-              points={sorted.map((t, i) => `${i * pointGap + pointGap / 2},${trackHeight / 2 - valenceY(t) * 34}`).join(' ')}
-            />
+            {/* 点間セグメントごとに valence×強度の濃淡で着色する（終点側の色を使う） */}
+            {sorted.slice(1).map((t, i) => {
+              const prev = sorted[i];
+              const keys = t.emotion_keys ?? (t.emotion_key ? [t.emotion_key] : []);
+              const { color, opacity } = getValenceGradientColor(keys, t.intensity);
+              return (
+                <line
+                  key={`seg-${t.id}`}
+                  x1={i * pointGap + pointGap / 2} y1={trackHeight / 2 - valenceY(prev) * 34}
+                  x2={(i + 1) * pointGap + pointGap / 2} y2={trackHeight / 2 - valenceY(t) * 34}
+                  stroke={color} strokeOpacity={Math.max(opacity, 0.4)} strokeWidth={2}
+                  pathLength={1}
+                  style={{ strokeDasharray: 1, animation: 'emotion-line-draw 0.4s ease-out both', animationDelay: `${Math.min(i * (1 / Math.max(sorted.length - 1, 1)), 1)}s` }}
+                />
+              );
+            })}
             {sorted.map((t, i) => {
               const keys = t.emotion_keys ?? (t.emotion_key ? [t.emotion_key] : []);
               const emotion = getEmotion(keys[0]);
+              const { color, opacity } = getValenceGradientColor(keys, t.intensity);
               const cx = i * pointGap + pointGap / 2;
               const cy = trackHeight / 2 - valenceY(t) * 34;
               return (
                 <g key={t.id} onClick={() => onSelect?.(t)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-                  <title>{`${t.title}（${new Date(t.created_at).toLocaleDateString('ja-JP')}）${emotion ? ' ・ ' + emotion.label : ''}${t.region ? ' ・ ' + t.region : ''}`}</title>
+                  <title>{`${t.title}（${new Date(t.created_at).toLocaleDateString('ja-JP')}）${emotion ? ' ・ ' + emotion.label : ''}${t.intensity ? ' ・ 強さ' + t.intensity : ''}${t.region ? ' ・ ' + t.region : ''}`}</title>
                   <circle
-                    cx={cx} cy={cy} r={5} fill={emotion?.color ?? '#ccc'} stroke="#fff" strokeWidth={1.5}
+                    cx={cx} cy={cy} r={3 + Math.min(Math.max(t.intensity ?? 3, 1), 5)}
+                    fill={color} fillOpacity={Math.max(opacity, 0.5)} stroke="#fff" strokeWidth={1.5}
                     style={{ animation: 'emotion-dot-in 0.3s ease-out both', animationDelay: `${Math.min(i * (1 / Math.max(sorted.length - 1, 1)), 1)}s` }}
                   />
                 </g>

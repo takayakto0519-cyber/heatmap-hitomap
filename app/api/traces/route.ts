@@ -15,6 +15,19 @@ import { getCurrentUserId } from '@/lib/supabase/requestClient';
 import { notifyDiscord, notifyDiscordError } from '@/lib/discord';
 import { haversine } from '@/lib/geo';
 import { isRateLimited } from '@/lib/rateLimit';
+import { getEmotion } from '@/lib/emotions';
+
+// タイトル未入力でも投稿できるようにするための自動タイトル。
+// 感情が選ばれていれば「✨ときめきの記録・7/17」、なければ「みちくさの記録・7/17」（日付はJST）。
+function autoTitle(body: CreateTraceRequest): string {
+  const emotionKey = body.emotion_keys?.[0] ?? body.emotion_key;
+  const emotion = getEmotion(emotionKey);
+  const now = new Date(Date.now() + 9 * 60 * 60 * 1000); // JST
+  const dateLabel = `${now.getUTCMonth() + 1}/${now.getUTCDate()}`;
+  return emotion
+    ? `${emotion.emoji}${emotion.label}の記録・${dateLabel}`
+    : `みちくさの記録・${dateLabel}`;
+}
 
 const CROSSED_PATHS_RADIUS_M = 50;
 
@@ -94,13 +107,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
 
     const body = (await req.json()) as CreateTraceRequest;
 
-    // 最低限のバリデーション（入力負荷を下げるため必須は title と座標のみ）
-    if (!body.title || typeof body.latitude !== 'number' || typeof body.longitude !== 'number') {
+    // 最低限のバリデーション（入力負荷を下げるため必須は座標のみ。タイトル未入力は自動生成する）
+    if (typeof body.latitude !== 'number' || typeof body.longitude !== 'number') {
       return NextResponse.json(
-        { ok: false, error: 'title・latitude・longitude は必須です' },
+        { ok: false, error: 'latitude・longitude は必須です' },
         { status: 400 }
       );
     }
+    const title = body.title?.trim() || autoTitle(body);
     if (
       Number.isNaN(body.latitude) || Number.isNaN(body.longitude) ||
       body.latitude < -90 || body.latitude > 90 ||
@@ -152,7 +166,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
         region,
         latitude: body.latitude,
         longitude: body.longitude,
-        title: body.title,
+        title,
         why: body.why ?? null,
         interpretation: body.interpretation ?? null,
         self_reflection: body.self_reflection ?? null,
@@ -195,7 +209,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateTraceRe
     const who = userId ? 'ログイン投稿' : '匿名投稿';
     const statusNote = visibility === 'pending_review' ? '⏳ 審査待ち（匿名投稿）' : `公開範囲: ${visibility}`;
     notifyDiscord(
-      `📍 新しい痕跡が投稿されました\n**${body.title}**${region ? `（${region}）` : ''}\n${who} ・ ${statusNote}`
+      `📍 新しい痕跡が投稿されました\n**${title}**${region ? `（${region}）` : ''}\n${who} ・ ${statusNote}`
     );
 
     if (visibility === 'public') {

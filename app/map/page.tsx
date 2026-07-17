@@ -11,7 +11,6 @@ import { ARCHIVE_TYPES, getArchiveType, VOICE_RELATIONS } from '@/lib/archiveTyp
 import { haversine } from '@/lib/geo';
 import { colors, shadows } from '@/lib/theme';
 import EmotionPicker from '@/components/form/EmotionPicker';
-import IntensityPicker from '@/components/form/IntensityPicker';
 import AudioRecorder from '@/components/form/AudioRecorder';
 import TraceCard from '@/components/report/TraceCard';
 import TraceDetail from '@/components/TraceDetail';
@@ -741,7 +740,9 @@ function MapApp() {
   // ── 投稿 ────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setSubmitError('タイトルを入力してください'); return; }
+    // 通常の痕跡はタイトル未入力でも投稿できる（サーバー側で自動生成）。
+    // アーカイブ投稿（地名・言い伝え等）は名前そのものが本体なので従来どおり必須。
+    if (selectedArchiveType && !title.trim()) { setSubmitError('タイトルを入力してください'); return; }
     if (!lat || !lng) { setSubmitError('位置情報を取得してください'); return; }
     setSubmitting(true); setSubmitError('');
     try {
@@ -781,7 +782,7 @@ function MapApp() {
           photo_url: photoUrls[0] ?? null, photo_urls: photoUrls.length > 0 ? photoUrls : null,
           video_url: videoUrl,
           latitude: lat, longitude: lng,
-          title: title.trim(),
+          title: title.trim() || null, // 空欄ならサーバー側で「✨ときめきの記録・7/17」形式に自動生成
           why: why.trim() || null,
           interpretation: interpretation.trim() || null,
           self_reflection: selfReflection.trim() || null,
@@ -966,11 +967,11 @@ function MapApp() {
     }
   }
 
-  const canSubmit = Boolean(title.trim() && lat && lng && !submitting && !submitDone);
+  const canSubmit = Boolean((selectedArchiveType ? title.trim() : true) && lat && lng && !submitting && !submitDone);
 
-  // ── 必須フィールド進捗 ───────────────────
+  // ── 必須フィールド進捗（通常の痕跡はタイトル任意になったため位置のみ。アーカイブは名前が本体なので必須のまま） ──
   const steps = [
-    { label: 'タイトル', done: !!title.trim() },
+    ...(selectedArchiveType ? [{ label: 'タイトル', done: !!title.trim() }] : []),
     { label: '位置', done: !!(lat && lng) },
   ];
   const stepsDone = steps.filter(s => s.done).length;
@@ -1770,18 +1771,18 @@ function MapApp() {
                   {videoError && <p style={{ margin: '6px 10px 0', fontSize: 11, color: '#B23A2E' }}>{videoError}</p>}
                 </div>
 
-                {/* STEP 2: タイトル（必須） */}
+                {/* STEP 2: タイトル（アーカイブは必須・通常の痕跡は任意で自動生成） */}
                 <div style={{ background: '#fff', borderRadius: 14, padding: '14px 14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                   <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600, marginBottom: 6 }}>
-                    {selectedArchiveType ? selectedArchiveType.titleLabel : '何を見つけた？'} <span style={{ color: '#566246' }}>*</span>
+                    {selectedArchiveType ? selectedArchiveType.titleLabel : '何を見つけた？（任意）'} {selectedArchiveType && <span style={{ color: '#566246' }}>*</span>}
                   </label>
                   <input
                     type="text"
                     value={title}
                     onChange={e => setTitle(e.target.value)}
-                    placeholder={selectedArchiveType ? selectedArchiveType.titlePlaceholder : '例：修理された木の椅子、古い看板…'}
+                    placeholder={selectedArchiveType ? selectedArchiveType.titlePlaceholder : '空欄なら自動でタイトルが付きます'}
                     style={{ ...inputStyle, fontSize: 16, fontWeight: 600, border: '2px solid ' + (title.trim() ? '#2F8C88' : '#E9E3D2') }}
-                    required
+                    required={Boolean(selectedArchiveType)}
                   />
                 </div>
 
@@ -1876,9 +1877,12 @@ function MapApp() {
                 {!selectedArchiveType && (
                   <div style={{ background: '#fff', borderRadius: 14, padding: '14px', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                     <label style={{ ...labelStyle, fontSize: 12, color: '#8C8579', fontWeight: 600, marginBottom: 8 }}>
-                      なにを感じた？（複数選べます）
+                      なにを感じた？（1タップでOK・複数選べます）
                     </label>
-                    <EmotionPicker value={emotionKeys} onChange={setEmotionKeys} />
+                    <EmotionPicker
+                      value={emotionKeys} onChange={setEmotionKeys}
+                      intensity={intensity} onIntensityChange={setIntensity}
+                    />
                   </div>
                 )}
 
@@ -2009,11 +2013,7 @@ function MapApp() {
                       ))}
                     </section>
 
-                    {/* 強度 */}
-                    <section>
-                      <label style={labelStyle}>💫 どのくらい強く感じた？</label>
-                      <IntensityPicker value={intensity} onChange={setIntensity} />
-                    </section>
+                    {/* 強度は感情ピッカー直下（EmotionPicker内蔵の5ドット）へ統合済み */}
 
                     {/* カテゴリ */}
                     <section>

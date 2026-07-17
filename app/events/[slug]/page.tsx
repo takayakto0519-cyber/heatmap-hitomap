@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import EventPageClient from '@/components/EventPageClient';
 import RelayEventClient from '@/components/RelayEventClient';
 import BonnoEventClient from '@/components/bonno/BonnoEventClient';
+import MyEmotionShift from '@/components/events/MyEmotionShift';
 import type { Route, Trace } from '@/lib/types';
 
 interface Props {
@@ -73,8 +74,27 @@ export default async function EventPage({ params }: Props) {
   if (event.route.event_mode === 'bonno') {
     return <BonnoEventClient route={event.route} />;
   }
+
+  // 本人限定「イベント前後のわたしの感情」：開始・終了日時が設定されたイベントで、
+  // ログイン中の参加者にだけ表示される（コンポーネント側で判定。他人には何も出ない）
+  const myShift = event.route.event_starts_at && event.route.event_ends_at ? (
+    <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 16px 32px' }}>
+      <MyEmotionShift slug={params.slug} />
+    </div>
+  ) : null;
+
   if (event.route.event_mode === 'relay') {
-    return <RelayEventClient route={event.route} traces={event.traces} />;
+    return (
+      <>
+        <RelayEventClient route={event.route} traces={event.traces} />
+        {myShift}
+      </>
+    );
   }
-  return <EventPageClient route={event.route} traces={event.traces} />;
+  return (
+    <>
+      <EventPageClient route={event.route} traces={event.traces} />
+      {myShift}
+    </>
+  );
 }
