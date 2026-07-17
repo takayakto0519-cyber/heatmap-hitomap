@@ -3,6 +3,7 @@
 //   POST ... 新規作成（末尾に追加）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { revalidateSitePages } from '@/lib/revalidateSite';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -62,5 +63,6 @@ export async function POST(req: NextRequest) {
     .select('*')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  revalidateSitePages(); // 保存した瞬間にサイトへ反映（ISRの60秒待ちをなくす）
   return NextResponse.json({ ok: true, block: data });
 }

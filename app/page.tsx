@@ -6,9 +6,11 @@ import RecentTraces from '@/components/corp/RecentTraces';
 import ProofBand from '@/components/corp/ProofBand';
 import BlockRenderer from '@/components/corp/BlockRenderer';
 import MobileCTABar from '@/components/corp/MobileCTABar';
+import AnnouncementBar from '@/components/corp/AnnouncementBar';
 import { corpColor } from '@/components/corp/tokens';
 import AdSlot from '@/components/AdSlot';
 import type { SiteBlock } from '@/lib/siteBlocks';
+import { fetchSiteSettings } from '@/lib/siteSettings';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hitomap.com';
 
@@ -56,17 +58,19 @@ async function fetchHomeBlocks(): Promise<SiteBlock[]> {
 }
 
 export default async function HomePage() {
-  const blocks = await fetchHomeBlocks();
+  const [blocks, settings] = await Promise.all([fetchHomeBlocks(), fetchSiteSettings()]);
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <AnnouncementBar settings={settings.announcement} />
       <CorpHeader />
 
-      {/* Hero・感情・実投稿フィードは固定表示。それ以外のセクション（機能紹介・体験の流れ・MVV・
-          事業紹介・CTA帯等）は運営が /admin/blocks から自由に追加・並び替え・削除できるブロックで構成される。 */}
+      {/* Heroの文言とお知らせ帯は運営ダッシュボード「サイト設定」タブから編集できる。
+          感情・実投稿フィードは固定表示。それ以外のセクション（機能紹介・体験の流れ・MVV・
+          事業紹介・CTA帯等）は運営がページ編集タブから自由に追加・並び替え・削除できるブロックで構成される。 */}
       <main style={{ flex: 1 }}>
-        <Hero />
+        <Hero settings={settings.hero} />
         <ProofBand />
         <BlockRenderer blocks={blocks} />
         <EmotionPalette />

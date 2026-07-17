@@ -49,6 +49,7 @@ export const SITE_PAGES: { key: string; label: string; path: string }[] = [
   { key: 'school', label: '学校の方へ', path: '/school' },
   { key: 'service', label: 'ヒトマップの使い方', path: '/service' },
   { key: 'team', label: '運営', path: '/team' },
+  { key: 'contact', label: 'お問い合わせ', path: '/contact' },
 ];
 
 export function pagePath(key: string): string {

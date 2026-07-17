@@ -167,10 +167,12 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
           }}>初期セクションを読み込む</button>
         )}
       </div>
-      <p style={{ fontSize: 11, color: '#999', margin: '0 0 16px' }}>
+      <p style={{ fontSize: 11, color: '#999', margin: '0 0 16px', lineHeight: 1.8 }}>
         {page === 'home'
-          ? 'トップページはHero（一番上）・感情タグ一覧・直近の投稿フィードが固定表示のため、ここには出ません。'
-          : 'このページの見出し文言はここで編集できます。'}
+          ? 'トップページの一番上（大見出し・お知らせ帯）は「サイト設定」タブで編集します。感情タグ一覧・直近の投稿フィードは自動表示です。それ以外の中間セクションをここで自由に編集できます。'
+          : page === 'contact'
+            ? 'お問い合わせフォーム自体は固定です。フォームの上に出る見出し・説明文をここで編集できます（何も無い場合は元の文言が出ます）。'
+            : 'このページのセクション（見出し・文章・カードなど）をここで追加・編集・並び替えできます。'}
       </p>
 
       <div style={{ marginBottom: 20 }}>
@@ -181,14 +183,20 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
 
       {!draft && (
         <>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0 20px' }}>
-            <select value={newType} onChange={e => setNewType(e.target.value as BlockType)} style={{ ...inputStyle, width: 'auto' }}>
-              {BLOCK_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
-            <button onClick={() => setDraft(emptyDraft(newType))} style={{
-              padding: '10px 20px', borderRadius: 8, border: 'none',
-              background: '#566246', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13,
-            }}>＋ セクションを追加</button>
+          <div style={{ margin: '12px 0 20px' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select value={newType} onChange={e => setNewType(e.target.value as BlockType)} style={{ ...inputStyle, width: 'auto' }}>
+                {BLOCK_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+              <button onClick={() => setDraft(emptyDraft(newType))} style={{
+                padding: '10px 20px', borderRadius: 8, border: 'none',
+                background: '#566246', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13,
+              }}>＋ セクションを追加</button>
+            </div>
+            {/* 選んだ種類が何者かを、追加する前に日本語で説明する（非エンジニアが試行錯誤しなくて済むように） */}
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#999' }}>
+              {BLOCK_TYPES.find(t => t.key === newType)?.hint}
+            </p>
           </div>
 
           {loading ? (

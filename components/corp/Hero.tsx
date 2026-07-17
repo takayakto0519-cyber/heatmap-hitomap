@@ -3,14 +3,16 @@ import Reveal from './Reveal';
 import MapArt from './MapArt';
 import CharReveal from './CharReveal';
 import Parallax from './Parallax';
+import { DEFAULT_SITE_SETTINGS, type HeroSettings } from '@/lib/siteSettings';
 
 // SANU（sa-nu.com）のヒーロー構成を踏襲：
 //   全面ビジュアル ＋ 詩的な一行のタグライン ＋ 控えめなサブコピー ＋ 主CTA。
 // 写真素材の代わりに、サービスの実体である「感情の地図」をコードで描いて敷く。
 // （偽のスクリーンショットや素材写真を使わない＝嘘のない事実だけを見せる）
 // MapArt本体はcomponents/corp/MapArt.tsxに切り出し、MVV演出（MVVReveal）でも同じ意匠を再利用する。
+// 文言は運営ダッシュボード「サイト設定」タブ（site_settings.hero）から編集できる。
 
-export default function Hero() {
+export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settings?: HeroSettings }) {
   return (
     <section
       style={{
@@ -52,12 +54,12 @@ export default function Hero() {
               fontWeight: 700,
             }}
           >
-            HITOMAP — まちの痕跡と感情の地図
+            {settings.eyebrow}
           </p>
         </Reveal>
 
         <CharReveal
-          lines={['その色あせも、', '誰かが生きた証です。']}
+          lines={settings.headline_lines}
           baseDelay={200}
           charDelay={55}
           style={{
@@ -82,16 +84,14 @@ export default function Hero() {
               maxWidth: 460,
             }}
           >
-            まちで見つけた痕跡を、写真と一言で地図に残せます。
-            記録が重なると、町ごとの感情の濃淡が浮かび上がります。
-            名所を見るのではなく、人に会いに行く旅がここから始まります。
+            {settings.subcopy}
           </p>
         </Reveal>
 
         <Reveal immediate delay={550} y={16}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
             <a
-              href="/start"
+              href={settings.cta_href}
               className="hm-lift"
               style={{
                 display: 'inline-block',
@@ -105,10 +105,10 @@ export default function Hero() {
                 letterSpacing: '0.05em',
               }}
             >
-              地図をひらく — 無料
+              {settings.cta_label}
             </a>
             <a
-              href="/company/service"
+              href={settings.sub_link_href}
               style={{
                 fontSize: 13,
                 color: corpColor.moss,
@@ -119,7 +119,7 @@ export default function Hero() {
                 paddingBottom: 2,
               }}
             >
-              使い方を見る →
+              {settings.sub_link_label}
             </a>
           </div>
 
@@ -131,13 +131,13 @@ export default function Hero() {
               fontFamily: corpFont.body,
             }}
           >
-            ログインしなくても、匿名のまま今日から記録できます。
+            {settings.note}
           </p>
 
           {/* 個人利用者だけでなく法人・自治体の見込み客も同じ導線を通るため、
               最初の画面で行き先を分岐させる（両者に無関係な証跡を延々スクロールさせない）。 */}
           <a
-            href="/company/business"
+            href={settings.biz_link_href}
             style={{
               fontSize: 12.5,
               color: corpColor.inkSoft,
@@ -145,7 +145,7 @@ export default function Hero() {
               fontFamily: corpFont.body,
             }}
           >
-            法人・自治体の方はこちら →
+            {settings.biz_link_label}
           </a>
         </Reveal>
       </div>

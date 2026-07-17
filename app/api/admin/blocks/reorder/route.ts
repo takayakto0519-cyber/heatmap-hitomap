@@ -1,6 +1,7 @@
 // POST /api/admin/blocks/reorder { page, order: [id, id, ...] } — 表示順を一括更新
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { revalidateSitePages } from '@/lib/revalidateSite';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -21,5 +22,6 @@ export async function POST(req: NextRequest) {
   );
   const failed = results.find(r => r.error);
   if (failed?.error) return NextResponse.json({ ok: false, error: failed.error.message }, { status: 500 });
+  revalidateSitePages(); // 並び替えた瞬間にサイトへ反映
   return NextResponse.json({ ok: true });
 }

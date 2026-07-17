@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { revalidateSitePages } from '@/lib/revalidateSite';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -134,6 +135,14 @@ const SEEDS: Record<string, SeedBlock[]> = {
     },
   ],
 
+  contact: [
+    {
+      block_type: 'text',
+      heading: 'まずは、お気軽にご連絡ください。',
+      body: '法人・行政・学校でのご利用、取材・提携のご相談など、内容にかかわらずご連絡ください。',
+    },
+  ],
+
   team: [],
 };
 
@@ -165,5 +174,6 @@ export async function POST(req: NextRequest) {
   }));
   const { error } = await supabaseServer.from('site_blocks').insert(rows);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  revalidateSitePages(); // 投入した瞬間にサイトへ反映
   return NextResponse.json({ ok: true, inserted: rows.length });
 }

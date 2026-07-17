@@ -1,6 +1,7 @@
 // /api/admin/blocks/[id] — サイトブロックの更新・削除（パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { revalidateSitePages } from '@/lib/revalidateSite';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const PATCHABLE = ['block_type', 'eyebrow', 'heading', 'body', 'image_url', 'cta_label', 'cta_href', 'items', 'is_visible', 'sort_order'] as const;
@@ -23,6 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select('*')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  revalidateSitePages(); // 保存した瞬間にサイトへ反映
   return NextResponse.json({ ok: true, block: data });
 }
 
@@ -33,5 +35,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { supabaseServer } = await import('@/lib/supabase/server');
   const { error } = await supabaseServer.from('site_blocks').delete().eq('id', params.id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  revalidateSitePages(); // 削除した瞬間にサイトへ反映
   return NextResponse.json({ ok: true });
 }

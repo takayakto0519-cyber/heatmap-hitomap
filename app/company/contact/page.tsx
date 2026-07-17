@@ -3,7 +3,9 @@ import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
 import Reveal from '@/components/corp/Reveal';
 import ContactForm from '@/components/corp/ContactForm';
+import BlockRenderer from '@/components/corp/BlockRenderer';
 import { corpColor, corpFont } from '@/components/corp/tokens';
+import type { SiteBlock } from '@/lib/siteBlocks';
 
 export const metadata: Metadata = {
   title: 'お問い合わせ',
@@ -11,34 +13,62 @@ export const metadata: Metadata = {
   alternates: { canonical: '/company/contact' },
 };
 
-export default function ContactPage() {
+export const revalidate = 60;
+
+// 冒頭の見出し・説明はダッシュボード「ページ編集」タブ（対象ページ：お問い合わせ）で編集できる。
+// ブロックが1つも無い場合は、従来どおりの固定文言で表示する。
+async function fetchBlocks(): Promise<SiteBlock[]> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  try {
+    const { supabaseServer } = await import('@/lib/supabase/server');
+    const { data } = await supabaseServer
+      .from('site_blocks')
+      .select('*')
+      .eq('page', 'contact')
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true });
+    return (data ?? []) as SiteBlock[];
+  } catch {
+    return [];
+  }
+}
+
+export default async function ContactPage() {
+  const blocks = await fetchBlocks();
+
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
       <CorpHeader />
 
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-        <div style={{ maxWidth: 560, margin: '0 auto', padding: '80px 24px', width: '100%' }}>
+      <main style={{ flex: 1 }}>
+        {blocks.length > 0 && <BlockRenderer blocks={blocks} />}
+
+        <div style={{ maxWidth: 560, margin: '0 auto', padding: blocks.length > 0 ? '40px 24px 80px' : '80px 24px', width: '100%' }}>
           <Reveal immediate y={16}>
             <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
               CONTACT
             </p>
           </Reveal>
           <Reveal immediate delay={120} y={18}>
-            <h1
-              style={{
-                margin: '0 0 24px',
-                fontFamily: corpFont.mincho,
-                fontSize: 'clamp(22px, 3.2vw, 28px)',
-                lineHeight: 1.8,
-                color: corpColor.ink,
-                fontWeight: 600,
-              }}
-            >
-              まずは、お気軽にご連絡ください。
-            </h1>
-            <p style={{ margin: '0 0 36px', fontSize: 14, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
-              法人・行政・学校でのご利用、取材・提携のご相談など、内容にかかわらずご連絡ください。
-            </p>
+            {blocks.length === 0 && (
+              <>
+                <h1
+                  style={{
+                    margin: '0 0 24px',
+                    fontFamily: corpFont.mincho,
+                    fontSize: 'clamp(22px, 3.2vw, 28px)',
+                    lineHeight: 1.8,
+                    color: corpColor.ink,
+                    fontWeight: 600,
+                  }}
+                >
+                  まずは、お気軽にご連絡ください。
+                </h1>
+                <p style={{ margin: '0 0 36px', fontSize: 14, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
+                  法人・行政・学校でのご利用、取材・提携のご相談など、内容にかかわらずご連絡ください。
+                </p>
+              </>
+            )}
 
             <ContactForm />
 
