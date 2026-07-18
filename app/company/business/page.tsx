@@ -4,7 +4,7 @@ import CorpFooter from '@/components/corp/CorpFooter';
 import BlockRenderer from '@/components/corp/BlockRenderer';
 import Reveal from '@/components/corp/Reveal';
 import CharReveal from '@/components/corp/CharReveal';
-import { corpColor, corpFont } from '@/components/corp/tokens';
+import { corpColor, corpFont, corpRadius, corpShadow } from '@/components/corp/tokens';
 import type { SiteBlock } from '@/lib/siteBlocks';
 
 const PAIN_POINTS = [
@@ -60,14 +60,15 @@ export default async function CompanyBusinessPage() {
   const blocks = await fetchBlocks();
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.surface }}>
       <CorpHeader />
 
       <main style={{ flex: 1 }}>
+        {/* 行政・法人トラックは、青(trust)の信頼トーンで個人向けと視覚的に区別する */}
         <section style={{ padding: '64px 24px 40px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal immediate y={16}>
-              <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
+              <p style={{ margin: '0 0 18px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.trust, fontFamily: corpFont.body, fontWeight: 700 }}>
                 FOR BUSINESS / GOVERNMENT
               </p>
             </Reveal>
@@ -95,10 +96,29 @@ export default async function CompanyBusinessPage() {
           </div>
         </section>
 
-        <section style={{ background: corpColor.white, padding: '16px 24px 64px' }}>
+        {/* 信頼の要素バンド：行政担当者が最初に安心できる事実を先に提示 */}
+        <section style={{ background: corpColor.trustSoft, borderTop: `1px solid ${corpColor.trust}22`, borderBottom: `1px solid ${corpColor.trust}22`, padding: '28px 24px' }}>
+          <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '16px 28px' }}>
+            {[
+              { icon: '🗺️', label: '国土地理院の地図基盤', note: '行政利用に耐える公式タイル' },
+              { icon: '📊', label: '表示するのは実データのみ', note: '捏造した数字を使わない' },
+              { icon: '🏛️', label: '自治体ダッシュボード', note: '地図範囲で集計・発行できる' },
+            ].map((t) => (
+              <div key={t.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 200px' }}>
+                <span style={{ fontSize: 18, lineHeight: 1.2 }} aria-hidden="true">{t.icon}</span>
+                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: corpColor.trustDeep, fontFamily: corpFont.body }}>{t.label}</span>
+                  <span style={{ fontSize: 11.5, color: corpColor.gray, fontFamily: corpFont.body }}>{t.note}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section style={{ background: corpColor.surfaceSoft, padding: '48px 24px 64px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal y={16}>
-              <p style={{ margin: '0 0 28px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
+              <p style={{ margin: '0 0 28px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.trust, fontFamily: corpFont.body, fontWeight: 700 }}>
                 こんな課題はありませんか
               </p>
             </Reveal>
@@ -127,7 +147,7 @@ export default async function CompanyBusinessPage() {
         <section style={{ padding: '64px 24px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal y={16}>
-              <p style={{ margin: '0 0 12px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
+              <p style={{ margin: '0 0 12px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.trust, fontFamily: corpFont.body, fontWeight: 700 }}>
                 ヒトマップが提供する価値
               </p>
               <h2
@@ -152,8 +172,10 @@ export default async function CompanyBusinessPage() {
                       display: 'flex',
                       gap: 20,
                       padding: 24,
-                      border: `1px solid ${corpColor.line}`,
-                      background: corpColor.white,
+                      border: `1px solid ${corpColor.lineSoft}`,
+                      borderRadius: corpRadius.md,
+                      boxShadow: corpShadow.card,
+                      background: corpColor.surface,
                     }}
                   >
                     <span
@@ -162,7 +184,7 @@ export default async function CompanyBusinessPage() {
                         fontFamily: corpFont.mincho,
                         fontSize: 22,
                         fontWeight: 700,
-                        color: corpColor.moss,
+                        color: corpColor.trust,
                       }}
                     >
                       {v.n}
@@ -185,7 +207,7 @@ export default async function CompanyBusinessPage() {
         {/* 以下は運営ダッシュボード（サイトCMS）から自由に編集・追加・並び替えできる */}
         <BlockRenderer blocks={blocks} />
 
-        <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
+        <section style={{ background: corpColor.trustSoft, padding: '56px 24px 72px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal>
               <p style={{ margin: '0 0 20px', fontSize: 13, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
@@ -195,30 +217,31 @@ export default async function CompanyBusinessPage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                 <a
                   href="/company/contact"
-                  className="hm-lift"
+                  className="hm-lift hm-btn"
                   style={{
                     display: 'inline-block',
                     padding: '15px 32px',
-                    background: corpColor.ink,
+                    background: corpColor.trust,
                     color: corpColor.white,
                     textDecoration: 'none',
                     fontWeight: 700,
                     fontSize: 14,
                     fontFamily: corpFont.body,
                     letterSpacing: '0.05em',
+                    borderRadius: corpRadius.sm,
+                    boxShadow: corpShadow.card,
                   }}
                 >
                   お問い合わせ
                 </a>
                 <a
                   href="/company/works"
+                  className="hm-ul"
                   style={{
                     fontSize: 13,
-                    color: corpColor.moss,
-                    textDecoration: 'none',
+                    color: corpColor.trust,
                     fontWeight: 700,
                     fontFamily: corpFont.body,
-                    borderBottom: `1px solid ${corpColor.moss}`,
                     paddingBottom: 2,
                   }}
                 >

@@ -1,4 +1,4 @@
-import { corpColor, corpFont } from './tokens';
+import { corpColor, corpFont, corpRadius } from './tokens';
 
 // スマホのみ表示する常駐CTAバー。sticky CTAはモバイルのコンバージョン率を
 // 大きく押し上げるという知見（Contentsquare等の事例で+15〜30%程度）に基づく。
@@ -28,8 +28,10 @@ export default function MobileCTABar() {
           alignItems: 'center',
           gap: 8,
           padding: '10px 14px calc(10px + env(safe-area-inset-bottom))',
-          background: corpColor.ground,
-          borderTop: `1px solid ${corpColor.line}`,
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'saturate(1.2) blur(8px)',
+          WebkitBackdropFilter: 'saturate(1.2) blur(8px)',
+          borderTop: `1px solid ${corpColor.lineSoft}`,
           boxShadow: '0 -6px 20px rgba(35,35,31,0.1)',
         }}
       >
@@ -50,18 +52,20 @@ export default function MobileCTABar() {
         </a>
         <a
           href="/start"
+          className="hm-btn"
           style={{
             flex: 1,
             textAlign: 'center',
             display: 'block',
             padding: '13px 12px',
-            background: corpColor.ink,
+            background: corpColor.moss,
             color: corpColor.white,
             textDecoration: 'none',
             fontWeight: 700,
             fontSize: 13.5,
             fontFamily: corpFont.body,
             letterSpacing: '0.03em',
+            borderRadius: corpRadius.sm,
           }}
         >
           地図をひらく — 無料

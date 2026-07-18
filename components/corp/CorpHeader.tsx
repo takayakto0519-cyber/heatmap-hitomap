@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { corpColor, corpFont } from './tokens';
+import { corpColor, corpFont, corpRadius, corpShadow } from './tokens';
 import ReadingProgress from './ReadingProgress';
 
 // 「思想」ページはまだ内容を作り込み中のため、ナビゲーションからは一旦外す。
@@ -19,6 +19,7 @@ const NAV = [
 // 860px以下ではリンクをハンバーガー内に格納し、ロゴ＋CTA＋開閉ボタンの1行に固定する。
 export default function CorpHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
@@ -26,6 +27,14 @@ export default function CorpHeader() {
       document.body.style.overflow = '';
     };
   }, [open]);
+
+  // スクロールすると淡い影が出るヘッダー（白基調で"貼り付き"を上品に見せる）
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
     <>
@@ -35,6 +44,8 @@ export default function CorpHeader() {
 .hm-header-nav, .hm-header-sep { display: flex; }
 .hm-header-burger { display: none; }
 .hm-header-cta-full { display: inline; }
+.hm-navlink { transition: color .2s, background .2s; }
+.hm-navlink:hover { color: #566246 !important; background: #FAF9F6; }
 @media (max-width: 860px) {
   .hm-header-nav, .hm-header-sep { display: none; }
   .hm-header-burger { display: inline-flex; }
@@ -53,8 +64,12 @@ export default function CorpHeader() {
           justifyContent: 'space-between',
           gap: 16,
           padding: '12px 20px',
-          background: corpColor.ground,
-          borderBottom: `1px solid ${corpColor.line}`,
+          background: scrolled ? 'rgba(255,255,255,0.86)' : corpColor.surface,
+          backdropFilter: scrolled ? 'saturate(1.2) blur(8px)' : undefined,
+          WebkitBackdropFilter: scrolled ? 'saturate(1.2) blur(8px)' : undefined,
+          borderBottom: `1px solid ${scrolled ? corpColor.lineSoft : 'transparent'}`,
+          boxShadow: scrolled ? corpShadow.header : 'none',
+          transition: 'box-shadow .3s, background .3s, border-color .3s',
           fontFamily: corpFont.body,
         }}
       >
@@ -75,6 +90,7 @@ export default function CorpHeader() {
               <a
                 key={item.href}
                 href={item.href}
+                className="hm-navlink"
                 style={{
                   fontSize: 13,
                   color: corpColor.inkSoft,
@@ -82,7 +98,7 @@ export default function CorpHeader() {
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                   padding: '6px 10px',
-                  borderRadius: 3,
+                  borderRadius: 6,
                 }}
               >
                 {item.label}
@@ -90,14 +106,15 @@ export default function CorpHeader() {
             ))}
             <a
               href="/company/contact"
+              className="hm-btn"
               style={{
                 fontSize: 13,
                 color: corpColor.moss,
                 textDecoration: 'none',
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
-                padding: '6px 10px',
-                borderRadius: 3,
+                padding: '6px 12px',
+                borderRadius: corpRadius.sm,
                 border: `1px solid ${corpColor.moss}`,
               }}
             >
@@ -105,21 +122,24 @@ export default function CorpHeader() {
             </a>
           </nav>
 
-          <span className="hm-header-sep" style={{ width: 1, height: 22, background: corpColor.line, flexShrink: 0 }} />
+          <span className="hm-header-sep" style={{ width: 1, height: 22, background: corpColor.lineSoft, flexShrink: 0 }} />
 
           <a
             href="/login"
+            className="hm-lift hm-btn"
             style={{
               flexShrink: 0,
               display: 'inline-block',
-              padding: '9px 16px',
-              background: corpColor.ink,
+              padding: '9px 18px',
+              background: corpColor.moss,
               color: corpColor.white,
               textDecoration: 'none',
               fontWeight: 700,
               fontSize: 13,
               letterSpacing: '0.03em',
               whiteSpace: 'nowrap',
+              borderRadius: corpRadius.sm,
+              boxShadow: corpShadow.card,
             }}
           >
             <span className="hm-header-cta-full">ログイン / </span>地図を開く
@@ -138,7 +158,8 @@ export default function CorpHeader() {
               height: 38,
               flexShrink: 0,
               background: 'transparent',
-              border: `1px solid ${corpColor.line}`,
+              border: `1px solid ${corpColor.lineSoft}`,
+              borderRadius: corpRadius.sm,
               cursor: 'pointer',
               padding: 0,
             }}
@@ -177,7 +198,7 @@ export default function CorpHeader() {
           inset: 0,
           top: 63,
           zIndex: 199,
-          background: corpColor.ground,
+          background: corpColor.surface,
           flexDirection: 'column',
         }}
       >

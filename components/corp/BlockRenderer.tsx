@@ -1,4 +1,4 @@
-import { corpColor, corpFont } from './tokens';
+import { corpColor, corpFont, corpRadius, corpShadow } from './tokens';
 import Reveal from './Reveal';
 import MVVReveal from './MVVReveal';
 import type { SiteBlock, BlockCardItem, BlockQuoteItem } from '@/lib/siteBlocks';
@@ -20,10 +20,11 @@ export default function BlockRenderer({ blocks }: { blocks: SiteBlock[] }) {
           return <MVVReveal key={block.id} eyebrow={block.eyebrow} items={block.items as BlockCardItem[]} />;
         }
         const alt = i % 2 === 1;
-        const bg = block.block_type === 'cta' ? corpColor.ink : alt ? corpColor.ground : corpColor.white;
+        // 白基調の交互リズム：白面 ↔ わずかに沈めたsurfaceSoft。CTAは墨の高コントラスト帯で締める。
+        const bg = block.block_type === 'cta' ? corpColor.ink : alt ? corpColor.surfaceSoft : corpColor.surface;
         return (
           <Reveal key={block.id}>
-            <section style={{ background: bg, padding: '64px 24px' }}>
+            <section style={{ background: bg, padding: block.block_type === 'cta' ? '64px 24px' : '84px 24px' }}>
               <div style={{ maxWidth: 960, margin: '0 auto' }}>
                 {renderBlockBody(block)}
               </div>
@@ -109,7 +110,8 @@ function renderBlockBody(block: SiteBlock) {
                   className="hm-lift hm-tilt"
                   style={{
                     flex: '1 1 240px', display: 'block', padding: '24px 26px',
-                    border: `1px solid ${corpColor.line}`, background: corpColor.white,
+                    border: `1px solid ${corpColor.lineSoft}`, background: corpColor.surface,
+                    borderRadius: corpRadius.md, boxShadow: corpShadow.card, overflow: 'hidden',
                     textDecoration: 'none', marginTop: i === 1 ? 20 : 0,
                   }}
                 >
@@ -148,7 +150,8 @@ function renderBlockBody(block: SiteBlock) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {items.map((t, i) => (
               <figure key={i} style={{
-                margin: 0, borderLeft: `2px solid ${corpColor.moss}`, background: corpColor.ground,
+                margin: 0, borderLeft: `3px solid ${corpColor.moss}`, background: corpColor.surfaceSoft,
+                borderRadius: `0 ${corpRadius.md}px ${corpRadius.md}px 0`,
                 padding: '18px 22px', marginLeft: i % 2 === 1 ? 24 : 0,
               }}>
                 <blockquote style={{ margin: '0 0 10px', fontFamily: corpFont.mincho, fontSize: 15, lineHeight: 2, color: corpColor.ink, whiteSpace: 'pre-wrap' }}>
@@ -176,9 +179,10 @@ function renderBlockBody(block: SiteBlock) {
             )}
           </div>
           {block.cta_label && block.cta_href && (
-            <a href={block.cta_href} className="hm-lift" style={{
+            <a href={block.cta_href} className="hm-lift hm-btn" style={{
               display: 'inline-block', padding: '16px 40px', background: corpColor.white, color: corpColor.ink,
               textDecoration: 'none', fontWeight: 700, fontSize: 14, fontFamily: corpFont.body, letterSpacing: '0.05em', flexShrink: 0,
+              borderRadius: corpRadius.sm, boxShadow: corpShadow.card,
             }}>
               {block.cta_label}
             </a>

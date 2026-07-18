@@ -39,8 +39,8 @@ export default function CorpFooter() {
   return (
     <footer
       style={{
-        borderTop: `1px solid ${corpColor.line}`,
-        background: corpColor.ground,
+        borderTop: `1px solid ${corpColor.lineSoft}`,
+        background: corpColor.surfaceSoft,
         fontFamily: corpFont.body,
       }}
     >
@@ -70,7 +70,7 @@ export default function CorpFooter() {
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
               {col.links.map(l => (
                 <li key={l.href}>
-                  <a href={l.href} style={{ fontSize: 12.5, color: corpColor.inkSoft, textDecoration: 'none' }}>
+                  <a href={l.href} className="hm-ul" style={{ fontSize: 12.5, color: corpColor.inkSoft }}>
                     {l.label}
                   </a>
                 </li>
@@ -82,7 +82,7 @@ export default function CorpFooter() {
 
       <div
         style={{
-          borderTop: `1px solid ${corpColor.line}`,
+          borderTop: `1px solid ${corpColor.lineSoft}`,
           padding: '18px 24px',
         }}
       >

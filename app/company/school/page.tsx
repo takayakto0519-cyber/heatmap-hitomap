@@ -4,7 +4,7 @@ import CorpFooter from '@/components/corp/CorpFooter';
 import BlockRenderer from '@/components/corp/BlockRenderer';
 import Reveal from '@/components/corp/Reveal';
 import CharReveal from '@/components/corp/CharReveal';
-import { corpColor, corpFont } from '@/components/corp/tokens';
+import { corpColor, corpFont, corpRadius, corpShadow } from '@/components/corp/tokens';
 import type { SiteBlock } from '@/lib/siteBlocks';
 
 const PAIN_POINTS = [
@@ -47,7 +47,7 @@ export default async function CompanySchoolPage() {
   const blocks = await fetchBlocks();
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.surface }}>
       <CorpHeader />
 
       <main style={{ flex: 1 }}>
@@ -80,7 +80,7 @@ export default async function CompanySchoolPage() {
           </div>
         </section>
 
-        <section style={{ background: corpColor.white, padding: '16px 24px 64px' }}>
+        <section style={{ background: corpColor.surfaceSoft, padding: '40px 24px 64px', borderTop: `1px solid ${corpColor.lineSoft}` }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal y={16}>
               <p style={{ margin: '0 0 28px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
@@ -137,8 +137,10 @@ export default async function CompanySchoolPage() {
                       display: 'flex',
                       gap: 20,
                       padding: 24,
-                      border: `1px solid ${corpColor.line}`,
-                      background: corpColor.white,
+                      border: `1px solid ${corpColor.lineSoft}`,
+                      borderRadius: corpRadius.md,
+                      boxShadow: corpShadow.card,
+                      background: corpColor.surface,
                     }}
                   >
                     <span style={{ flexShrink: 0, fontFamily: corpFont.mincho, fontSize: 22, fontWeight: 700, color: corpColor.moss }}>
@@ -162,7 +164,7 @@ export default async function CompanySchoolPage() {
         {/* 以下は運営ダッシュボード（サイトCMS）から自由に編集・追加・並び替えできる */}
         <BlockRenderer blocks={blocks} />
 
-        <section style={{ background: corpColor.white, padding: '56px 24px 72px' }}>
+        <section style={{ background: corpColor.surfaceSoft, padding: '56px 24px 72px', borderTop: `1px solid ${corpColor.lineSoft}` }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal>
               <p style={{ margin: '0 0 20px', fontSize: 13, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
@@ -172,30 +174,31 @@ export default async function CompanySchoolPage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                 <a
                   href="/company/contact"
-                  className="hm-lift"
+                  className="hm-lift hm-btn"
                   style={{
                     display: 'inline-block',
                     padding: '15px 32px',
-                    background: corpColor.ink,
+                    background: corpColor.moss,
                     color: corpColor.white,
                     textDecoration: 'none',
                     fontWeight: 700,
                     fontSize: 14,
                     fontFamily: corpFont.body,
                     letterSpacing: '0.05em',
+                    borderRadius: corpRadius.sm,
+                    boxShadow: corpShadow.card,
                   }}
                 >
                   お問い合わせ
                 </a>
                 <a
                   href="/company/works"
+                  className="hm-ul"
                   style={{
                     fontSize: 13,
                     color: corpColor.moss,
-                    textDecoration: 'none',
                     fontWeight: 700,
                     fontFamily: corpFont.body,
-                    borderBottom: `1px solid ${corpColor.moss}`,
                     paddingBottom: 2,
                   }}
                 >
