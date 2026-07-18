@@ -1,7 +1,26 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
+import { Noto_Serif_JP, Zen_Kaku_Gothic_New } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+
+// 見た目の統一のため日本語WEBフォントを軽量読込（会長承認済み・20260718）。
+// weight/サブセットを絞り、preload:false + display:swap で初期表示をブロックしない。
+// tokens.ts が var(--font-serif) / var(--font-gothic) を先頭に参照する。
+const fontSerif = Noto_Serif_JP({
+  weight: ['600'],
+  subsets: ['latin'],
+  display: 'swap',
+  preload: false,
+  variable: '--font-serif',
+});
+const fontGothic = Zen_Kaku_Gothic_New({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+  preload: false,
+  variable: '--font-gothic',
+});
 
 // 本番ドメインを既定値にする（Vercel側でNEXT_PUBLIC_SITE_URLを設定していなくても正しいOGP絶対URLが解決される）。
 // ローカル開発時のみ .env.local で NEXT_PUBLIC_SITE_URL=http://localhost:3000 を設定して上書きする。
@@ -65,12 +84,12 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#FF6B9D',
+  themeColor: '#FBFAF6',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={`${fontSerif.variable} ${fontGothic.variable}`}>
       <head>
         <Script
           async
@@ -82,9 +101,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         style={{
           margin: 0,
-          fontFamily: 'system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif',
-          background: '#fafafa',
-          color: '#222',
+          fontFamily: 'var(--font-gothic), system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif',
+          background: '#FFFFFF',
+          color: '#23231F',
         }}
       >
         {/* サイト全体の演出用ユーティリティ（SANU/YAMAP風のホバー・漂いアニメ）。reduced-motionでは全て無効化 */}
@@ -102,10 +121,57 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ::selection { background: #566246; color: #FBFAF6; }
 h1, h2, h3 { font-feature-settings: "palt" 1; }
 .hm-tilt { transform-style: preserve-3d; }
+
+/* --- 20260718 モーション基盤の拡張（recent/1GUU級の"動き"を白基調の上で） --- */
+/* ボタンの押下・ホバー反応の統一 */
+.hm-btn { transition: transform .14s ease, box-shadow .3s cubic-bezier(.22,1,.36,1), background .2s, color .2s; }
+.hm-btn:active { transform: translateY(1px) scale(.995); }
+/* リンク下線をホバーで左から引く（1GUU的な上品さ） */
+.hm-ul { background-image: linear-gradient(currentColor, currentColor); background-size: 0% 1px; background-position: 0 100%; background-repeat: no-repeat; text-decoration: none; transition: background-size .35s cubic-bezier(.22,1,.36,1); }
+.hm-ul:hover { background-size: 100% 1px; }
+/* 流れる痕跡帯（マーキー）。1組を複製して -50% 送り、無限ループに見せる */
+@keyframes hm-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.hm-marquee { display: flex; width: max-content; animation: hm-marquee 48s linear infinite; }
+.hm-marquee:hover { animation-play-state: paused; }
+/* ピンや現在地の脈動（共感が集まる場所の鼓動） */
+@keyframes hm-pulse { 0% { box-shadow: 0 0 0 0 rgba(86,98,70,.35); } 70% { box-shadow: 0 0 0 12px rgba(86,98,70,0); } 100% { box-shadow: 0 0 0 0 rgba(86,98,70,0); } }
+.hm-pulse { animation: hm-pulse 2.6s ease-out infinite; }
+/* 要素の"ポップ"登場（ピン出現・バッジ用） */
+@keyframes hm-pop { from { opacity: 0; transform: translateY(6px) scale(.92); } to { opacity: 1; transform: none; } }
+.hm-pop { animation: hm-pop .5s cubic-bezier(.22,1,.36,1) both; }
+/* 苔の淡い明滅（MapArtの痕跡が"灯る"） */
+@keyframes hm-glow { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+.hm-glow { animation: hm-glow 3.2s ease-in-out infinite; }
+/* 感情パレットのセル：ホバーでドットが膨らむ微演出 */
+.hm-swatch { transition: background .25s ease; }
+.hm-swatch:hover { background: #FAF9F6; }
+.hm-swatch .hm-dot { transition: transform .35s cubic-bezier(.22,1,.36,1); }
+.hm-swatch:hover .hm-dot { transform: scale(1.45); }
+/* アクセシビリティ：キーボード操作時のフォーカスリング */
+a:focus-visible, button:focus-visible, [role="button"]:focus-visible { outline: 2px solid #566246; outline-offset: 3px; border-radius: 4px; }
+
+/* --- 20260718 Leaflet地図のブランド化（白基調ミニマル） --- */
+/* 淡色タイルを無彩色寄りに整える（継ぎ目回避のためpane単位） */
+.leaflet-tile-pane { filter: saturate(.88) contrast(1.02); }
+/* ズーム/現在地などのコントロールを白・角丸・淡い影・ブランド調に */
+.leaflet-bar { border: none !important; border-radius: 12px !important; box-shadow: 0 4px 16px -6px rgba(35,35,31,.28) !important; overflow: hidden; }
+.leaflet-bar a, .leaflet-bar a:hover { background: #FBFAF6; color: #23231F; border-bottom: 1px solid #E9E6DD; width: 34px; height: 34px; line-height: 34px; font-weight: 700; transition: background .2s; }
+.leaflet-bar a:hover { background: #EFEDE6; }
+.leaflet-bar a:last-child { border-bottom: none; }
+.leaflet-control-attribution { background: rgba(251,250,246,.82) !important; color: #8C8677 !important; font-size: 10px !important; border-radius: 8px 0 0 0; }
+.leaflet-control-attribution a { color: #566246 !important; }
+/* ポップアップの意匠統一：角丸・柔らかい影・ブランドフォント */
+.leaflet-popup-content-wrapper { border-radius: 14px !important; box-shadow: 0 10px 34px -12px rgba(35,35,31,.34) !important; border: 1px solid #E9E6DD; font-family: var(--font-gothic), "Yu Gothic", sans-serif; }
+.leaflet-popup-content { margin: 12px 14px !important; line-height: 1.6; }
+.leaflet-popup-tip { box-shadow: 0 10px 34px -12px rgba(35,35,31,.34); }
+.leaflet-container a.leaflet-popup-close-button { color: #8C8677; }
+
 @media (prefers-reduced-motion: reduce) {
-  .hm-lift, .hm-photo-zoom img { transition: none; }
+  .hm-lift, .hm-photo-zoom img, .hm-btn { transition: none; }
   .hm-lift:hover { transform: none; box-shadow: none; }
-  .hm-drift, .hm-drift-slow { animation: none; }
+  .hm-drift, .hm-drift-slow, .hm-marquee, .hm-pulse, .hm-pop, .hm-glow { animation: none; }
+  .hm-pop { opacity: 1; transform: none; }
+  .hm-glow { opacity: 1; }
 }
 `,
           }}

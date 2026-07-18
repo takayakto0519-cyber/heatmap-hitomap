@@ -5,7 +5,7 @@ import { corpColor, corpFont } from './tokens';
 // ヒトマップの実データ（lib/emotions.ts の10種の感情タグ）で再現している。
 export default function EmotionPalette() {
   return (
-    <section style={{ background: corpColor.ground, padding: '72px 24px' }}>
+    <section style={{ background: corpColor.surfaceSoft, padding: '88px 24px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <p
           style={{
@@ -36,26 +36,30 @@ export default function EmotionPalette() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
             gap: 1,
-            background: corpColor.line,
-            border: `1px solid ${corpColor.line}`,
+            background: corpColor.lineSoft,
+            border: `1px solid ${corpColor.lineSoft}`,
+            borderRadius: 14,
+            overflow: 'hidden',
           }}
         >
           {EMOTIONS.map((e) => (
             <div
               key={e.key}
+              className="hm-swatch"
               style={{
-                background: corpColor.white,
-                padding: '20px 16px',
+                background: corpColor.surface,
+                padding: '22px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 10,
               }}
             >
               <span
+                className="hm-dot"
                 style={{
                   display: 'inline-block',
-                  width: 10,
-                  height: 10,
+                  width: 11,
+                  height: 11,
                   borderRadius: '50%',
                   background: e.color,
                 }}

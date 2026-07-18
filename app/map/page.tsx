@@ -55,7 +55,7 @@ function memoryDateFromYearSeason(year: string, season: string): string {
 
 const mapLoadingStyle: React.CSSProperties = {
   height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: '#E9E3D2', color: '#8C8579', fontSize: 14,
+  background: '#FAF9F6', color: '#8C8579', fontSize: 14,
 };
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '11px 13px', fontSize: 15,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { corpColor, corpFont } from './tokens';
+import { corpColor, corpFont, corpRadius, corpShadow } from './tokens';
 import { getEmotion } from '@/lib/emotions';
 import type { Trace } from '@/lib/types';
 
@@ -67,11 +67,14 @@ export default function RecentTraces() {
             <a
               key={t.id}
               href={`/t/${t.id}`}
-              className="hm-lift"
+              className="hm-lift hm-tilt"
               style={{
                 flex: '0 0 220px',
                 background: corpColor.white,
-                border: `1px solid ${corpColor.line}`,
+                border: `1px solid ${corpColor.lineSoft}`,
+                borderRadius: corpRadius.md,
+                boxShadow: corpShadow.card,
+                overflow: 'hidden',
                 textDecoration: 'none',
                 display: 'flex',
                 flexDirection: 'column',
@@ -134,13 +137,12 @@ export default function RecentTraces() {
       <div style={{ maxWidth: 960, margin: '24px auto 0', padding: '0 24px' }}>
         <a
           href="/map"
+          className="hm-ul"
           style={{
             fontSize: 13,
             color: corpColor.moss,
-            textDecoration: 'none',
             fontWeight: 700,
             fontFamily: corpFont.body,
-            borderBottom: `1px solid ${corpColor.moss}`,
             paddingBottom: 2,
           }}
         >

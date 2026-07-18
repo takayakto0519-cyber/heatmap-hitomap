@@ -61,7 +61,7 @@ export default async function HomePage() {
   const [blocks, settings] = await Promise.all([fetchHomeBlocks(), fetchSiteSettings()]);
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.surface }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <AnnouncementBar settings={settings.announcement} />
       <CorpHeader />
