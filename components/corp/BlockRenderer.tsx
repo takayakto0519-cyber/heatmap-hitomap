@@ -11,7 +11,12 @@ function isQuoteItems(items: (BlockCardItem | BlockQuoteItem)[]): items is Block
   return items.length > 0 && 'comment' in items[0];
 }
 
+// CTAが連続しても中盤が「暗いスラブ」にならないよう、CTAは墨→苔→淡色の3種を巡回させる。
+// （MVVの暗色没入は演出として残しつつ、CTAの重なりで暗くなりすぎるのを防ぐ）
+const CTA_BG = [corpColor.ink, corpColor.moss, corpColor.surfaceSoft] as const;
+
 export default function BlockRenderer({ blocks }: { blocks: SiteBlock[] }) {
+  let ctaSeen = 0;
   return (
     <>
       {blocks.map((block, i) => {
@@ -20,13 +25,21 @@ export default function BlockRenderer({ blocks }: { blocks: SiteBlock[] }) {
           return <MVVReveal key={block.id} eyebrow={block.eyebrow} items={block.items as BlockCardItem[]} />;
         }
         const alt = i % 2 === 1;
-        // 白基調の交互リズム：白面 ↔ わずかに沈めたsurfaceSoft。CTAは墨の高コントラスト帯で締める。
-        const bg = block.block_type === 'cta' ? corpColor.ink : alt ? corpColor.surfaceSoft : corpColor.surface;
+        let bg: string;
+        let ctaVariant = 0;
+        if (block.block_type === 'cta') {
+          ctaVariant = ctaSeen % CTA_BG.length;
+          ctaSeen += 1;
+          bg = CTA_BG[ctaVariant];
+        } else {
+          // 白基調の交互リズム：白面 ↔ わずかに沈めたsurfaceSoft
+          bg = alt ? corpColor.surfaceSoft : corpColor.surface;
+        }
         return (
           <Reveal key={block.id}>
             <section style={{ background: bg, padding: block.block_type === 'cta' ? '64px 24px' : '84px 24px' }}>
               <div style={{ maxWidth: 960, margin: '0 auto' }}>
-                {renderBlockBody(block)}
+                {renderBlockBody(block, ctaVariant)}
               </div>
             </section>
           </Reveal>
@@ -48,7 +61,7 @@ function Eyebrow({ children, light }: { children: React.ReactNode; light?: boole
   );
 }
 
-function renderBlockBody(block: SiteBlock) {
+function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
   switch (block.block_type) {
     case 'heading':
       return (
@@ -165,22 +178,28 @@ function renderBlockBody(block: SiteBlock) {
       );
     }
 
-    case 'cta':
+    case 'cta': {
+      // 0=墨(暗) / 1=苔 / 2=淡色。背景の明暗に合わせて文字・ボタン色を切り替える。
+      const onDark = ctaVariant === 0 || ctaVariant === 1;
+      const headColor = onDark ? corpColor.white : corpColor.ink;
+      const bodyColor = ctaVariant === 0 ? corpColor.line : ctaVariant === 1 ? 'rgba(255,255,255,0.85)' : corpColor.inkSoft;
+      const btnBg = onDark ? corpColor.white : corpColor.moss;
+      const btnColor = ctaVariant === 0 ? corpColor.ink : ctaVariant === 1 ? corpColor.moss : corpColor.white;
       return (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
           <div>
             {block.heading && (
-              <h2 style={{ margin: '0 0 10px', fontFamily: corpFont.mincho, fontSize: 'clamp(22px,3.2vw,30px)', fontWeight: 600, color: corpColor.white, lineHeight: 1.6 }}>
+              <h2 style={{ margin: '0 0 10px', fontFamily: corpFont.mincho, fontSize: 'clamp(22px,3.2vw,30px)', fontWeight: 600, color: headColor, lineHeight: 1.6 }}>
                 {block.heading}
               </h2>
             )}
             {block.body && (
-              <p style={{ margin: 0, fontSize: 13, color: corpColor.line, fontFamily: corpFont.body, lineHeight: 1.9 }}>{block.body}</p>
+              <p style={{ margin: 0, fontSize: 13, color: bodyColor, fontFamily: corpFont.body, lineHeight: 1.9 }}>{block.body}</p>
             )}
           </div>
           {block.cta_label && block.cta_href && (
             <a href={block.cta_href} className="hm-lift hm-btn" style={{
-              display: 'inline-block', padding: '16px 40px', background: corpColor.white, color: corpColor.ink,
+              display: 'inline-block', padding: '16px 40px', background: btnBg, color: btnColor,
               textDecoration: 'none', fontWeight: 700, fontSize: 14, fontFamily: corpFont.body, letterSpacing: '0.05em', flexShrink: 0,
               borderRadius: corpRadius.sm, boxShadow: corpShadow.card,
             }}>
@@ -189,6 +208,7 @@ function renderBlockBody(block: SiteBlock) {
           )}
         </div>
       );
+    }
 
     default:
       return null;

@@ -22,11 +22,11 @@ export default function MapArt({ variant = 0, id = 'a' }: { variant?: 0 | 1 | 2;
     >
       <defs>
         <radialGradient id={gidA} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={v.heatA} stopOpacity="0.34" />
+          <stop offset="0%" stopColor={v.heatA} stopOpacity="0.44" />
           <stop offset="100%" stopColor={v.heatA} stopOpacity="0" />
         </radialGradient>
         <radialGradient id={gidB} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={v.heatB} stopOpacity="0.22" />
+          <stop offset="0%" stopColor={v.heatB} stopOpacity="0.30" />
           <stop offset="100%" stopColor={v.heatB} stopOpacity="0" />
         </radialGradient>
       </defs>
@@ -55,27 +55,24 @@ export default function MapArt({ variant = 0, id = 'a' }: { variant?: 0 | 1 | 2;
         <circle cx={120 + variant * 70} cy={400 - variant * 60} r="110" fill={`url(#${gidB})`} />
       </g>
 
-      {/* 痕跡ピン（点）。1つ1つが時間差で"灯る"＝生きた証が地図に積み重なる様子 */}
-      <g fill={v.pin}>
+      {/* 痕跡ピン（点）。1つ1つが時間差で"灯る"＝生きた証が地図に積み重なる様子。
+          点は感情色を帯び、白地でも「感情の地図」だと伝わるようにする（淡いハロ＋濃い芯）。 */}
+      <g>
         {[
-          { cx: 205, cy: 190, r: 4 },
-          { cx: 252, cy: 168, r: 3 },
-          { cx: 178, cy: 238, r: 3 },
-          { cx: 480, cy: 330, r: 4 },
-          { cx: 512, cy: 300, r: 3 },
-          { cx: 443, cy: 356, r: 3 },
-          { cx: 600, cy: 120, r: 3.5 },
-          { cx: 120, cy: 400, r: 3 },
-          { cx: 352, cy: 92, r: 2.5 },
+          { cx: 205, cy: 190, r: 5, c: '#E8607D' },   // ときめき
+          { cx: 252, cy: 168, r: 3.5, c: '#E0A43B' }, // なつかしさ
+          { cx: 178, cy: 238, r: 3.5, c: '#5B8DEF' }, // 切なさ
+          { cx: 480, cy: 330, r: 5, c: '#38ADA9' },   // 驚き
+          { cx: 512, cy: 300, r: 3.5, c: '#8E5AA8' }, // 感動
+          { cx: 443, cy: 356, r: 3.5, c: '#C0562E' }, // あたたかさ
+          { cx: 600, cy: 120, r: 4, c: '#566246' },   // 苔
+          { cx: 120, cy: 400, r: 3.5, c: '#E8607D' },
+          { cx: 352, cy: 92, r: 3, c: '#38ADA9' },
         ].map((p, i) => (
-          <circle
-            key={i}
-            cx={p.cx}
-            cy={p.cy}
-            r={p.r}
-            className="hm-glow"
-            style={{ animationDelay: `${(i * 0.4).toFixed(1)}s` }}
-          />
+          <g key={i} className="hm-glow" style={{ animationDelay: `${(i * 0.4).toFixed(1)}s` }}>
+            <circle cx={p.cx} cy={p.cy} r={p.r * 2.6} fill={p.c} opacity={0.16} />
+            <circle cx={p.cx} cy={p.cy} r={p.r} fill={p.c} opacity={0.92} />
+          </g>
         ))}
       </g>
     </svg>

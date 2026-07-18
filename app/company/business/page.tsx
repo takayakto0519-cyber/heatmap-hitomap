@@ -5,6 +5,7 @@ import BlockRenderer from '@/components/corp/BlockRenderer';
 import Reveal from '@/components/corp/Reveal';
 import CharReveal from '@/components/corp/CharReveal';
 import { corpColor, corpFont, corpRadius, corpShadow } from '@/components/corp/tokens';
+import { IconLayers, IconChart, IconBuilding } from '@/components/corp/icons';
 import type { SiteBlock } from '@/lib/siteBlocks';
 
 const PAIN_POINTS = [
@@ -100,12 +101,12 @@ export default async function CompanyBusinessPage() {
         <section style={{ background: corpColor.trustSoft, borderTop: `1px solid ${corpColor.trust}22`, borderBottom: `1px solid ${corpColor.trust}22`, padding: '28px 24px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '16px 28px' }}>
             {[
-              { icon: '🗺️', label: '国土地理院の地図基盤', note: '行政利用に耐える公式タイル' },
-              { icon: '📊', label: '表示するのは実データのみ', note: '捏造した数字を使わない' },
-              { icon: '🏛️', label: '自治体ダッシュボード', note: '地図範囲で集計・発行できる' },
+              { Icon: IconLayers, label: '国土地理院の地図基盤', note: '行政利用に耐える公式タイル' },
+              { Icon: IconChart, label: '表示するのは実データのみ', note: '捏造した数字を使わない' },
+              { Icon: IconBuilding, label: '自治体ダッシュボード', note: '地図範囲で集計・発行できる' },
             ].map((t) => (
-              <div key={t.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 200px' }}>
-                <span style={{ fontSize: 18, lineHeight: 1.2 }} aria-hidden="true">{t.icon}</span>
+              <div key={t.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, flex: '1 1 200px' }}>
+                <t.Icon size={22} color={corpColor.trust} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: corpColor.trustDeep, fontFamily: corpFont.body }}>{t.label}</span>
                   <span style={{ fontSize: 11.5, color: corpColor.gray, fontFamily: corpFont.body }}>{t.note}</span>

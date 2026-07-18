@@ -3,6 +3,7 @@ import Reveal from './Reveal';
 import MapArt from './MapArt';
 import CharReveal from './CharReveal';
 import Parallax from './Parallax';
+import { IconWalk, IconCamera, IconLayers, IconBuilding } from './icons';
 import { DEFAULT_SITE_SETTINGS, type HeroSettings } from '@/lib/siteSettings';
 
 // SANU（sa-nu.com）のヒーロー構成を踏襲：
@@ -18,10 +19,11 @@ import { DEFAULT_SITE_SETTINGS, type HeroSettings } from '@/lib/siteSettings';
 //   ・個人／自治体・法人の2つの入口を最初の画面で分岐させる。
 
 // 何をする組織かを3語で言い切る（言葉より先に体験で理解させる補助）
+// アイコンは絵文字ではなく自作の線画SVG（行政・法人向けの品位のため）
 const STEPS = [
-  { icon: '🚶', label: '歩く', note: 'まちで痕跡に出会う' },
-  { icon: '📷', label: '記録する', note: '写真と一言で残す' },
-  { icon: '🗺️', label: '積み重なる', note: '感情の地図になる' },
+  { Icon: IconWalk, label: '歩く', note: 'まちで痕跡に出会う' },
+  { Icon: IconCamera, label: '記録する', note: '写真と一言で残す' },
+  { Icon: IconLayers, label: '積み重なる', note: '感情の地図になる' },
 ] as const;
 
 export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settings?: HeroSettings }) {
@@ -119,15 +121,15 @@ export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settin
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 9,
-                      padding: '9px 14px',
+                      gap: 10,
+                      padding: '9px 15px',
                       background: corpColor.white,
                       border: `1px solid ${corpColor.lineSoft}`,
                       borderRadius: corpRadius.pill,
                       boxShadow: corpShadow.card,
                     }}
                   >
-                    <span style={{ fontSize: 16, lineHeight: 1 }} aria-hidden="true">{s.icon}</span>
+                    <s.Icon size={20} color={corpColor.moss} />
                     <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
                       <span style={{ fontSize: 13.5, fontWeight: 700, color: corpColor.ink, fontFamily: corpFont.body }}>
                         {s.label}
@@ -213,7 +215,7 @@ export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settin
                   borderRadius: corpRadius.sm,
                 }}
               >
-                <span aria-hidden="true">🏛️</span>
+                <IconBuilding size={16} color={corpColor.trustDeep} />
                 {settings.biz_link_label}
               </a>
             </div>
