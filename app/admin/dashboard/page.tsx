@@ -10,13 +10,14 @@ import PostsTab from '@/components/admin/PostsTab';
 import OverviewTab from '@/components/admin/OverviewTab';
 import AttachmentTab from '@/components/admin/AttachmentTab';
 import SettingsTab from '@/components/admin/SettingsTab';
+import SnsTab from '@/components/admin/SnsTab';
 
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
   ssr: false,
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads' | 'attachment';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads' | 'attachment';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -24,6 +25,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   settings: { label: 'サイト設定', icon: '🎨', group: 'サイト編集', desc: 'トップの大見出し・お知らせ帯の文言を書き換える' },
   blocks: { label: 'ページ編集', icon: '🧩', group: 'サイト編集', desc: '各ページのセクションを追加・並び替え（プレビュー付き）' },
   posts: { label: '実績ブログ', icon: '📝', group: 'サイト編集', desc: 'イベント記録・参加者の声を書いて公開' },
+  sns: { label: 'SNS投稿', icon: '📣', group: 'サイト編集', desc: 'Instagram等のキャプション・画像をコピペしてすぐ投稿' },
   review: { label: '承認待ち', icon: '✅', group: '投稿・安全', desc: '全国公開の申請を承認/却下' },
   traces: { label: '投稿管理', icon: '📍', group: '投稿・安全', desc: '投稿を検索・削除・復元' },
   reports: { label: '通報', icon: '🚨', group: '投稿・安全', desc: '寄せられた通報の対応' },
@@ -363,6 +365,7 @@ export default function AdminDashboardPage() {
           {tab === 'settings' && <SettingsTab authHeaders={authHeaders} />}
           {tab === 'blocks' && <BlocksTab authHeaders={authHeaders} />}
           {tab === 'posts' && <PostsTab authHeaders={authHeaders} />}
+          {tab === 'sns' && <SnsTab authHeaders={authHeaders} />}
           {tab === 'review' && <ReviewTab authHeaders={authHeaders} />}
           {tab === 'traces' && <TracesTab authHeaders={authHeaders} />}
           {tab === 'reports' && <ReportsTab authHeaders={authHeaders} />}
