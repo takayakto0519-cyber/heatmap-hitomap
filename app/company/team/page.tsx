@@ -15,17 +15,6 @@ export const metadata: Metadata = {
 
 export const revalidate = 60;
 
-// 小田太志の情報は本人確認後に追加する（現時点では加藤のみ掲載）。
-const MEMBERS = [
-  {
-    name: '加藤貴也',
-    role: '代表 / マーケティング',
-    quote: 'モノに残った痕跡から、その人の生きた証を読み解く。',
-    bio: 'ヒトマップの思想設計とマーケティングを担当。「モノの痕跡から人を読む」という視点をもとに、サービスの世界観をつくっています。',
-    photoSrc: '/images/team/kato-takaya.jpg',
-  },
-];
-
 async function fetchBlocks(): Promise<SiteBlock[]> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
   try {
@@ -44,6 +33,11 @@ async function fetchBlocks(): Promise<SiteBlock[]> {
 
 export default async function TeamPage() {
   const blocks = await fetchBlocks();
+  // 運営メンバー（氏名・肩書き・写真）は運営ダッシュボードのサイトCMSから編集できる
+  // team_memberブロックのみを先に取り出し、TeamCardで一覧表示する。それ以外のブロック
+  // （採用メッセージ等の自由セクション）は従来どおりBlockRendererに任せる。
+  const memberBlocks = blocks.filter((b) => b.block_type === 'team_member');
+  const otherBlocks = blocks.filter((b) => b.block_type !== 'team_member');
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: corpColor.ground }}>
@@ -76,16 +70,23 @@ export default async function TeamPage() {
 
         <section style={{ background: corpColor.white, padding: '8px 24px 72px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
-            {MEMBERS.map((m, i) => (
-              <Reveal key={m.name} delay={i * 100}>
-                <TeamCard {...m} />
-              </Reveal>
-            ))}
+            {memberBlocks.length === 0 && (
+              <p style={{ margin: 0, fontSize: 13, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
+                運営メンバーは準備中です。
+              </p>
+            )}
+            {memberBlocks.flatMap((block) =>
+              (block.items as { title: string; body: string; role?: string; quote?: string; image_url?: string }[]).map((m, i) => (
+                <Reveal key={`${block.id}-${i}`} delay={i * 100}>
+                  <TeamCard name={m.title} role={m.role ?? ''} quote={m.quote ?? ''} bio={m.body} photoSrc={m.image_url} />
+                </Reveal>
+              ))
+            )}
           </div>
         </section>
 
         {/* 以下は運営ダッシュボード（サイトCMS）から自由に追加できる（例：採用メッセージ、参画者の声など） */}
-        <BlockRenderer blocks={blocks} />
+        <BlockRenderer blocks={otherBlocks} />
 
         <section style={{ padding: '8px 24px 72px' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>

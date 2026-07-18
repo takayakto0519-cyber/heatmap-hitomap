@@ -1,6 +1,7 @@
 import { corpColor, corpFont, corpRadius, corpShadow } from './tokens';
 import Reveal from './Reveal';
 import MVVReveal from './MVVReveal';
+import TeamCard from './TeamCard';
 import type { SiteBlock, BlockCardItem, BlockQuoteItem } from '@/lib/siteBlocks';
 
 // 運営が /admin/blocks から自由に追加・並び替えできるサイトブロックの描画。
@@ -151,6 +152,27 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
               );
             })}
           </div>
+        </>
+      );
+    }
+
+    case 'team_member': {
+      // TeamCardをそのまま再利用する——写真は常に56x56の丸型に収まるため、
+      // 管理画面でどんな画像をアップロードしても「大きすぎる」事故が起きない。
+      const items = block.items as BlockCardItem[];
+      return (
+        <>
+          <Eyebrow>{block.eyebrow}</Eyebrow>
+          {items.map((item, i) => (
+            <TeamCard
+              key={i}
+              name={item.title}
+              role={item.role ?? ''}
+              quote={item.quote ?? ''}
+              bio={item.body}
+              photoSrc={item.image_url}
+            />
+          ))}
         </>
       );
     }

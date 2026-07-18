@@ -23,7 +23,10 @@ function emptyDraft(type: BlockType): Draft {
   return {
     block_type: type, eyebrow: '', heading: '', body: '', image_url: '',
     cta_label: '', cta_href: '',
-    items: type === 'cards' || type === 'mvv' ? [{ title: '', body: '' }] : type === 'quote' ? [{ name: '', comment: '' }] : [],
+    items: type === 'cards' || type === 'mvv' ? [{ title: '', body: '' }]
+      : type === 'quote' ? [{ name: '', comment: '' }]
+      : type === 'team_member' ? [{ title: '', body: '', role: '', quote: '' }]
+      : [],
     is_visible: true,
   };
 }
@@ -302,6 +305,34 @@ export default function BlocksTab({ authHeaders }: { authHeaders: () => HeadersI
                   </div>
                 ))}
                 <button onClick={() => setDraft({ ...draft, items: [...draft.items, { title: '', body: '' } as BlockCardItem] })} style={{ alignSelf: 'flex-start', padding: '8px 16px', borderRadius: 8, border: '1.5px solid #566246', background: '#fff', color: '#566246', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>＋ カードを追加</button>
+              </div>
+            </>
+          )}
+
+          {draft.block_type === 'team_member' && (
+            <>
+              <label style={labelStyle}>小ラベル（任意）</label>
+              <input value={draft.eyebrow} onChange={e => setDraft({ ...draft, eyebrow: e.target.value })} style={inputStyle} placeholder="例：TEAM" />
+              <label style={labelStyle}>メンバー（写真は自動で丸型・一定サイズに収まります）</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(draft.items as BlockCardItem[]).map((item, i) => (
+                  <div key={i} style={{ border: '1px solid #e5e0d0', borderRadius: 10, padding: 12, background: '#fff' }}>
+                    <input value={item.title} onChange={e => setDraft({ ...draft, items: (draft.items as BlockCardItem[]).map((x, j) => j === i ? { ...x, title: e.target.value } : x) })} placeholder="氏名" style={{ ...inputStyle, marginBottom: 8, fontSize: 13 }} />
+                    <input value={item.role ?? ''} onChange={e => setDraft({ ...draft, items: (draft.items as BlockCardItem[]).map((x, j) => j === i ? { ...x, role: e.target.value } : x) })} placeholder="肩書き（例：代表 / マーケティング）" style={{ ...inputStyle, marginBottom: 8, fontSize: 13 }} />
+                    <input value={item.quote ?? ''} onChange={e => setDraft({ ...draft, items: (draft.items as BlockCardItem[]).map((x, j) => j === i ? { ...x, quote: e.target.value } : x) })} placeholder="一言（見出しとして大きく表示されます）" style={{ ...inputStyle, marginBottom: 8, fontSize: 13 }} />
+                    <textarea rows={3} value={item.body} onChange={e => setDraft({ ...draft, items: (draft.items as BlockCardItem[]).map((x, j) => j === i ? { ...x, body: e.target.value } : x) })} placeholder="自己紹介文" style={{ ...inputStyle, marginBottom: 8, fontSize: 13, lineHeight: 1.7, resize: 'vertical' }} />
+                    {item.image_url && (
+                      <div style={{ marginBottom: 8 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.image_url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
+                      </div>
+                    )}
+                    <label style={{ fontSize: 11, color: '#999', display: 'block', marginBottom: 4 }}>写真（任意・未設定ならイニシャル表示）</label>
+                    <input type="file" accept="image/*" disabled={uploading} onChange={e => uploadImage(e.target.files, i)} />
+                    <button onClick={() => setDraft({ ...draft, items: (draft.items as BlockCardItem[]).filter((_, j) => j !== i) })} style={{ display: 'block', marginTop: 8, fontSize: 11, color: '#B23A2E', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>このメンバーを削除</button>
+                  </div>
+                ))}
+                <button onClick={() => setDraft({ ...draft, items: [...draft.items, { title: '', body: '', role: '', quote: '' } as BlockCardItem] })} style={{ alignSelf: 'flex-start', padding: '8px 16px', borderRadius: 8, border: '1.5px solid #566246', background: '#fff', color: '#566246', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>＋ メンバーを追加</button>
               </div>
             </>
           )}
