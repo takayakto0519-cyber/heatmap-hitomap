@@ -16,6 +16,7 @@ import SettingsTab from '@/components/admin/SettingsTab';
 import SnsTab from '@/components/admin/SnsTab';
 import AIOpsTab from '@/components/admin/AIOpsTab';
 import SalesTab from '@/components/admin/SalesTab';
+import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
@@ -23,7 +24,7 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'sales' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops' | 'minutes';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops' | 'minutes';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -42,6 +43,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   quests: { label: 'クエスト', icon: '🎯', group: '体験づくり', desc: 'クエストの作成・管理' },
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   bizmodels: { label: 'ビジネスモデル案', icon: '💡', group: '調査・研究', desc: '新しい事業案を書き溜め、検証状況を追う' },
+  funding: { label: 'コンテスト・助成金', icon: '🏆', group: '学校・法人', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
   sales: { label: '縁の司令室', icon: '🧭', group: '学校・法人', desc: '営業を縁の方程式（痕跡×余白＋共動×推譲）で見立て、今日の一手を自動で示す' },
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
@@ -388,6 +390,7 @@ export default function AdminDashboardPage() {
           {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
           {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
           {tab === 'bizmodels' && <BizModelIdeasTab authHeaders={authHeaders} />}
+          {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} />}
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={id => goTab(id as Tab)} />}
           {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}

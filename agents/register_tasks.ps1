@@ -46,6 +46,8 @@ Register-Agent "HitomapEmailQueue" "email_queue.py" "08:35"
 Register-Agent "HitomapTracePattern" "trace_pattern.py" "02:30"
 Register-Agent "HitomapRelationPopulation" "relation_population.py" "02:40"
 Register-Agent "HitomapCalendarWatch" "calendar_watch.py" "06:50"
+Register-Agent "HitomapCompetitorMarketResearch" "competitor_market_research.py" "06:00"
+Register-Agent "HitomapMarketingDigest" "marketing_digest.py" "08:40"
 
 Write-Host ""
 Write-Host "Manual test example:" -ForegroundColor Cyan
