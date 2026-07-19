@@ -16,6 +16,7 @@ import SettingsTab from '@/components/admin/SettingsTab';
 import SnsTab from '@/components/admin/SnsTab';
 import AIOpsTab from '@/components/admin/AIOpsTab';
 import SalesTab from '@/components/admin/SalesTab';
+import AgentStatusTab from '@/components/admin/AgentStatusTab';
 import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 
@@ -24,7 +25,7 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops' | 'minutes';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'agentstatus' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops' | 'minutes';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -50,6 +51,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   relation: { label: '関係人口', icon: '🔁', group: '調査・研究', desc: '複数回関わった人（関係人口の芽）と地域ランキング' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
   aiops: { label: 'AIエージェント運営', icon: '🤖', group: 'AIエージェント', desc: '収益化イニシアチブ・案件パイプライン・顧問先カルテ・LINE縁ミッション・営業メール送り先の管理' },
+  agentstatus: { label: '稼働状況', icon: '🏢', group: 'AIエージェント', desc: 'ローカルAIエージェント（番人）の稼働状況・空きオフィスを確認（会長のPCでのみ実データ表示）' },
   minutes: { label: '議事録', icon: '🗒', group: '経営管理', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
@@ -355,7 +357,7 @@ export default function AdminDashboardPage() {
       <main className="hm-main" style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           position: 'sticky', top: 0, zIndex: 10, background: 'rgba(244,246,245,0.92)', backdropFilter: 'blur(6px)',
-          padding: '14px 20px', borderBottom: '1px solid #e5e8e7', display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 20px', borderBottom: '1px solid #e5e8e7', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
           <button className="hm-hamburger" onClick={() => setNavOpen(v => !v)} style={{
             width: 34, height: 34, borderRadius: 8, border: '1px solid #ddd', background: '#fff',
@@ -397,6 +399,7 @@ export default function AdminDashboardPage() {
           {tab === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
           {tab === 'aiops' && <AIOpsTab authHeaders={authHeaders} />}
+          {tab === 'agentstatus' && <AgentStatusTab authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
         </div>
       </main>
