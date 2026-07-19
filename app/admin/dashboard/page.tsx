@@ -21,7 +21,7 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops' | 'minutes';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -39,14 +39,16 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   routes: { label: '公開イベント', icon: '🧭', group: '体験づくり', desc: 'route/relay/煩悩イベントの作成・管理' },
   quests: { label: 'クエスト', icon: '🎯', group: '体験づくり', desc: 'クエストの作成・管理' },
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
+  bizmodels: { label: 'ビジネスモデル案', icon: '💡', group: '調査・研究', desc: '新しい事業案を書き溜め、検証状況を追う' },
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
   relation: { label: '関係人口', icon: '🔁', group: '調査・研究', desc: '複数回関わった人（関係人口の芽）と地域ランキング' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
   aiops: { label: 'AIエージェント運営', icon: '🤖', group: 'AIエージェント', desc: '収益化イニシアチブ・案件パイプライン・顧問先カルテ・LINE縁ミッション・営業メール送り先の管理' },
+  minutes: { label: '議事録', icon: '🗒', group: '経営管理', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
-const TAB_GROUPS = ['サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究', 'AIエージェント'];
+const TAB_GROUPS = ['サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究', 'AIエージェント', '経営管理'];
 
 // ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
 const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
@@ -382,11 +384,13 @@ export default function AdminDashboardPage() {
           {tab === 'routes' && <RoutesTab authHeaders={authHeaders} />}
           {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
           {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
+          {tab === 'bizmodels' && <BizModelIdeasTab authHeaders={authHeaders} />}
           {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
           {tab === 'aiops' && <AIOpsTab authHeaders={authHeaders} />}
+          {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
         </div>
       </main>
     </div>
@@ -2177,6 +2181,321 @@ function EventPlansTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
               />
               <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
                 最終更新: {new Date(p.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+              </p>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── ビジネスモデル案 ──────────────────────────
+interface BizModelIdea {
+  id: string;
+  title: string;
+  memo: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const BIZMODEL_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  idea: { label: '💡 アイデア', color: '#8E44AD' },
+  validating: { label: '🔍 検証中', color: '#F6B93B' },
+  building: { label: '🛠 構築中', color: '#4A69BD' },
+  live: { label: '🚀 稼働中', color: '#38ADA9' },
+  shelved: { label: '📦 保留', color: '#aaa' },
+};
+
+function BizModelIdeasTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [ideas, setIdeas] = useState<BizModelIdea[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch('/api/admin/biz-model-ideas', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          setIdeas(d.ideas);
+          const memoMap: Record<string, string> = {};
+          for (const i of d.ideas as BizModelIdea[]) memoMap[i.id] = i.memo ?? '';
+          setEditingMemo(memoMap);
+        } else setError(d.error ?? '取得に失敗しました');
+      })
+      .catch(() => setError('通信エラー'))
+      .finally(() => setLoading(false));
+  }, [authHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function createIdea() {
+    if (!newTitle.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/biz-model-ideas', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ title: newTitle.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) { setNewTitle(''); setShowCreate(false); load(); }
+      else setError(data.error ?? '作成に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateIdea(id: string, fields: Record<string, unknown>) {
+    const res = await fetch(`/api/admin/biz-model-ideas/${id}`, {
+      method: 'PATCH', headers: authHeaders(), body: JSON.stringify(fields),
+    });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '更新に失敗しました');
+  }
+
+  async function deleteIdea(id: string) {
+    if (!confirm('このビジネスモデル案を削除しますか？')) return;
+    const res = await fetch(`/api/admin/biz-model-ideas/${id}`, { method: 'DELETE', headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
+  }
+
+  if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+        次の商品・事業の種になりそうな案をここに書き溜め、検証状況を追っていくための一覧です。
+      </p>
+      {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+
+      {showCreate ? (
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input placeholder="事業案の名前（例：導入キットの外販パッケージ化）" value={newTitle}
+              onChange={e => setNewTitle(e.target.value)} style={inputStyle} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={createIdea} disabled={saving || !newTitle.trim()} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: 'pointer',
+              }}>{saving ? '作成中…' : '追加する'}</button>
+              <button onClick={() => setShowCreate(false)} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #ddd',
+                background: '#fff', color: '#888', cursor: 'pointer',
+              }}>キャンセル</button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <button onClick={() => setShowCreate(true)} style={{
+          display: 'block', width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px dashed #38ADA9',
+          background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 14,
+        }}>＋ 新しいビジネスモデル案を追加</button>
+      )}
+
+      {ideas.length === 0 && <p style={{ color: '#aaa' }}>まだ事業案がありません。</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {ideas.map(i => {
+          const statusInfo = BIZMODEL_STATUS_LABELS[i.status] ?? BIZMODEL_STATUS_LABELS.idea;
+          return (
+            <Card key={i.id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 15 }}>
+                  {i.title}
+                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
+                </p>
+                <button onClick={() => deleteIdea(i.id)} style={{
+                  padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                }}>削除</button>
+              </div>
+
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+                {Object.entries(BIZMODEL_STATUS_LABELS).map(([key, info]) => (
+                  <button key={key} onClick={() => updateIdea(i.id, { status: key })} style={{
+                    padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+                    border: `1.5px solid ${i.status === key ? info.color : '#ddd'}`,
+                    background: i.status === key ? info.color + '18' : '#fff',
+                    color: i.status === key ? info.color : '#999', fontWeight: i.status === key ? 700 : 400,
+                  }}>{info.label}</button>
+                ))}
+              </div>
+
+              <textarea
+                value={editingMemo[i.id] ?? ''}
+                onChange={e => setEditingMemo(prev => ({ ...prev, [i.id]: e.target.value }))}
+                onBlur={() => { if ((editingMemo[i.id] ?? '') !== (i.memo ?? '')) updateIdea(i.id, { memo: editingMemo[i.id] || null }); }}
+                placeholder="事業案のメモ（誰向け・収益モデル・必要なもの・検証方法など自由に）"
+                rows={4}
+                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                最終更新: {new Date(i.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+              </p>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── 議事録（日記形式） ────────
+interface MeetingMinute {
+  id: string;
+  entry_date: string;
+  title: string | null;
+  participants: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function MinutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [entries, setEntries] = useState<MeetingMinute[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [newDate, setNewDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newTitle, setNewTitle] = useState('');
+  const [newParticipants, setNewParticipants] = useState('');
+  const [newBody, setNewBody] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<Record<string, { title: string; participants: string; body: string }>>({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch('/api/admin/meeting-minutes', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          setEntries(d.minutes);
+          const map: Record<string, { title: string; participants: string; body: string }> = {};
+          for (const e of d.minutes as MeetingMinute[]) map[e.id] = { title: e.title ?? '', participants: e.participants ?? '', body: e.body ?? '' };
+          setEditing(map);
+        } else setError(d.error ?? '取得に失敗しました');
+      })
+      .catch(() => setError('通信エラー'))
+      .finally(() => setLoading(false));
+  }, [authHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function createEntry() {
+    if (!newDate) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/meeting-minutes', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ entry_date: newDate, title: newTitle, participants: newParticipants, body: newBody }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setNewTitle(''); setNewParticipants(''); setNewBody(''); setShowCreate(false); load();
+      } else setError(data.error ?? '作成に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateEntry(id: string, fields: Record<string, unknown>) {
+    const res = await fetch(`/api/admin/meeting-minutes/${id}`, {
+      method: 'PATCH', headers: authHeaders(), body: JSON.stringify(fields),
+    });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '更新に失敗しました');
+  }
+
+  async function deleteEntry(id: string) {
+    if (!confirm('この議事録を削除しますか？')) return;
+    const res = await fetch(`/api/admin/meeting-minutes/${id}`, { method: 'DELETE', headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
+  }
+
+  if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+        打ち合わせ・商談の内容を、日記のように日付順で書き溜めていく場所です。
+      </p>
+      {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+
+      {showCreate ? (
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={inputStyle} />
+            <input placeholder="タイトル（例：◯◯市との打ち合わせ）" value={newTitle}
+              onChange={e => setNewTitle(e.target.value)} style={inputStyle} />
+            <input placeholder="参加者（例：加藤、◯◯様）" value={newParticipants}
+              onChange={e => setNewParticipants(e.target.value)} style={inputStyle} />
+            <textarea placeholder="内容・決定事項・宿題など自由に書く" value={newBody}
+              onChange={e => setNewBody(e.target.value)} rows={6}
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={createEntry} disabled={saving || !newDate} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: 'pointer',
+              }}>{saving ? '記録中…' : '記録する'}</button>
+              <button onClick={() => setShowCreate(false)} style={{
+                flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #ddd',
+                background: '#fff', color: '#888', cursor: 'pointer',
+              }}>キャンセル</button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <button onClick={() => setShowCreate(true)} style={{
+          display: 'block', width: '100%', padding: '10px 0', borderRadius: 10, border: '1.5px dashed #38ADA9',
+          background: '#fff', color: '#38ADA9', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 14,
+        }}>＋ 新しい議事録を書く</button>
+      )}
+
+      {entries.length === 0 && <p style={{ color: '#aaa' }}>まだ議事録がありません。</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {entries.map(e => {
+          const edit = editing[e.id] ?? { title: '', participants: '', body: '' };
+          return (
+            <Card key={e.id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>
+                  {new Date(e.entry_date + 'T00:00:00').toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}
+                </p>
+                <button onClick={() => deleteEntry(e.id)} style={{
+                  padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                }}>削除</button>
+              </div>
+
+              <input
+                value={edit.title}
+                onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, title: ev.target.value } }))}
+                onBlur={() => { if (edit.title !== (e.title ?? '')) updateEntry(e.id, { title: edit.title || null }); }}
+                placeholder="タイトル"
+                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontWeight: 700, margin: '8px 0 6px' }}
+              />
+              <input
+                value={edit.participants}
+                onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, participants: ev.target.value } }))}
+                onBlur={() => { if (edit.participants !== (e.participants ?? '')) updateEntry(e.id, { participants: edit.participants || null }); }}
+                placeholder="参加者"
+                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 12, color: '#888', marginBottom: 6 }}
+              />
+              <textarea
+                value={edit.body}
+                onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, body: ev.target.value } }))}
+                onBlur={() => { if (edit.body !== (e.body ?? '')) updateEntry(e.id, { body: edit.body }); }}
+                placeholder="内容・決定事項・宿題など自由に書く"
+                rows={6}
+                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                最終更新: {new Date(e.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
               </p>
             </Card>
           );

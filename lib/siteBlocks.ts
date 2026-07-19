@@ -47,13 +47,16 @@ export const BLOCK_TYPES: { key: BlockType; label: string; hint: string }[] = [
   { key: 'team_member', label: '運営メンバー', hint: '氏名・肩書き・一言・自己紹介・写真を丸型で表示（写真は自動で一定サイズに収まる）' },
 ];
 
+// path は実際にコンテンツを描画している本番URL。/business 等は next.config.js の redirects()
+// で /company/business 等へ301恒久リダイレクト済みのため、キャッシュ再検証はリダイレクト先の
+// 実体ページを指定する必要がある（そうしないと保存してもISRの自然失効まで反映されない）。
 export const SITE_PAGES: { key: string; label: string; path: string }[] = [
   { key: 'home', label: 'トップページ', path: '/' },
-  { key: 'business', label: '法人・行政の方へ', path: '/business' },
-  { key: 'school', label: '学校の方へ', path: '/school' },
-  { key: 'service', label: 'ヒトマップの使い方', path: '/service' },
-  { key: 'team', label: '運営', path: '/team' },
-  { key: 'contact', label: 'お問い合わせ', path: '/contact' },
+  { key: 'business', label: '法人・行政の方へ', path: '/company/business' },
+  { key: 'school', label: '学校の方へ', path: '/company/school' },
+  { key: 'service', label: 'ヒトマップの使い方', path: '/company/service' },
+  { key: 'team', label: '運営', path: '/company/team' },
+  { key: 'contact', label: 'お問い合わせ', path: '/company/contact' },
 ];
 
 export function pagePath(key: string): string {

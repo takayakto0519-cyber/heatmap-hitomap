@@ -160,6 +160,20 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         </p>
       </Card>
 
+      {/* 外部コンテスト応募状況（手動更新のメモ） */}
+      <Card style={{ marginTop: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>🏆 牧之原市チャレンジビジネスコンテスト2026</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#4A69BD', padding: '2px 9px', borderRadius: 10 }}>応募中</span>
+        </div>
+        <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: '#555', lineHeight: 1.9 }}>
+          <li>エントリー済み（受付は2026-07-17で終了）</li>
+          <li>ビジネスプラン最終提出期限：2026-08-03</li>
+          <li>協賛企業：SBプレイヤーズ株式会社を想定</li>
+          <li>10/21 協業ミートアップ（受賞可否に関わらず参加可）</li>
+        </ul>
+      </Card>
+
       {/* マネタイズ */}
       <SectionHeading icon="💰" title="マネタイズ" hint="収益の入口の状態" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
