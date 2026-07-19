@@ -30,6 +30,28 @@ interface RegionResult {
   error?: string;
 }
 
+interface MunicipalityProfile {
+  id: string;
+  region_name: string;
+  engagement_stage: string;
+  evidence_summary: string | null;
+  relation_population_initiative: string | null;
+  fit_assessment: string | null;
+  opportunity_level: string;
+  opportunity_notes: string | null;
+  source_links: string | null;
+  updated_at: string;
+}
+
+const ENGAGEMENT_STAGES = [
+  { key: 'observing', label: '観察' },
+  { key: 'lead', label: 'リード' },
+  { key: 'proposed', label: '提案中' },
+  { key: 'contracted', label: '契約済み' },
+];
+const OPPORTUNITY_LEVELS = ['高', '中', '低'];
+const OPPORTUNITY_COLORS: Record<string, string> = { 高: '#27AE60', 中: '#E5A139', 低: '#999' };
+
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', ...style }}>
@@ -42,6 +64,11 @@ const inputStyle: React.CSSProperties = {
   padding: '9px 12px', borderRadius: 8, border: '1.5px solid #ddd',
   fontSize: 13, outline: 'none', fontFamily: 'inherit', flex: 1,
 };
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: '#555', margin: '10px 0 4px', display: 'block' };
+const pillStyle = (active: boolean, color = '#38ADA9'): React.CSSProperties => ({
+  padding: '5px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+  border: active ? 'none' : '1px solid #ccc', background: active ? color : 'transparent', color: active ? '#fff' : '#666',
+});
 
 function StatTile({ label, value, hint, color }: { label: string; value: string; hint: string; color: string }) {
   return (
@@ -71,6 +98,23 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   const [regionResult, setRegionResult] = useState<RegionResult | null>(null);
   const [regionLoading, setRegionLoading] = useState(false);
 
+  const [profiles, setProfiles] = useState<MunicipalityProfile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [showProfileForm, setShowProfileForm] = useState(false);
+  const [profileForm, setProfileForm] = useState({ region_name: '', engagement_stage: 'lead', opportunity_level: '中' });
+
+  function jsonHeaders(): HeadersInit {
+    return { ...authHeaders(), 'Content-Type': 'application/json' };
+  }
+
+  async function loadProfiles() {
+    setProfilesLoading(true);
+    const res = await fetch('/api/admin/municipality-profiles', { headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) setProfiles(data.profiles ?? []);
+    setProfilesLoading(false);
+  }
+
   useEffect(() => {
     setLoading(true);
     fetch('/api/admin/relation-population', { headers: authHeaders() })
@@ -78,8 +122,26 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
       .then(d => { if (d.ok) setOverall(d); else setError(d.error ?? '取得に失敗しました'); })
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
+    loadProfiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function createProfile() {
+    if (!profileForm.region_name.trim()) return;
+    await fetch('/api/admin/municipality-profiles', { method: 'POST', headers: jsonHeaders(), body: JSON.stringify(profileForm) });
+    setProfileForm({ region_name: '', engagement_stage: 'lead', opportunity_level: '中' });
+    setShowProfileForm(false);
+    await loadProfiles();
+  }
+  async function patchProfile(id: string, fields: Partial<MunicipalityProfile>) {
+    await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    await loadProfiles();
+  }
+  async function removeProfile(id: string) {
+    if (!window.confirm('削除しますか？')) return;
+    await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'DELETE', headers: authHeaders() });
+    await loadProfiles();
+  }
 
   async function lookupRegion(region: string) {
     if (!region.trim()) return;
@@ -178,6 +240,76 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
         )}
         {regionResult && !regionResult.ok && (
           <p style={{ marginTop: 14, fontSize: 12.5, color: '#E74C3C' }}>{regionResult.error}</p>
+        )}
+      </Card>
+
+      <p style={{ margin: '24px 0 8px', fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出の取り組み・提案余地）</p>
+      <Card>
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#888', lineHeight: 1.6 }}>
+          営業対象・実証先の自治体ごとに、調べた内容と関係人口創出の取り組みの有無、ヒトマップとの親和性、提案余地をまとめておく場所です。
+        </p>
+        <button onClick={() => setShowProfileForm(v => !v)} style={{
+          padding: '8px 16px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 12,
+        }}>{showProfileForm ? 'キャンセル' : '+ 自治体を追加'}</button>
+
+        {showProfileForm && (
+          <div style={{ padding: 12, borderRadius: 10, background: '#fafafa', marginBottom: 14 }}>
+            <label style={labelStyle}>自治体名</label>
+            <input style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} value={profileForm.region_name}
+              onChange={e => setProfileForm(f => ({ ...f, region_name: e.target.value }))} placeholder="例：佐野市（栃木県）" />
+            <div style={{ marginTop: 10 }}><button onClick={createProfile} style={{
+              padding: '8px 16px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            }}>保存する</button></div>
+          </div>
+        )}
+
+        {profilesLoading ? (
+          <p style={{ margin: 0, fontSize: 13, color: '#999' }}>読み込み中…</p>
+        ) : profiles.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>まだ自治体プロファイルがありません。</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {profiles.map(p => (
+              <div key={p.id} style={{ padding: 12, borderRadius: 10, border: '1px solid #eee' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b style={{ fontSize: 14 }}>{p.region_name}</b>
+                  <button onClick={() => removeProfile(p.id)} style={{ fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer' }}>削除</button>
+                </div>
+                <div style={{ display: 'flex', gap: 12, margin: '8px 0', flexWrap: 'wrap' }}>
+                  <div>
+                    <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>関わり方</span>
+                    {ENGAGEMENT_STAGES.map(s => (
+                      <span key={s.key} onClick={() => patchProfile(p.id, { engagement_stage: s.key })}
+                        style={{ ...pillStyle(p.engagement_stage === s.key), marginRight: 4 }}>{s.label}</span>
+                    ))}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>提案余地</span>
+                    {OPPORTUNITY_LEVELS.map(o => (
+                      <span key={o} onClick={() => patchProfile(p.id, { opportunity_level: o })}
+                        style={{ ...pillStyle(p.opportunity_level === o, OPPORTUNITY_COLORS[o]), marginRight: 4 }}>{o}</span>
+                    ))}
+                  </div>
+                </div>
+                <label style={labelStyle}>調べた内容（証拠パック）</label>
+                <textarea defaultValue={p.evidence_summary ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+                  onBlur={e => { if (e.target.value !== (p.evidence_summary ?? '')) patchProfile(p.id, { evidence_summary: e.target.value || null }); }} />
+                <label style={labelStyle}>関係人口創出の取り組み</label>
+                <textarea defaultValue={p.relation_population_initiative ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+                  placeholder="具体的な施策名・内容（なければ「確認できず」等）"
+                  onBlur={e => { if (e.target.value !== (p.relation_population_initiative ?? '')) patchProfile(p.id, { relation_population_initiative: e.target.value || null }); }} />
+                <label style={labelStyle}>ヒトマップとの親和性・提案余地の理由</label>
+                <textarea defaultValue={p.fit_assessment ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+                  onBlur={e => { if (e.target.value !== (p.fit_assessment ?? '')) patchProfile(p.id, { fit_assessment: e.target.value || null }); }} />
+                <label style={labelStyle}>次の一手・メモ</label>
+                <textarea defaultValue={p.opportunity_notes ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+                  onBlur={e => { if (e.target.value !== (p.opportunity_notes ?? '')) patchProfile(p.id, { opportunity_notes: e.target.value || null }); }} />
+                <label style={labelStyle}>情報源（URL等）</label>
+                <textarea defaultValue={p.source_links ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+                  onBlur={e => { if (e.target.value !== (p.source_links ?? '')) patchProfile(p.id, { source_links: e.target.value || null }); }} />
+              </div>
+            ))}
+          </div>
         )}
       </Card>
     </div>
