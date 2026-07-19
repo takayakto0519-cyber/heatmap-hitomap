@@ -4,7 +4,7 @@
 // サイト本体からライブに見る画面。データは /api/admin/relation-population（lib/relationPopulation.ts）。
 // 複数の実験回に関わった人＝関係人口の芽、また来たいと答えた人＝関係の温度。
 // 個人を特定できる値は一切表示せず、少人数（5人未満）の地域は非表示にする。
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface RelationStats {
   totalContributors: number;
@@ -40,6 +40,11 @@ interface MunicipalityProfile {
   opportunity_level: string;
   opportunity_notes: string | null;
   source_links: string | null;
+  contact_email: string | null;
+  email_draft: string | null;
+  email_sent_at: string | null;
+  email_reply: string | null;
+  is_priority_pick: boolean;
   updated_at: string;
 }
 
@@ -50,6 +55,7 @@ const ENGAGEMENT_STAGES = [
   { key: 'contracted', label: '契約済み' },
 ];
 const OPPORTUNITY_LEVELS = ['高', '中', '低'];
+const OPPORTUNITY_RANK: Record<string, number> = { 高: 0, 中: 1, 低: 2 };
 const OPPORTUNITY_COLORS: Record<string, string> = { 高: '#27AE60', 中: '#E5A139', 低: '#999' };
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -90,6 +96,28 @@ function StatsRow({ stats }: { stats: RelationStats }) {
   );
 }
 
+// URLらしき行だけを別タブで開けるリンクにする（複数行・複数URL対応）
+function LinkList({ text }: { text: string }) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {lines.map((line, i) => {
+        const isUrl = /^https?:\/\//.test(line);
+        return isUrl ? (
+          <a key={i} href={line} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: '#38ADA9', wordBreak: 'break-all' }}>
+            🔗 {line}
+          </a>
+        ) : (
+          <span key={i} style={{ fontSize: 11.5, color: '#888' }}>{line}</span>
+        );
+      })}
+    </div>
+  );
+}
+
+type SortKey = 'rank_desc' | 'rank_asc' | 'name';
+
 export default function RelationPopulationTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [overall, setOverall] = useState<OverallResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +130,9 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   const [profilesLoading, setProfilesLoading] = useState(true);
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [profileForm, setProfileForm] = useState({ region_name: '', engagement_stage: 'lead', opportunity_level: '中' });
+  const [sortKey, setSortKey] = useState<SortKey>('rank_desc');
+  const [nameFilter, setNameFilter] = useState('');
+  const [levelFilter, setLevelFilter] = useState<'all' | '高' | '中' | '低'>('all');
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -142,6 +173,12 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'DELETE', headers: authHeaders() });
     await loadProfiles();
   }
+  async function markSent(id: string) {
+    await patchProfile(id, { email_sent_at: new Date().toISOString() });
+  }
+  async function unmarkSent(id: string) {
+    await patchProfile(id, { email_sent_at: null });
+  }
 
   async function lookupRegion(region: string) {
     if (!region.trim()) return;
@@ -157,6 +194,126 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     } finally {
       setRegionLoading(false);
     }
+  }
+
+  const priorityPicks = useMemo(
+    () => profiles.filter(p => p.is_priority_pick).sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja')),
+    [profiles]
+  );
+
+  const visibleProfiles = useMemo(() => {
+    let list = profiles.filter(p => !p.is_priority_pick);
+    if (levelFilter !== 'all') list = list.filter(p => p.opportunity_level === levelFilter);
+    if (nameFilter.trim()) {
+      const q = nameFilter.trim();
+      list = list.filter(p => p.region_name.includes(q));
+    }
+    const sorted = [...list];
+    if (sortKey === 'name') {
+      sorted.sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja'));
+    } else {
+      const dir = sortKey === 'rank_desc' ? 1 : -1;
+      sorted.sort((a, b) => dir * ((OPPORTUNITY_RANK[a.opportunity_level] ?? 9) - (OPPORTUNITY_RANK[b.opportunity_level] ?? 9)));
+    }
+    return sorted;
+  }, [profiles, sortKey, nameFilter, levelFilter]);
+
+  const levelCounts = {
+    高: profiles.filter(p => p.opportunity_level === '高').length,
+    中: profiles.filter(p => p.opportunity_level === '中').length,
+    低: profiles.filter(p => p.opportunity_level === '低').length,
+  };
+
+  function ProfileCard({ p, highlight }: { p: MunicipalityProfile; highlight?: boolean }) {
+    return (
+      <div style={{
+        padding: 14, borderRadius: 10,
+        border: highlight ? '2px solid #E5A139' : '1px solid #eee',
+        background: highlight ? '#FFFBF2' : '#fff',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <b style={{ fontSize: 14 }}>
+            {highlight && '🌟 '}{p.region_name}
+          </b>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span onClick={() => patchProfile(p.id, { is_priority_pick: !p.is_priority_pick })} style={{
+              fontSize: 11, cursor: 'pointer', color: p.is_priority_pick ? '#E5A139' : '#ccc', fontWeight: 700,
+            }} title="営業価値の高い最優先自治体としてピン留め">{p.is_priority_pick ? '★ 最優先' : '☆ ピン留め'}</span>
+            <button onClick={() => removeProfile(p.id)} style={{ fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer' }}>削除</button>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 12, margin: '8px 0', flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>関わり方</span>
+            {ENGAGEMENT_STAGES.map(s => (
+              <span key={s.key} onClick={() => patchProfile(p.id, { engagement_stage: s.key })}
+                style={{ ...pillStyle(p.engagement_stage === s.key), marginRight: 4 }}>{s.label}</span>
+            ))}
+          </div>
+          <div>
+            <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>提案余地</span>
+            {OPPORTUNITY_LEVELS.map(o => (
+              <span key={o} onClick={() => patchProfile(p.id, { opportunity_level: o })}
+                style={{ ...pillStyle(p.opportunity_level === o, OPPORTUNITY_COLORS[o]), marginRight: 4 }}>{o}</span>
+            ))}
+          </div>
+        </div>
+
+        <label style={labelStyle}>調べた内容（証拠パック）</label>
+        <textarea defaultValue={p.evidence_summary ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+          onBlur={e => { if (e.target.value !== (p.evidence_summary ?? '')) patchProfile(p.id, { evidence_summary: e.target.value || null }); }} />
+
+        <label style={labelStyle}>関係人口創出・新規実証の受け入れ実績</label>
+        <textarea defaultValue={p.relation_population_initiative ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+          placeholder="具体的な施策名・内容（なければ「確認できず」等）"
+          onBlur={e => { if (e.target.value !== (p.relation_population_initiative ?? '')) patchProfile(p.id, { relation_population_initiative: e.target.value || null }); }} />
+
+        <label style={labelStyle}>ヒトマップとの親和性・提案余地の理由</label>
+        <textarea defaultValue={p.fit_assessment ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+          onBlur={e => { if (e.target.value !== (p.fit_assessment ?? '')) patchProfile(p.id, { fit_assessment: e.target.value || null }); }} />
+
+        <label style={labelStyle}>次の一手・メモ</label>
+        <textarea defaultValue={p.opportunity_notes ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+          onBlur={e => { if (e.target.value !== (p.opportunity_notes ?? '')) patchProfile(p.id, { opportunity_notes: e.target.value || null }); }} />
+
+        <label style={labelStyle}>情報源（クリックで開けます）</label>
+        {p.source_links ? (
+          <div style={{ padding: '8px 10px', background: '#fafafa', borderRadius: 8, marginBottom: 6 }}>
+            <LinkList text={p.source_links} />
+          </div>
+        ) : null}
+        <textarea defaultValue={p.source_links ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+          placeholder="URLを1行に1つ貼り付け"
+          onBlur={e => { if (e.target.value !== (p.source_links ?? '')) patchProfile(p.id, { source_links: e.target.value || null }); }} />
+
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#F4FAF9', border: '1px solid #DDF0EE' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#2A8580' }}>📮 営業メール</p>
+          <label style={labelStyle}>宛先メールアドレス</label>
+          <input defaultValue={p.contact_email ?? ''} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+            placeholder="判明していれば入力"
+            onBlur={e => { if (e.target.value !== (p.contact_email ?? '')) patchProfile(p.id, { contact_email: e.target.value || null }); }} />
+          <label style={labelStyle}>メール文案（下書き・編集可）</label>
+          <textarea defaultValue={p.email_draft ?? ''} rows={6} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+            onBlur={e => { if (e.target.value !== (p.email_draft ?? '')) patchProfile(p.id, { email_draft: e.target.value || null }); }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0 4px', flexWrap: 'wrap' }}>
+            {p.email_sent_at ? (
+              <>
+                <span style={{ fontSize: 11.5, color: '#27AE60', fontWeight: 700 }}>✓ 送信済み（{new Date(p.email_sent_at).toLocaleDateString('ja-JP')}）</span>
+                <button onClick={() => unmarkSent(p.id)} style={{ fontSize: 11, background: 'none', border: '1px solid #ccc', borderRadius: 999, padding: '3px 10px', cursor: 'pointer' }}>取り消す</button>
+              </>
+            ) : (
+              <button onClick={() => markSent(p.id)} style={{ fontSize: 11.5, fontWeight: 700, background: '#38ADA9', color: '#fff', border: 'none', borderRadius: 999, padding: '5px 12px', cursor: 'pointer' }}>
+                送信済みにする
+              </button>
+            )}
+          </div>
+          <label style={labelStyle}>届いた返信（貼り付けて保存）</label>
+          <textarea defaultValue={p.email_reply ?? ''} rows={3} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+            placeholder="返信メールの本文を貼り付けておくと、ここに残ります"
+            onBlur={e => { if (e.target.value !== (p.email_reply ?? '')) patchProfile(p.id, { email_reply: e.target.value || null }); }} />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -243,11 +400,20 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
         )}
       </Card>
 
-      <p style={{ margin: '24px 0 8px', fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出の取り組み・提案余地）</p>
+      <p style={{ margin: '24px 0 8px', fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出・スタートアップ受け入れの取り組みと提案余地）</p>
       <Card>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#888', lineHeight: 1.6 }}>
-          営業対象・実証先の自治体ごとに、調べた内容と関係人口創出の取り組みの有無、ヒトマップとの親和性、提案余地をまとめておく場所です。
-        </p>
+        <div style={{ fontSize: 12, color: '#888', lineHeight: 1.8, marginBottom: 12 }}>
+          <p style={{ margin: '0 0 6px' }}>
+            営業対象・実証先の自治体を、①どんなデータを調べたか（証拠パック）、②関係人口創出やスタートアップ受け入れの取り組みが実際にあるか、③ヒトマップの体験型サービスとの相性、④営業として攻める価値（提案余地：高・中・低）の4点でまとめています。
+          </p>
+          <p style={{ margin: '0 0 6px' }}>
+            データソースは2種類です。（A）自治体の総合戦略・提案準備状況から個別に深掘りしたもの（既存の営業リード12件）と、（B）総務省「関係人口創出・拡大事業」モデル事業（2018〜2020年度・全国約93自治体）＋内閣府「スタートアップエコシステム拠点都市」等の公的認定リスト（約14自治体）から一次評価したものです。後者は要約情報からのルールベース判定のため、提案前に個別の裏取りをおすすめします。
+          </p>
+          <p style={{ margin: 0 }}>
+            メール文案は下書きの自動生成です。送信前に必ず内容をご確認ください。送信・返信の記録はここに手動で残す運用です（自動送信は一切行いません）。
+          </p>
+        </div>
+
         <button onClick={() => setShowProfileForm(v => !v)} style={{
           padding: '8px 16px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 12,
         }}>{showProfileForm ? 'キャンセル' : '+ 自治体を追加'}</button>
@@ -265,51 +431,44 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
 
         {profilesLoading ? (
           <p style={{ margin: 0, fontSize: 13, color: '#999' }}>読み込み中…</p>
-        ) : profiles.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>まだ自治体プロファイルがありません。</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {profiles.map(p => (
-              <div key={p.id} style={{ padding: 12, borderRadius: 10, border: '1px solid #eee' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <b style={{ fontSize: 14 }}>{p.region_name}</b>
-                  <button onClick={() => removeProfile(p.id)} style={{ fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer' }}>削除</button>
+          <>
+            {priorityPicks.length > 0 && (
+              <>
+                <p style={{ margin: '4px 0 8px', fontWeight: 800, fontSize: 13, color: '#B7791F' }}>🌟 営業価値の高い最優先自治体（{priorityPicks.length}）</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                  {priorityPicks.map(p => <ProfileCard key={p.id} p={p} highlight />)}
                 </div>
-                <div style={{ display: 'flex', gap: 12, margin: '8px 0', flexWrap: 'wrap' }}>
-                  <div>
-                    <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>関わり方</span>
-                    {ENGAGEMENT_STAGES.map(s => (
-                      <span key={s.key} onClick={() => patchProfile(p.id, { engagement_stage: s.key })}
-                        style={{ ...pillStyle(p.engagement_stage === s.key), marginRight: 4 }}>{s.label}</span>
-                    ))}
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>提案余地</span>
-                    {OPPORTUNITY_LEVELS.map(o => (
-                      <span key={o} onClick={() => patchProfile(p.id, { opportunity_level: o })}
-                        style={{ ...pillStyle(p.opportunity_level === o, OPPORTUNITY_COLORS[o]), marginRight: 4 }}>{o}</span>
-                    ))}
-                  </div>
-                </div>
-                <label style={labelStyle}>調べた内容（証拠パック）</label>
-                <textarea defaultValue={p.evidence_summary ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-                  onBlur={e => { if (e.target.value !== (p.evidence_summary ?? '')) patchProfile(p.id, { evidence_summary: e.target.value || null }); }} />
-                <label style={labelStyle}>関係人口創出の取り組み</label>
-                <textarea defaultValue={p.relation_population_initiative ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-                  placeholder="具体的な施策名・内容（なければ「確認できず」等）"
-                  onBlur={e => { if (e.target.value !== (p.relation_population_initiative ?? '')) patchProfile(p.id, { relation_population_initiative: e.target.value || null }); }} />
-                <label style={labelStyle}>ヒトマップとの親和性・提案余地の理由</label>
-                <textarea defaultValue={p.fit_assessment ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-                  onBlur={e => { if (e.target.value !== (p.fit_assessment ?? '')) patchProfile(p.id, { fit_assessment: e.target.value || null }); }} />
-                <label style={labelStyle}>次の一手・メモ</label>
-                <textarea defaultValue={p.opportunity_notes ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-                  onBlur={e => { if (e.target.value !== (p.opportunity_notes ?? '')) patchProfile(p.id, { opportunity_notes: e.target.value || null }); }} />
-                <label style={labelStyle}>情報源（URL等）</label>
-                <textarea defaultValue={p.source_links ?? ''} rows={2} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-                  onBlur={e => { if (e.target.value !== (p.source_links ?? '')) patchProfile(p.id, { source_links: e.target.value || null }); }} />
+              </>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', margin: '4px 0 12px' }}>
+              <input value={nameFilter} onChange={e => setNameFilter(e.target.value)} placeholder="自治体名で絞り込み"
+                style={{ ...inputStyle, maxWidth: 220 }} />
+              <div style={{ display: 'flex', gap: 4 }}>
+                {(['all', '高', '中', '低'] as const).map(lv => (
+                  <span key={lv} onClick={() => setLevelFilter(lv)}
+                    style={pillStyle(levelFilter === lv, lv === 'all' ? '#38ADA9' : OPPORTUNITY_COLORS[lv])}>
+                    {lv === 'all' ? `すべて（${profiles.length}）` : `${lv}（${levelCounts[lv]}）`}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
+              <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                <span style={{ fontSize: 10.5, color: '#999', alignSelf: 'center' }}>並び順</span>
+                <span onClick={() => setSortKey('rank_desc')} style={pillStyle(sortKey === 'rank_desc')}>提案余地 高→低</span>
+                <span onClick={() => setSortKey('rank_asc')} style={pillStyle(sortKey === 'rank_asc')}>提案余地 低→高</span>
+                <span onClick={() => setSortKey('name')} style={pillStyle(sortKey === 'name')}>自治体名</span>
+              </div>
+            </div>
+
+            {visibleProfiles.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>該当する自治体プロファイルがありません。</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {visibleProfiles.map(p => <ProfileCard key={p.id} p={p} />)}
+              </div>
+            )}
+          </>
         )}
       </Card>
     </div>

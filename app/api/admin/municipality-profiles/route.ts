@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { supabaseServer } = await import('@/lib/supabase/server');
   const { data, error } = await supabaseServer
-    .from('municipality_profiles').select('*').order('opportunity_level', { ascending: true }).order('region_name', { ascending: true });
+    .from('municipality_profiles').select('*').order('region_name', { ascending: true });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, profiles: data ?? [] });
@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
     region_name?: string; engagement_stage?: string;
     evidence_summary?: string | null; relation_population_initiative?: string | null;
     fit_assessment?: string | null; opportunity_level?: string; opportunity_notes?: string | null;
-    source_links?: string | null;
+    source_links?: string | null; contact_email?: string | null; email_draft?: string | null;
+    email_sent_at?: string | null; email_reply?: string | null; is_priority_pick?: boolean;
   };
   if (!body.region_name?.trim()) return NextResponse.json({ ok: false, error: '自治体名は必須です' }, { status: 400 });
 
@@ -42,6 +43,11 @@ export async function POST(req: NextRequest) {
       opportunity_level: body.opportunity_level?.trim() || '中',
       opportunity_notes: body.opportunity_notes?.trim() || null,
       source_links: body.source_links?.trim() || null,
+      contact_email: body.contact_email?.trim() || null,
+      email_draft: body.email_draft?.trim() || null,
+      email_sent_at: body.email_sent_at || null,
+      email_reply: body.email_reply?.trim() || null,
+      is_priority_pick: body.is_priority_pick ?? false,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'region_name' })
     .select().single();
