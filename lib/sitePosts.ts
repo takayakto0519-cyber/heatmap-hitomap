@@ -13,6 +13,7 @@ export interface SitePost {
   post_type: 'achievement' | 'blog';
   related_slug: string | null;
   event_date: string | null;
+  event_date_end: string | null;
   body: string;
   cover_url: string | null;
   photo_urls: string[];
@@ -47,4 +48,12 @@ export function generateSlug(eventDate?: string | null): string {
   const d = eventDate ? new Date(eventDate) : new Date();
   const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   return `${ymd}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+// 実施日の表示。複数日程（event_date_end が別日）の場合は「〜」でつなぐ。
+export function formatEventDateRange(start: string | null, end?: string | null): string {
+  if (!start) return '';
+  const startLabel = new Date(start).toLocaleDateString('ja-JP');
+  if (!end || end === start) return startLabel;
+  return `${startLabel}〜${new Date(end).toLocaleDateString('ja-JP')}`;
 }

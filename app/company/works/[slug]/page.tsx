@@ -4,7 +4,7 @@ import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
 import Reveal from '@/components/corp/Reveal';
 import { corpColor, corpFont } from '@/components/corp/tokens';
-import { categoryLabel, type SitePost } from '@/lib/sitePosts';
+import { categoryLabel, formatEventDateRange, type SitePost } from '@/lib/sitePosts';
 
 export const revalidate = 300;
 
@@ -71,7 +71,7 @@ export default async function WorkDetailPage({ params }: { params: { slug: strin
               </a>
               <p style={{ margin: '22px 0 12px', fontSize: 11, letterSpacing: '0.12em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
                 {categoryLabel(post.category)}
-                {post.event_date && ` ・ ${new Date(post.event_date).toLocaleDateString('ja-JP')}`}
+                {post.event_date && ` ・ ${formatEventDateRange(post.event_date, post.event_date_end)}`}
               </p>
               <h1
                 style={{

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({})) as {
     title?: string; category?: string; post_type?: string; related_slug?: string | null;
-    event_date?: string | null; body?: string;
+    event_date?: string | null; event_date_end?: string | null; body?: string;
     cover_url?: string | null; photo_urls?: string[]; testimonials?: { name: string; comment: string }[];
     is_published?: boolean;
   };
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
       post_type: body.post_type ?? 'achievement',
       related_slug: body.related_slug || null,
       event_date: body.event_date || null,
+      event_date_end: body.event_date_end || null,
       body: body.body ?? '',
       cover_url: body.cover_url || null,
       photo_urls: body.photo_urls ?? [],

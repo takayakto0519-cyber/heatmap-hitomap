@@ -3,7 +3,7 @@ import CorpHeader from '@/components/corp/CorpHeader';
 import CorpFooter from '@/components/corp/CorpFooter';
 import Reveal from '@/components/corp/Reveal';
 import { corpColor, corpFont } from '@/components/corp/tokens';
-import { categoryLabel, type SitePost } from '@/lib/sitePosts';
+import { categoryLabel, formatEventDateRange, type SitePost } from '@/lib/sitePosts';
 
 export const metadata: Metadata = {
   title: '実績',
@@ -100,7 +100,7 @@ export default async function WorksPage() {
                       <div style={{ flex: '1 1 300px', minWidth: 0 }}>
                         <p style={{ margin: '0 0 8px', fontSize: 11, letterSpacing: '0.12em', color: corpColor.moss, fontFamily: corpFont.body, fontWeight: 700 }}>
                           {categoryLabel(post.category)}
-                          {post.event_date && ` ・ ${new Date(post.event_date).toLocaleDateString('ja-JP')}`}
+                          {post.event_date && ` ・ ${formatEventDateRange(post.event_date, post.event_date_end)}`}
                         </p>
                         <h2
                           style={{

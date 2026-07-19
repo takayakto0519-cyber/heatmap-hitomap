@@ -3,7 +3,7 @@
 // 運営ダッシュボードに統合された実績ブログタブ。認証は親のauthHeadersを共有する。
 import { useEffect, useState } from 'react';
 import LivePreview from './LivePreview';
-import { POST_CATEGORIES, POST_TYPES, categoryLabel, postTypeLabel, type SitePost, type Testimonial } from '@/lib/sitePosts';
+import { POST_CATEGORIES, POST_TYPES, categoryLabel, postTypeLabel, formatEventDateRange, type SitePost, type Testimonial } from '@/lib/sitePosts';
 
 interface Draft {
   id?: string;
@@ -12,6 +12,7 @@ interface Draft {
   post_type: string;
   related_slug: string;
   event_date: string;
+  event_date_end: string;
   body: string;
   cover_url: string;
   photo_urls: string[];
@@ -20,7 +21,7 @@ interface Draft {
 }
 
 const EMPTY_DRAFT: Draft = {
-  title: '', category: 'event', post_type: 'achievement', related_slug: '', event_date: '', body: '',
+  title: '', category: 'event', post_type: 'achievement', related_slug: '', event_date: '', event_date_end: '', body: '',
   cover_url: '', photo_urls: [], testimonials: [], is_published: false,
 };
 
@@ -80,6 +81,7 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
         post_type: draft.post_type,
         related_slug: draft.post_type === 'achievement' ? (draft.related_slug || null) : null,
         event_date: draft.event_date || null,
+        event_date_end: draft.event_date && draft.event_date_end ? draft.event_date_end : null,
         body: draft.body,
         cover_url: draft.cover_url || null,
         photo_urls: draft.photo_urls,
@@ -163,7 +165,7 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
                     <p style={{ margin: '4px 0 0', fontSize: 11, color: '#999' }}>
                       <span style={{ color: p.post_type === 'blog' ? '#2F8C88' : '#566246', fontWeight: 700 }}>{postTypeLabel(p.post_type)}</span>
                       {' ・ '}{categoryLabel(p.category)}
-                      {p.event_date && ` ・ ${new Date(p.event_date).toLocaleDateString('ja-JP')}`}
+                      {p.event_date && ` ・ ${formatEventDateRange(p.event_date, p.event_date_end)}`}
                       {` ・ 感想${p.testimonials.length}件 ・ 写真${p.photo_urls.length}枚`}
                       {p.related_slug && ' ・ 関連ブログあり'}
                     </p>
@@ -172,7 +174,7 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
                     <button onClick={() => setDraft({
                       id: p.id, title: p.title, category: p.category,
                       post_type: p.post_type, related_slug: p.related_slug ?? '',
-                      event_date: p.event_date ?? '', body: p.body,
+                      event_date: p.event_date ?? '', event_date_end: p.event_date_end ?? '', body: p.body,
                       cover_url: p.cover_url ?? '', photo_urls: p.photo_urls,
                       testimonials: p.testimonials, is_published: p.is_published,
                     })} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#566246' }}>編集</button>
@@ -204,8 +206,13 @@ export default function PostsTab({ authHeaders }: { authHeaders: () => HeadersIn
               </select>
             </div>
             <div style={{ flex: '1 1 200px' }}>
-              <label style={labelStyle}>実施日</label>
+              <label style={labelStyle}>実施日（開始日）</label>
               <input type="date" value={draft.event_date} onChange={e => setDraft({ ...draft, event_date: e.target.value })} style={inputStyle} />
+            </div>
+            <div style={{ flex: '1 1 200px' }}>
+              <label style={labelStyle}>終了日（複数日程の場合のみ）</label>
+              <input type="date" value={draft.event_date_end} min={draft.event_date || undefined} disabled={!draft.event_date}
+                onChange={e => setDraft({ ...draft, event_date_end: e.target.value })} style={inputStyle} />
             </div>
           </div>
 
