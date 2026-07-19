@@ -34,6 +34,9 @@ def main():
             common.write_result("trace_pattern", {"error": f"取得エラー: {e}"})
             return
 
+        # 商談デモ用の合成データは実際の利用実態ではないため集計から除外する
+        rows = [r for r in rows if r.get("session_code") != common.DEMO_SESSION_CODE]
+
         total = len(rows)
         if total == 0:
             common.write_result("trace_pattern", {"total": 0, "note": "まだ痕跡がありません"})

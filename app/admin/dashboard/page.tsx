@@ -2585,6 +2585,8 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [filter, setFilter] = useState<'all' | 'school' | 'business'>('all');
   const [hotSort, setHotSort] = useState(false);
   const [leads, setLeads] = useState<ClientLead[]>([]);
+  const [includeDemo, setIncludeDemo] = useState(false);
+  const [demoHiddenCount, setDemoHiddenCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -2645,17 +2647,18 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch('/api/admin/client-leads', { headers: authHeaders() })
+    fetch(`/api/admin/client-leads${includeDemo ? '?includeDemo=true' : ''}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
         if (d.ok) {
           setLeads(d.leads);
+          setDemoHiddenCount(d.demoHiddenCount ?? 0);
           setEditingMemo(Object.fromEntries((d.leads as ClientLead[]).map(l => [l.id, l.memo ?? ''])));
         } else setError(d.error ?? '取得に失敗しました');
       })
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
-  }, [authHeaders]);
+  }, [authHeaders, includeDemo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -2771,6 +2774,17 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         学校・法人からの問い合わせや契約状況をまとめる「縁のデータベース」です。<a href="/company/school" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>学校向けページ ↗</a>
         {' '}・<a href="/company/business" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}> 法人向けページ ↗</a>
       </p>
+
+      {(includeDemo || demoHiddenCount > 0) && (
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '5px 12px',
+          borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+          background: includeDemo ? '#E5A13918' : '#f4f4f4', color: includeDemo ? '#B7791F' : '#999',
+        }}>
+          <input type="checkbox" checked={includeDemo} onChange={e => setIncludeDemo(e.target.checked)} />
+          🎭 商談デモ用データ{includeDemo ? 'を表示中' : `（${demoHiddenCount}件）を隠しています`}
+        </label>
+      )}
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {([['all', `すべて（${counts.all}）`], ['school', `🏫 学校（${counts.school}）`], ['business', `🏢 法人（${counts.business}）`]] as [typeof filter, string][]).map(([id, label]) => (

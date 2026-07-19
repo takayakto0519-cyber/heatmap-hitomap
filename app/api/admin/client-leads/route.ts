@@ -1,6 +1,7 @@
 // GET/POST /api/admin/client-leads — 学校・法人向け問い合わせ/契約の管理（パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isDemoLead } from '@/lib/demoData';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -13,7 +14,15 @@ export async function GET(req: NextRequest) {
     .from('client_leads').select('*').order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, leads: data ?? [] });
+
+  // 商談デモ用の合成リード（【デモ】架空市役所）は普段の営業リストではノイズなので既定では除外する。
+  // 商談デモの直前など、あえて見たいときだけ ?includeDemo=true を付けて呼ぶ。
+  const includeDemo = req.nextUrl.searchParams.get('includeDemo') === 'true';
+  const allLeads = data ?? [];
+  const leads = includeDemo ? allLeads : allLeads.filter(l => !isDemoLead(l));
+  const demoHiddenCount = allLeads.length - leads.length;
+
+  return NextResponse.json({ ok: true, leads, demoHiddenCount });
 }
 
 export async function POST(req: NextRequest) {

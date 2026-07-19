@@ -9,6 +9,10 @@ WORK_DIR = AGENTS_DIR / "work"
 WORK_DIR.mkdir(exist_ok=True)
 ROOT = AGENTS_DIR.parent
 
+# 商談デモ用の合成データ（scripts/seed-demo-sales-data.mjs）のタグ。
+# 集計系の番人はこれを含む行を数字に混ぜないよう、フィルタしてから集計すること。
+DEMO_SESSION_CODE = "demo-sales-20260720"
+
 
 @contextmanager
 def running(agent_id: str):
