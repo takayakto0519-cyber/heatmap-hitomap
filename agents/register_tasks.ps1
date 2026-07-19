@@ -51,6 +51,10 @@ Register-Agent "HitomapMarketingDigest" "marketing_digest.py" "08:40"
 Register-Agent "HitomapCompetitorFeatureMonitor" "competitor_feature_monitor.py" "06:10"
 Register-Agent "HitomapAbTestSummaryWatch" "ab_test_summary_watch.py" "03:10"
 Register-Agent "HitomapCommandCenter" "command_center.py" "09:30"
+Register-Agent "HitomapNewBizSignalWatch" "new_biz_signal_watch.py" "05:40"
+Register-Agent "HitomapGlobalMarketWatch" "global_market_watch.py" "06:20"
+Register-Agent "HitomapAcademicPartnershipWatch" "academic_partnership_watch.py" "06:30"
+Register-Agent "HitomapMemorialAnniversaryWatch" "memorial_anniversary_watch.py" "07:05"
 
 Write-Host ""
 Write-Host "Manual test example:" -ForegroundColor Cyan

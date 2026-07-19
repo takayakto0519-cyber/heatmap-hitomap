@@ -1,15 +1,15 @@
 // ============================================================
 // 縁スコア・エンジン — ヒトマップの核心方程式をそのまま営業に実装する。
 //
-//   出会い ＝ 【生きた証（痕跡）】×【自分を重ねる余白】
-//   縁   ＝（出会い）＋【共に取り組む行動（共動）】×【互いの価値の承認（推譲）】
+//   出会い ＝ 【事実】×【共感】
+//   縁   ＝（出会い）＋【一緒の行動】×【恩返し】
 //
 // 従来のファネル型CRM（候補→接触→商談→契約）は「相手を落とす」発想。
-// ここでは相手ごとに 痕跡・余白・共動・推譲 の4要素を記録し（縁の台帳）、
+// ここでは相手ごとに 事実・共感・行動・恩返し の4要素を記録し（縁の台帳）、
 // 方程式のどこが欠けているかから「次の一手」を機械的に導く。
 // AI呼び出しは一切ない純関数（サーバー課金なし・クライアントでも動く）。
 //
-// もうひとつの原理：「行動の対義語は惰性」。縁は放置すると冷える。
+// もうひとつの原理：何もしないと縁は冷める。
 // 最後の接点からの日数で鮮度が減衰する。
 // ============================================================
 import { HOT_WORDS } from '@/lib/leadTemperature';
@@ -17,10 +17,10 @@ import { HOT_WORDS } from '@/lib/leadTemperature';
 export type EnKind = 'trace' | 'yohaku' | 'action' | 'suijo';
 
 export const EN_KINDS: Record<EnKind, { label: string; icon: string; color: string; hint: string }> = {
-  trace: { label: '痕跡', icon: '🔍', color: '#4A69BD', hint: '嘘のない事実。広報誌・求人票・総合計画・現場で見たモノから読み取った生きた証' },
-  yohaku: { label: '余白', icon: '🌫', color: '#8E44AD', hint: '相手の痛みとヒトマップが重なる一行。「◯◯に困っている。うちの◯◯が重なる」' },
-  action: { label: '共動', icon: '🤝', color: '#E5A139', hint: '身体的負荷を共有した行動。商談だけでなく、イベント同席・現場見学・一緒に痕跡集め' },
-  suijo: { label: '推譲', icon: '🎁', color: '#27AE60', hint: '見返りを求めず譲ったもの／相手から承認・紹介されたこと' },
+  trace: { label: '事実', icon: '🔍', color: '#4A69BD', hint: '本当にあった事実。広報誌・求人票・総合計画・現場で見たものなど、嘘のない情報' },
+  yohaku: { label: '共感', icon: '🌫', color: '#8E44AD', hint: '相手の困りごとと、こちらの強みが重なる一言。「〇〇に困っている。うちの〇〇が役に立つ」' },
+  action: { label: '行動', icon: '🤝', color: '#E5A139', hint: '一緒に何かをすること。商談だけでなく、イベントへの同席・現場見学・一緒に調べ物をするなど' },
+  suijo: { label: '恩返し', icon: '🎁', color: '#27AE60', hint: '見返りを求めずに渡したもの。または、相手からもらった感謝や紹介' },
 };
 
 export interface EnRecord {
@@ -41,14 +41,14 @@ export interface NextMove {
 }
 
 export interface EnBreakdown {
-  konseki: number;   // 0-10 生きた証
-  yohaku: number;    // 0-10 自分を重ねる余白
-  deai: number;      // 0-100 出会い ＝ 痕跡×余白
-  kyodo: number;     // 0-10 共に取り組む行動
-  suijo: number;     // 0-10 互いの価値の承認
-  en: number;        // 0-200 縁 ＝ 出会い ＋ 共動×推譲
+  konseki: number;   // 0-10 事実
+  yohaku: number;    // 0-10 共感
+  deai: number;      // 0-100 出会い ＝ 事実×共感
+  kyodo: number;     // 0-10 一緒の行動
+  suijo: number;     // 0-10 恩返し
+  en: number;        // 0-200 縁 ＝ 出会い ＋ 行動×恩返し
   daysSinceTouch: number;
-  freshness: number; // 0.4-1.0 鮮度（惰性で減衰）
+  freshness: number; // 0.4-1.0 鮮度（放っておくと下がる）
   freshnessLabel: string;
   enLive: number;    // いまの縁の温度 ＝ 縁 × 鮮度
   stage: string;     // 方程式から導かれる現在地
@@ -86,7 +86,7 @@ export function computeEn(lead: LeadLike, records: EnRecord[], now: number = Dat
   const byKind = (k: EnKind) => records.filter(r => r.kind === k);
   const memo = lead.memo ?? '';
 
-  // 痕跡（生きた証）：台帳の痕跡記録が主、証拠パック(memo)内の熱いキーワードと連絡先の有無が従
+  // 事実：台帳の記録が主、証拠パック(memo)内の熱いキーワードと連絡先の有無が従
   let keywordPoints = 0;
   for (const [word, points] of Object.entries(HOT_WORDS)) {
     if (memo.includes(word)) keywordPoints += points;
@@ -98,26 +98,26 @@ export function computeEn(lead: LeadLike, records: EnRecord[], now: number = Dat
     (memo.trim().length >= 80 ? 1 : 0)
   );
 
-  // 余白（自分を重ねる余白）：書かない限り0。1行書くことに意味がある
+  // 共感：書かない限り0。1行書くことに意味がある
   const yohaku = clamp10(byKind('yohaku').length * 4);
 
-  // 出会い ＝ 痕跡 × 余白（どちらかが0なら出会いは起きない、が方程式の主張）
+  // 出会い ＝ 事実 × 共感（どちらかが0なら出会いは起きない、が方程式の主張）
   const deai = Math.round(konseki * yohaku);
 
-  // 共動：記録が主、ステータスが従（商談中＝共動が始まっている兆し）
+  // 行動：記録が主、ステータスが従（商談中＝一緒の行動が始まっている兆し）
   const status = lead.status ?? 'lead';
   const kyodo = clamp10(
     byKind('action').length * 3 +
     (status === 'negotiating' ? 2 : status === 'contracted' ? 3 : 0)
   );
 
-  // 推譲：先に譲ったこと・承認されたこと
+  // 恩返し：先に渡したこと・お礼や紹介をもらったこと
   const suijo = clamp10(byKind('suijo').length * 4);
 
-  // 縁 ＝ 出会い ＋ 共動 × 推譲
+  // 縁 ＝ 出会い ＋ 行動 × 恩返し
   const en = deai + Math.round(kyodo * suijo);
 
-  // 鮮度：行動の対義語は惰性。契約中は関係が制度化されているため減衰を緩める
+  // 鮮度：何もしないと縁は冷める。契約中は関係が続いているため下がり方を緩める
   const daysSinceTouch = daysSinceLastTouch(lead, records, now);
   const decayDays = status === 'contracted' ? daysSinceTouch / 2 : daysSinceTouch;
   const freshness = decayDays <= 7 ? 1.0 : decayDays <= 21 ? 0.85 : decayDays <= 45 ? 0.65 : 0.4;
@@ -126,13 +126,13 @@ export function computeEn(lead: LeadLike, records: EnRecord[], now: number = Dat
   const enLive = Math.round(en * freshness);
 
   // 現在地（ステージは手で選ぶものではなく、方程式から導かれる）
-  let stage = '惰性（未着手）'; let stageColor = '#999';
+  let stage = 'まだ何もしていない'; let stageColor = '#999';
   if (status === 'lost') { stage = '見送り'; stageColor = '#E55039'; }
   else if (status === 'contracted') { stage = '縁（契約）'; stageColor = '#27AE60'; }
-  else if (kyodo > 0 && suijo > 0) { stage = '推譲の輪'; stageColor = '#27AE60'; }
-  else if (kyodo > 0) { stage = '共動'; stageColor = '#E5A139'; }
-  else if (deai >= 20) { stage = '出会いの入口'; stageColor = '#8E44AD'; }
-  else if (konseki > 0) { stage = '痕跡集め'; stageColor = '#4A69BD'; }
+  else if (kyodo > 0 && suijo > 0) { stage = 'お互いさまの関係'; stageColor = '#27AE60'; }
+  else if (kyodo > 0) { stage = '一緒に行動中'; stageColor = '#E5A139'; }
+  else if (deai >= 20) { stage = '出会えたところ'; stageColor = '#8E44AD'; }
+  else if (konseki > 0) { stage = '事実を集め中'; stageColor = '#4A69BD'; }
 
   return {
     konseki, yohaku, deai, kyodo, suijo, en,
@@ -148,63 +148,63 @@ function deriveNextMove(s: {
 }): NextMove {
   if (s.status === 'lost') {
     return {
-      key: 'keep-thread', priority: 9, title: '糸は切らない',
-      why: '見送りは縁の終わりではない。痕跡は残っている',
+      key: 'keep-thread', priority: 9, title: 'つながりを切らない',
+      why: '見送りになっても、それで終わりではありません。事実は残っています',
       how: '台帳はそのまま残し、季節の便りや実績報告を年1回だけ届ける',
     };
   }
   if (s.konseki < 3) {
     return {
-      key: 'gather-trace', priority: 1, title: '痕跡を集める',
-      why: '生きた証が薄い。痕跡×余白＝出会い——痕跡が0なら出会いは起きない',
-      how: '広報誌・求人票・総合計画・SNSから「嘘のない事実」を3つ、台帳の🔍痕跡に書き足す',
+      key: 'gather-trace', priority: 1, title: '事実を集める',
+      why: '知っている事実がまだ少ないです。事実と共感がそろって初めて出会いが生まれます',
+      how: '広報誌・求人票・総合計画・SNSから、本当にあった事実を3つ見つけて記録に足す',
     };
   }
   if (s.yohaku === 0) {
     return {
-      key: 'write-yohaku', priority: 2, title: '余白を書く',
-      why: '痕跡はあるが、相手が自分を重ねる余白がまだ言葉になっていない',
-      how: '「◯◯に困っている。ヒトマップの◯◯がそこに重なる」——この一行を🌫余白に書く',
+      key: 'write-yohaku', priority: 2, title: '共感ポイントを書く',
+      why: '事実は分かっているが、相手の困りごとと自社の強みが重なる部分がまだ言葉になっていません',
+      how: '「〇〇に困っている。うちの〇〇が役に立つ」——この一言を書いてみる',
     };
   }
   if (s.kyodo === 0) {
     if (s.freshness <= 0.65) {
       return {
-        key: 'rekindle', priority: 3, title: '火を絶やさない',
-        why: `最後の接点から${s.daysSinceTouch}日。出会いの入口まで来たのに惰性で冷えている`,
-        how: 'ひと言の便り（相手の痕跡に触れた感想）を送り、小さな共動をひとつ持ちかける',
+        key: 'rekindle', priority: 3, title: '連絡を絶やさない',
+        why: `最後に連絡してから${s.daysSinceTouch}日たっています。出会えているのに、このままだと冷めてしまいます`,
+        how: 'ひと言の便り（相手について知った事実への感想）を送り、小さな行動を一緒にすることを持ちかける',
       };
     }
     return {
-      key: 'small-action', priority: 3, title: '小さな共動を仕掛ける',
-      why: '出会いは成立している。縁に進むには「共に取り組む行動」の項が要る',
-      how: '会うだけの商談ではなく、身体的負荷の共有をひとつ——イベント同席・現場見学・一緒に痕跡集め',
+      key: 'small-action', priority: 3, title: '小さな行動を一緒にする',
+      why: '出会いはできています。次に進むには、一緒に何かをする機会が必要です',
+      how: '商談だけで終わらせず、イベントへの同席・現場見学・一緒に調べ物をするなど、一緒に動く機会をひとつ作る',
     };
   }
   if (s.suijo === 0) {
     return {
-      key: 'give-first', priority: 4, title: '先に譲る（推譲）',
-      why: '共動×推譲は掛け算。推譲が0のままでは共動が縁に化けない',
-      how: '見返りを求めず役に立つものをひとつ渡す——地域の痕跡データ・集計の一枚・誰かの紹介',
+      key: 'give-first', priority: 4, title: '先に何かを渡す',
+      why: '一緒に行動していても、こちらから先に渡すものが無いと、深い関係にはなりにくいです',
+      how: '見返りを求めず、役に立つものを先に渡す——地域のデータ、集計の一枚、誰かの紹介など',
     };
   }
   if (s.freshness <= 0.65) {
     return {
-      key: 'rekindle', priority: 5, title: '火を絶やさない',
-      why: `縁は結ばれつつあるが、最後の接点から${s.daysSinceTouch}日。惰性は縁を冷やす`,
-      how: '近況ひと言＋相手に役立つ小ネタひとつ。長文は不要、体温が伝わればいい',
+      key: 'rekindle', priority: 5, title: '連絡を絶やさない',
+      why: `良い関係になりつつありますが、最後に連絡してから${s.daysSinceTouch}日たっています`,
+      how: '近況ひと言＋相手に役立つ小ネタひとつ。長文は不要、気持ちが伝わればいい',
     };
   }
   if (s.status === 'contracted') {
     return {
-      key: 'suijo-circle', priority: 7, title: '推譲の輪を広げる',
-      why: '結ばれた縁は次の縁の親。紹介は最も安い新規獲得ではなく、推譲の実践',
+      key: 'suijo-circle', priority: 7, title: '恩返しの輪を広げる',
+      why: 'できた関係は、次の関係の入り口になります。紹介をお願いするのも恩返しの一つの形です',
       how: '「次の誰か」をご紹介いただく頼みごとをひとつ（/referral-request で下書きできます）',
     };
   }
   return {
-    key: 'deepen', priority: 6, title: '縁を深めてもう一巡',
-    why: '方程式の全項が立っている。あとは共動と推譲を重ねるほど縁は太くなる',
-    how: '次の共動の約束を取り付ける。契約の話はその場で自然に生まれる',
+    key: 'deepen', priority: 6, title: '関係をもっと深める',
+    why: '必要な要素はそろっています。あとは一緒に行動し、お互いに渡し合うほど関係は強くなります',
+    how: '次に一緒に行動する約束を取り付ける。契約の話はその場で自然に生まれる',
   };
 }

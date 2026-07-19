@@ -43,6 +43,10 @@ AGENT_META: dict[str, tuple[str, str, str | None]] = {
     "marketing_digest": ("B", "マーケティング日報", None),
     "ab_test_summary_watch": ("I", "UI改善A/Bテスト自動集計", None),
     "competitor_feature_monitor": ("I", "競合プロダクト機能差分モニタ", "update_count"),
+    "new_biz_signal_watch": ("J", "新規事業仮説の種探し", None),
+    "global_market_watch": ("J", "海外展開リサーチ", None),
+    "academic_partnership_watch": ("J", "産学連携リサーチ", None),
+    "memorial_anniversary_watch": ("J", "周年史アーカイブ", "upcoming_count"),
 }
 
 

@@ -2,8 +2,8 @@
 
 // 縁の司令室 — 営業自動化ダッシュボード。
 // ファネル型CRM（候補を「落とす」発想）を捨て、ヒトマップの核心方程式
-//   出会い ＝ 痕跡 × 余白　／　縁 ＝ 出会い ＋ 共動 × 推譲
-// をそのまま実装する。相手ごとに「縁の台帳」（痕跡・余白・共動・推譲の記録）を持ち、
+//   出会い ＝ 事実 × 共感　／　縁 ＝ 出会い ＋ 行動 × 恩返し
+// をそのまま実装する。相手ごとに「縁の台帳」（事実・共感・行動・恩返しの記録）を持ち、
 // 方程式のどこが欠けているかから「今日の一手」をルールベースで自動導出する（lib/enScore.ts）。
 // 外部送信は一切ここからは行わない。自動化するのは「判断の迷い」の除去だけ。
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -96,18 +96,21 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [needsMigration, setNeedsMigration] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [demoData, setDemoData] = useState<{ exists: boolean; enabled: boolean; totalCount: number } | null>(null);
+  const [demoToggling, setDemoToggling] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes] = await Promise.all([
+      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes, demoRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/en-records', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/sales-email-targets', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/client-dossiers', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
+        fetch('/api/admin/demo-data', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
       ]);
       if (leadsRes.ok) setLeads(leadsRes.leads ?? []);
       if (recordsRes.ok) {
@@ -118,6 +121,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       if (emailsRes.ok) setEmails(emailsRes.targets ?? []);
       if (dossiersRes.ok) setDossiers(dossiersRes.dossiers ?? []);
       if (profilesRes.ok) setMunicipalityProfiles(profilesRes.profiles ?? []);
+      if (demoRes.ok) setDemoData({ exists: demoRes.exists, enabled: demoRes.enabled, totalCount: demoRes.totalCount });
       const failed = [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes].find(r => !r.ok);
       if (failed) setError(failed.error ?? '一部のデータの取得に失敗しました');
     } catch {
@@ -128,6 +132,23 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   }, [authHeaders]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function toggleDemoData(nextEnabled: boolean) {
+    setDemoToggling(true);
+    try {
+      const res = await fetch('/api/admin/demo-data', {
+        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const data = await res.json();
+      if (data.ok) setDemoData(d => d ? { ...d, enabled: data.enabled } : d);
+      else setError(data.error ?? 'デモデータの切り替えに失敗しました');
+    } catch {
+      setError('通信エラー');
+    } finally {
+      setDemoToggling(false);
+    }
+  }
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -196,7 +217,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       items.push({
         priority: 0.5, icon: '📮', org: e.company,
         title: '便りが下書きのまま止まっています',
-        why: '書いた言葉は送るまで痕跡にならない',
+        why: '下書きのままでは相手に届きません',
         how: 'メールソフトから送信し、下の便り一覧で「送った」にする',
       });
     }
@@ -208,8 +229,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         items.push({
           priority: until < 0 ? 0 : 1, icon: '🤝', org: d.org_name,
           title: until < 0 ? `打合せ予定が${-until}日過ぎています（${d.next_meeting}）` : until === 0 ? '今日は打合せの日です' : `打合せまであと${until}日（${d.next_meeting}）`,
-          why: '結ばれた縁こそ、共動の約束を惰性にしない',
-          how: until < 0 ? '日程を組み直し、カルテの次回打合せ日を更新する' : 'カルテを見直し、渡せるもの（推譲）をひとつ用意して臨む',
+          why: 'せっかくできた関係を大事にする',
+          how: until < 0 ? '日程を組み直し、カルテの次回打合せ日を更新する' : 'カルテを見直し、渡せるもの（お礼になるもの）をひとつ用意して臨む',
           jumpTab: 'aiops', jumpLabel: 'カルテを開く',
         });
       }
@@ -251,15 +272,40 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {/* ---------- 方程式ヘッダー ---------- */}
       <div style={{ ...cardStyle, background: '#1F2A2A', color: '#fff', padding: '14px 18px' }}>
         <p style={{ margin: 0, fontSize: 13, fontWeight: 800, letterSpacing: 0.5 }}>
-          出会い ＝ 痕跡 × 余白　／　縁 ＝ 出会い ＋ 共動 × 推譲
+          出会い ＝ 事実 × 共感　／　縁 ＝ 出会い ＋ 行動 × 恩返し
         </p>
         <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.7 }}>
-          営業は縁の設計。相手を「落とす」のではなく、方程式の欠けている項を埋める。
-          縁は放置すると冷える——行動の対義語は惰性。ここは迷いを消すための司令室であり、送信などの外部行動は必ず会長が行う。
+          営業は縁づくり。相手を「落とす」のではなく、足りない要素を埋めていく。
+          何もしないと縁は冷めていきます。ここは迷いを減らすための場所で、送信などの外部への連絡は必ず会長が行います。
         </p>
       </div>
 
       {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
+
+      {demoData?.exists && (
+        <div style={{ ...cardStyle, marginTop: 10, borderLeft: `4px solid ${demoData.enabled ? '#E5A139' : '#999'}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#333' }}>🎭 営業デモ用の合成データ（{demoData.totalCount}件・デモ架空市）</p>
+            <p style={{ margin: '3px 0 0', fontSize: 11, color: '#999', lineHeight: 1.6 }}>
+              {demoData.enabled
+                ? '現在、公開マップ・自治体向けダッシュボードに表示されています。商談以外の時間は「非表示」にしておくことを推奨。'
+                : '現在は非表示です。商談の直前にオンにすると、公開マップ・ダッシュボードにデモ痕跡が反映されます。'}
+            </p>
+          </div>
+          <button
+            onClick={() => toggleDemoData(!demoData.enabled)}
+            disabled={demoToggling}
+            style={{
+              padding: '6px 16px', borderRadius: 14, fontSize: 12, fontWeight: 700, cursor: demoToggling ? 'default' : 'pointer',
+              border: `1.5px solid ${demoData.enabled ? '#E5A139' : '#999'}`,
+              background: demoData.enabled ? '#E5A13918' : '#fff',
+              color: demoData.enabled ? '#B7791F' : '#999',
+              opacity: demoToggling ? 0.6 : 1,
+            }}
+          >{demoToggling ? '切替中…' : demoData.enabled ? '● 表示中（クリックで非表示）' : '○ 非表示（クリックで表示）'}</button>
+        </div>
+      )}
+
       {needsMigration && (
         <div style={{ ...cardStyle, marginTop: 10, borderLeft: '4px solid #E5A139' }}>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#B7791F' }}>⚠ 縁の台帳のテーブルがまだ作成されていません</p>
@@ -463,7 +509,7 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
         })}
       </div>
       <p style={{ margin: '4px 0 0', fontSize: 10, color: '#bbb' }}>
-        出会い {en.deai}/100（痕跡×余白） ＋ 共動×推譲 {Math.round(en.kyodo * en.suijo)}/100 ＝ 縁 {en.en}/200
+        出会い {en.deai}/100（事実×共感） ＋ 行動×恩返し {Math.round(en.kyodo * en.suijo)}/100 ＝ 縁 {en.en}/200
       </p>
 
       {/* 次の一手 */}
@@ -515,7 +561,7 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
       {open && (
         <div style={{ marginTop: 10, borderTop: '1px solid #f0f0f0', paddingTop: 10 }}>
           {records.length === 0 ? (
-            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#bbb' }}>まだ記録がありません。最初の一本は🔍痕跡から。</p>
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#bbb' }}>まだ記録がありません。最初の一本は🔍事実から。</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
               {records.map(r => {

@@ -49,6 +49,10 @@ LOCAL_AGENTS = [
     {"id": "competitor_feature_monitor", "name": "42. 競合プロダクト機能差分モニタAI", "emoji": "🦎", "floor": "I", "schedule": "毎日 06:10"},
     {"id": "ab_test_summary_watch", "name": "79. UI改善A/Bテスト自動集計AI", "emoji": "🐁", "floor": "I", "schedule": "毎日 03:10"},
     {"id": "command_center", "name": "80. 統合司令室AI", "emoji": "🦅", "floor": "I", "schedule": "毎日 09:30"},
+    {"id": "new_biz_signal_watch", "name": "50. 新規事業仮説の種探しAI", "emoji": "🐣", "floor": "J", "schedule": "毎日 05:40"},
+    {"id": "global_market_watch", "name": "51. 海外展開リサーチAI", "emoji": "🦜", "floor": "J", "schedule": "毎日 06:20"},
+    {"id": "academic_partnership_watch", "name": "52. 産学連携リサーチAI", "emoji": "🦉", "floor": "J", "schedule": "毎日 06:30"},
+    {"id": "memorial_anniversary_watch", "name": "53. 周年史アーカイブAI", "emoji": "🕊️", "floor": "J", "schedule": "毎日 07:05"},
 ]
 LOCAL_AGENT_IDS = {a["id"] for a in LOCAL_AGENTS}
 
@@ -187,8 +191,7 @@ VACANT_AGENTS = [
     # 46統合司令室・48UI改善A/Bテスト自動集計・49競合プロダクト機能差分モニタ → 2026-07-20 実装済み
     # 47痕跡データパターン分析 → 2026-07-18 実装済み(62)
 
-    ("J", 50, "新規事業仮説生成AI"), ("J", 51, "海外展開リサーチAI"),
-    ("J", 52, "産学連携リサーチAI"), ("J", 53, "追悼・周年史アーカイブAI"),
+    # 50新規事業仮説の種探し・51海外展開リサーチ・52産学連携リサーチ・53周年史アーカイブ → 2026-07-20 実装済み
 
     ("K", 55, "文献収集AI"),
     ("K", 56, "参考文献フォーマッターAI"), ("K", 57, "授業ノート構造化AI"),
@@ -364,6 +367,17 @@ def _summarize_local_result(agent_id: str, result: dict | None) -> str:
         if result.get("test_count"):
             return f"実施中のA/Bテスト{result['test_count']}件を集計"
         return result.get("note", "まだ計測データがありません")
+    if agent_id == "new_biz_signal_watch":
+        kw = result.get("top_keywords") or []
+        head = kw[0]["word"] if kw else None
+        return (f"「なぜ」欄の頻出フレーズ{len(kw)}件（最多: {head}）" if head else "まだ目立つ頻出フレーズなし") + f" ／長期停滞中の事業案{result.get('stale_idea_count', 0)}件"
+    if agent_id == "global_market_watch":
+        return f"海外の市場ニュース{result.get('total', 0)}件を収集（英語圏）"
+    if agent_id == "academic_partnership_watch":
+        return f"産学連携ニュース{result.get('total', 0)}件を収集"
+    if agent_id == "memorial_anniversary_watch":
+        n = result.get("upcoming_count", 0)
+        return f"2週間以内に節目を迎えるアーカイブ{n}件" if n else f"該当なし（登録済みアーカイブ{result.get('archive_total', 0)}件中、日付を特定できたもの{result.get('date_parsed_count', 0)}件）"
     if agent_id == "command_center":
         n = result.get("attention_count", 0)
         return f"要注意項目{n}件" if n else "全フロア異常なし"
