@@ -24,6 +24,9 @@ __pycache__/
 # ログ・自動化ツールの実行時生成物
 agent-dashboard/server.log
 agents/work/
+
+# Googleカレンダー連携のOAuth資格情報・トークン（絶対にGitに含めない。手順書README.mdは追跡する）
+agents/secrets/*.json
 affiliate-auto/logs/
 affiliate-auto/cache/
 affiliate-auto/drafts/

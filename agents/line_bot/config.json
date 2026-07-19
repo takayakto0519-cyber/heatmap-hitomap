@@ -1,0 +1,12 @@
+{
+  "group_id": "",
+  "mission_interval_days": 14,
+  "auto_push": false,
+  "auto_welcome": false,
+  "_comment": "auto_push/auto_welcome を true にすると会長の承認なしにLINEへ自動投稿します。既定はfalse（下書きを06番地に置き会長が送信）。group_idとトークンは下記のとおり。channel_access_token は .env.local の LINE_CHANNEL_TOKEN に入れる（このファイルには書かない）。",
+  "members": [
+    { "name": "（例）田中さん", "note": "浦河でインターン。建設業。聞き上手。" },
+    { "name": "（例）佐藤さん", "note": "横浜で個人カフェ。人の痕跡が好き。" }
+  ],
+  "recent_pairs": []
+}

@@ -5,19 +5,23 @@ import dynamic from 'next/dynamic';
 import type { Trace, Sponsor, Route } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
+import { scoreLead } from '@/lib/leadTemperature';
 import BlocksTab from '@/components/admin/BlocksTab';
 import PostsTab from '@/components/admin/PostsTab';
 import OverviewTab from '@/components/admin/OverviewTab';
 import AttachmentTab from '@/components/admin/AttachmentTab';
+import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
+import TracePatternTab from '@/components/admin/TracePatternTab';
 import SettingsTab from '@/components/admin/SettingsTab';
 import SnsTab from '@/components/admin/SnsTab';
+import AIOpsTab from '@/components/admin/AIOpsTab';
 
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
   ssr: false,
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads' | 'attachment';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -37,9 +41,12 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
+  relation: { label: '関係人口', icon: '🔁', group: '調査・研究', desc: '複数回関わった人（関係人口の芽）と地域ランキング' },
+  patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
+  aiops: { label: 'AIエージェント運営', icon: '🤖', group: 'AIエージェント', desc: '収益化イニシアチブ・案件パイプライン・顧問先カルテ・LINE縁ミッション・営業メール送り先の管理' },
 };
 
-const TAB_GROUPS = ['サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究'];
+const TAB_GROUPS = ['サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究', 'AIエージェント'];
 
 // ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
 const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
@@ -377,6 +384,9 @@ export default function AdminDashboardPage() {
           {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
           {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
+          {tab === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
+          {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
+          {tab === 'aiops' && <AIOpsTab authHeaders={authHeaders} />}
         </div>
       </main>
     </div>
@@ -2200,6 +2210,7 @@ const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [filter, setFilter] = useState<'all' | 'school' | 'business'>('all');
+  const [hotSort, setHotSort] = useState(false);
   const [leads, setLeads] = useState<ClientLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -2371,11 +2382,14 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     URL.revokeObjectURL(url);
   }
 
-  const visibleLeads = leads.filter(l => filter === 'all' || l.client_type === filter);
+  const visibleLeads = leads
+    .filter(l => filter === 'all' || l.client_type === filter)
+    .sort((a, b) => (hotSort ? scoreLead(b).score - scoreLead(a).score : 0));
   const counts = {
     all: leads.length,
     school: leads.filter(l => l.client_type === 'school').length,
     business: leads.filter(l => l.client_type === 'business').length,
+    hot: leads.filter(l => scoreLead(l).score >= 45).length,
   };
 
   return (
@@ -2385,7 +2399,7 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         {' '}・<a href="/company/business" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}> 法人向けページ ↗</a>
       </p>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {([['all', `すべて（${counts.all}）`], ['school', `🏫 学校（${counts.school}）`], ['business', `🏢 法人（${counts.business}）`]] as [typeof filter, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setFilter(id)} style={{
             padding: '7px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
@@ -2394,6 +2408,12 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
             boxShadow: filter === id ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
           }}>{label}</button>
         ))}
+        <button onClick={() => setHotSort(v => !v)} title="証拠パック(メモ)のキーワード・連絡先有無・進行状況からルールベースで当たる順を推定します" style={{
+          padding: '7px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
+          background: hotSort ? '#E5A139' : '#fff',
+          color: hotSort ? '#fff' : '#666', fontWeight: 700, fontSize: 12,
+          boxShadow: hotSort ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+        }}>🔥 熱い順（{counts.hot}件）</button>
       </div>
 
       {showCreate ? (
@@ -2432,6 +2452,7 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
           {visibleLeads.length === 0 && <p style={{ color: '#aaa' }}>まだ案件がありません。</p>}
           {visibleLeads.map(l => {
             const statusInfo = LEAD_STATUS_LABELS[l.status] ?? LEAD_STATUS_LABELS.lead;
+            const temperature = scoreLead(l);
             return (
               <Card key={l.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -2439,6 +2460,9 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                     <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 15 }}>
                       {l.client_type === 'school' ? '🏫' : '🏢'} {l.org_name}
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
+                      <span title={temperature.reasons.join('・') || '加点要素なし'} style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#B7791F' }}>
+                        {temperature.temp}（{temperature.score}点）
+                      </span>
                     </p>
                     <p style={{ margin: 0, fontSize: 12, color: '#999' }}>
                       {l.contact_name && `👤 ${l.contact_name}`}
