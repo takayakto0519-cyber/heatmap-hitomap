@@ -11,6 +11,7 @@ node_modules/
 # ビルド成果物
 build/
 dist/
+tsconfig.tsbuildinfo
 
 # OS
 .DS_Store

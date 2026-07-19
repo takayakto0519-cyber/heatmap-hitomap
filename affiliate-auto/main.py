@@ -187,7 +187,7 @@ def _update_dashboard_log(all_entries: list):
     )
 
     # auto_data.js
-    js_path = Path(__file__).parent.parent / "auto_data.js"
+    js_path = Path(__file__).parent / "auto_data.js"
     js_content = (
         "// 自動生成ファイル — affiliate-auto/main.py が毎朝更新します\n"
         "window._autoDataList = " + json.dumps(all_entries, ensure_ascii=False, indent=2) + ";\n"
