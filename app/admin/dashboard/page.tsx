@@ -2196,9 +2196,17 @@ interface BizModelIdea {
   title: string;
   memo: string | null;
   status: string;
+  contest: string | null;
+  idea_no: number | null;
+  report_md: string | null;
   created_at: string;
   updated_at: string;
 }
+
+const CONTEST_LABELS: Record<string, string> = {
+  makichalle2026: '🍵 まきチャレ2026（牧之原市チャレンジビジネスコンテスト）',
+};
+const IDEA_NO_MARKS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
 
 const BIZMODEL_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   idea: { label: '💡 アイデア', color: '#8E44AD' },
@@ -2216,6 +2224,8 @@ function BizModelIdeasTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [newTitle, setNewTitle] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
+  const [editingReport, setEditingReport] = useState<Record<string, string>>({});
+  const [openReportId, setOpenReportId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -2225,8 +2235,13 @@ function BizModelIdeasTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         if (d.ok) {
           setIdeas(d.ideas);
           const memoMap: Record<string, string> = {};
-          for (const i of d.ideas as BizModelIdea[]) memoMap[i.id] = i.memo ?? '';
+          const reportMap: Record<string, string> = {};
+          for (const i of d.ideas as BizModelIdea[]) {
+            memoMap[i.id] = i.memo ?? '';
+            reportMap[i.id] = i.report_md ?? '';
+          }
           setEditingMemo(memoMap);
+          setEditingReport(reportMap);
         } else setError(d.error ?? '取得に失敗しました');
       })
       .catch(() => setError('通信エラー'))
@@ -2299,9 +2314,82 @@ function BizModelIdeasTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         }}>＋ 新しいビジネスモデル案を追加</button>
       )}
 
-      {ideas.length === 0 && <p style={{ color: '#aaa' }}>まだ事業案がありません。</p>}
+      {(() => {
+        const contestGroups = new Map<string, BizModelIdea[]>();
+        for (const i of ideas) {
+          if (!i.contest) continue;
+          if (!contestGroups.has(i.contest)) contestGroups.set(i.contest, []);
+          contestGroups.get(i.contest)!.push(i);
+        }
+        for (const list of contestGroups.values()) list.sort((a, b) => (a.idea_no ?? 99) - (b.idea_no ?? 99));
+        if (contestGroups.size === 0) return null;
+        return Array.from(contestGroups.entries()).map(([contest, list]) => (
+          <div key={contest} style={{ marginBottom: 20 }}>
+            <p style={{ fontWeight: 800, fontSize: 14, margin: '0 0 8px' }}>
+              {CONTEST_LABELS[contest] ?? `📌 ${contest}`}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {list.map(i => {
+                const statusInfo = BIZMODEL_STATUS_LABELS[i.status] ?? BIZMODEL_STATUS_LABELS.idea;
+                const isOpen = openReportId === i.id;
+                return (
+                  <Card key={i.id} style={{ border: '1.5px solid #FDEBD0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}
+                      onClick={() => setOpenReportId(isOpen ? null : i.id)}>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: 15 }}>
+                        {i.idea_no ? `${IDEA_NO_MARKS[i.idea_no - 1] ?? i.idea_no} ` : ''}{i.title}
+                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
+                      </p>
+                      <span style={{ color: '#bbb', fontSize: 12 }}>{isOpen ? '閉じる ▲' : '開く ▼'}</span>
+                    </div>
+
+                    {isOpen && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+                          {Object.entries(BIZMODEL_STATUS_LABELS).map(([key, info]) => (
+                            <button key={key} onClick={() => updateIdea(i.id, { status: key })} style={{
+                              padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+                              border: `1.5px solid ${i.status === key ? info.color : '#ddd'}`,
+                              background: i.status === key ? info.color + '18' : '#fff',
+                              color: i.status === key ? info.color : '#999', fontWeight: i.status === key ? 700 : 400,
+                            }}>{info.label}</button>
+                          ))}
+                        </div>
+
+                        <label style={{ fontSize: 11, color: '#999', fontWeight: 700 }}>ひとことメモ</label>
+                        <textarea
+                          value={editingMemo[i.id] ?? ''}
+                          onChange={e => setEditingMemo(prev => ({ ...prev, [i.id]: e.target.value }))}
+                          onBlur={() => { if ((editingMemo[i.id] ?? '') !== (i.memo ?? '')) updateIdea(i.id, { memo: editingMemo[i.id] || null }); }}
+                          rows={2}
+                          style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginTop: 4 }}
+                        />
+
+                        <label style={{ fontSize: 11, color: '#999', fontWeight: 700, display: 'block', marginTop: 8 }}>専用レポート（Markdown・運営メンバーが直接編集できます）</label>
+                        <textarea
+                          value={editingReport[i.id] ?? ''}
+                          onChange={e => setEditingReport(prev => ({ ...prev, [i.id]: e.target.value }))}
+                          onBlur={() => { if ((editingReport[i.id] ?? '') !== (i.report_md ?? '')) updateIdea(i.id, { report_md: editingReport[i.id] || null }); }}
+                          rows={14}
+                          style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'monospace', fontSize: 12.5, lineHeight: 1.6, marginTop: 4 }}
+                        />
+                        <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                          最終更新: {new Date(i.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+                        </p>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        ));
+      })()}
+
+      <p style={{ fontWeight: 800, fontSize: 14, margin: '4px 0 8px' }}>💡 その他の事業案</p>
+      {ideas.filter(i => !i.contest).length === 0 && <p style={{ color: '#aaa' }}>まだ事業案がありません。</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {ideas.map(i => {
+        {ideas.filter(i => !i.contest).map(i => {
           const statusInfo = BIZMODEL_STATUS_LABELS[i.status] ?? BIZMODEL_STATUS_LABELS.idea;
           return (
             <Card key={i.id}>

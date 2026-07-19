@@ -4,7 +4,7 @@ import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-const ALLOWED_FIELDS = ['title', 'memo', 'status'];
+const ALLOWED_FIELDS = ['title', 'memo', 'status', 'contest', 'idea_no', 'report_md'];
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
