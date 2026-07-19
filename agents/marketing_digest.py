@@ -14,7 +14,7 @@ import common
 
 # ここに並べたagent_idの結果だけを「マーケティング関連」として日報にまとめる。
 # 新しいマーケティング系エージェントを追加したら、このリストにagent_idを足すだけでよい。
-MARKETING_AGENTS = ["competitor_market_research", "trace_pattern", "relation_population"]
+MARKETING_AGENTS = ["competitor_market_research", "competitor_feature_monitor", "trace_pattern", "relation_population"]
 
 # news_digestは8時間ごとに自前でDiscord投稿しているため全文は転載しない。
 # ただしマーケティング色の強い「観光・関係人口・採用DX」カテゴリだけは要点を拾う。
@@ -57,6 +57,28 @@ def _embed_competitor_market_research(data: dict) -> dict | None:
         "title": f"🔍 競合・市場調査（{data.get('total', 0)}件）",
         "description": "\n".join(lines)[:4000],
         "color": 0x8E44AD,
+    }
+
+
+def _embed_competitor_feature_monitor(data: dict) -> dict | None:
+    if not data or data.get("error"):
+        return None
+    digest = data.get("digest") or {}
+    lines = []
+    for competitor, items in digest.items():
+        if not items:
+            continue
+        lines.append(f"**{competitor}**")
+        for i in items[:3]:
+            mark = "🆕 " if i.get("is_update") else ""
+            head = f"・{mark}[{i['title']}]({i['link']})" if i.get("link") else f"・{mark}{i['title']}"
+            lines.append(head)
+    if not lines:
+        return None
+    return {
+        "title": f"🦎 競合プロダクト機能差分モニタ（{data.get('total', 0)}件・更新らしき報道{data.get('update_count', 0)}件）",
+        "description": "\n".join(lines)[:4000],
+        "color": 0x2E86AB,
     }
 
 
@@ -107,6 +129,9 @@ def main():
         cmr = _embed_competitor_market_research(results.get("competitor_market_research"))
         if cmr:
             embeds.append(cmr)
+        cfm = _embed_competitor_feature_monitor(results.get("competitor_feature_monitor"))
+        if cfm:
+            embeds.append(cfm)
         tp = _embed_trace_pattern(results.get("trace_pattern"))
         if tp:
             embeds.append(tp)

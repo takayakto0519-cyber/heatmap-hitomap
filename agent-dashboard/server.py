@@ -44,6 +44,11 @@ LOCAL_AGENTS = [
     {"id": "trace_pattern", "name": "62. 痕跡データパターン分析AI", "emoji": "🦩", "floor": "I", "schedule": "毎日 02:30"},
     {"id": "relation_population", "name": "63. 関係人口ダッシュボードAI", "emoji": "🦚", "floor": "G", "schedule": "毎日 02:40"},
     {"id": "calendar_watch", "name": "29. カレンダー番人", "emoji": "🦉", "floor": "A", "schedule": "毎日 06:50"},
+    {"id": "competitor_market_research", "name": "9. 競合・市場調査エージェント", "emoji": "🦫", "floor": "B", "schedule": "毎日 06:00"},
+    {"id": "marketing_digest", "name": "マーケティング日報", "emoji": "🦔", "floor": "B", "schedule": "毎日 08:40"},
+    {"id": "competitor_feature_monitor", "name": "42. 競合プロダクト機能差分モニタAI", "emoji": "🦎", "floor": "I", "schedule": "毎日 06:10"},
+    {"id": "ab_test_summary_watch", "name": "79. UI改善A/Bテスト自動集計AI", "emoji": "🐁", "floor": "I", "schedule": "毎日 03:10"},
+    {"id": "command_center", "name": "80. 統合司令室AI", "emoji": "🦅", "floor": "I", "schedule": "毎日 09:30"},
 ]
 LOCAL_AGENT_IDS = {a["id"] for a in LOCAL_AGENTS}
 
@@ -152,8 +157,8 @@ VACANT_AGENTS = [
     ("A", 5, "意思決定ログ検索AI"),
     # 1.秘書AI・2.スケジュール番人・4.議事録要約AI・6.燃え尽き検知番人 → 2026-07-18 実装済み
 
-    ("B", 9, "競合・市場調査エージェント"),
     # 7.企業版プロファイリング・10.リード温度・11.ピッチ差分・12.名刺フォロー → 2026-07-18 実装済み
+    # 9.競合・市場調査エージェント → 2026-07-20 実装済み（competitor_market_research.py）
 
     # 8. 縁のデータベース番人 → 2026-07-18 実装済み（case_pipeline_watch.py、下記LOCAL_AGENTSに登録）
     # 14. 提案書ドラフトAI → 2026-07-18 案件カルテ制で部分実装（.claude/skills/case-pipeline/SKILL.md セクションD）
@@ -179,8 +184,7 @@ VACANT_AGENTS = [
     ("H", 43, "投資リターン追跡・リバランス提案AI"),
     ("H", 44, "事業別採算モニタAI"), ("H", 45, "助成金・補助金スキャンAI"),
 
-    ("I", 46, "統合司令室AI"),
-    ("I", 48, "UI改善A/Bテスト自動集計AI"), ("I", 49, "競合プロダクト機能差分モニタAI"),
+    # 46統合司令室・48UI改善A/Bテスト自動集計・49競合プロダクト機能差分モニタ → 2026-07-20 実装済み
     # 47痕跡データパターン分析 → 2026-07-18 実装済み(62)
 
     ("J", 50, "新規事業仮説生成AI"), ("J", 51, "海外展開リサーチAI"),
@@ -349,6 +353,20 @@ def _summarize_local_result(agent_id: str, result: dict | None) -> str:
         return f"痕跡{result.get('total', 0)}件を分析、また来たい率{result.get('want_revisit_rate', 0)}%、投稿ピーク{ph}"
     if agent_id == "relation_population":
         return f"関わった人{result.get('total_contributors', 0)}人、複数回関わった芽{result.get('repeat_contributors', 0)}人（また来たい{result.get('want_revisit_people', 0)}人）"
+    if agent_id == "competitor_market_research":
+        return f"競合・市場ニュース{result.get('total', 0)}件を収集（4カテゴリ）"
+    if agent_id == "marketing_digest":
+        return f"マーケティング日報：{result.get('sections', 0)}分野をDiscordへ報告（{result.get('post_result', '未実行')}）"
+    if agent_id == "competitor_feature_monitor":
+        u = result.get("update_count", 0)
+        return f"名指し競合の関連報道{result.get('total', 0)}件" + (f" ／新機能・更新らしき報道{u}件" if u else "")
+    if agent_id == "ab_test_summary_watch":
+        if result.get("test_count"):
+            return f"実施中のA/Bテスト{result['test_count']}件を集計"
+        return result.get("note", "まだ計測データがありません")
+    if agent_id == "command_center":
+        n = result.get("attention_count", 0)
+        return f"要注意項目{n}件" if n else "全フロア異常なし"
     if agent_id == "calendar_watch":
         if not result.get("connected"):
             return "未連携（agents/secrets/README.md の手順が未実施）"
