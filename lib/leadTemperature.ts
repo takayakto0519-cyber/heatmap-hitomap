@@ -39,7 +39,7 @@ export function scoreLead(lead: {
     score += 15;
     reasons.push('連絡先あり');
   }
-  if (lead.status && ['contacted', 'meeting', '商談中'].includes(lead.status)) {
+  if (lead.status && ['contacted', 'negotiating', 'meeting', '商談中'].includes(lead.status)) {
     score += 20;
     reasons.push('進行中');
   }

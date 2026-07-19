@@ -37,7 +37,7 @@ def score_lead(lead: dict) -> tuple[int, list[str]]:
         score += 15
         hits.append("連絡先あり")
     # ステータスがlead(初期)なら伸びしろ、商談中なら最優先
-    if lead.get("status") in ("contacted", "meeting", "商談中"):
+    if lead.get("status") in ("contacted", "negotiating", "meeting", "商談中"):
         score += 20
         hits.append("進行中")
     return score, hits
