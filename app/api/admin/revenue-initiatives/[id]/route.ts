@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const ALLOWED_FIELDS = ['title', 'stage', 'next_action'];
+const ALLOWED_FIELDS = ['title', 'code', 'stage', 'next_action'];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });

@@ -1,9 +1,9 @@
-// PATCH/DELETE /api/admin/business-cases/[id]
+// PATCH/DELETE /api/admin/business-line-pnl/[id]
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const ALLOWED_FIELDS = ['org_name', 'client_type', 'stage', 'evidence', 'proposal_link', 'next_action', 'lead_ref'];
+const ALLOWED_FIELDS = ['line_key', 'month', 'revenue', 'cost', 'memo'];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -15,9 +15,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const { supabaseServer } = await import('@/lib/supabase/server');
   const { data, error } = await supabaseServer
-    .from('business_cases').update(patch).eq('id', params.id).select().single();
+    .from('business_line_pnl').update(patch).eq('id', params.id).select().single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, case: data });
+  return NextResponse.json({ ok: true, entry: data });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
@@ -25,7 +25,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { error } = await supabaseServer.from('business_cases').delete().eq('id', params.id);
+  const { error } = await supabaseServer.from('business_line_pnl').delete().eq('id', params.id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
