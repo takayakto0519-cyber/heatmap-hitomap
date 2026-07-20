@@ -100,11 +100,17 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
   const [exporting, setExporting] = useState<'csv' | 'geojson' | null>(null);
   const [attention, setAttention] = useState<AttentionItem[] | null>(null);
   const [regionValence, setRegionValence] = useState<RegionValence[] | null>(null);
+  const [includeDemo, setIncludeDemo] = useState(false);
+  const [demoHiddenCount, setDemoHiddenCount] = useState(0);
 
   useEffect(() => {
-    fetch('/api/admin/stats', { headers: authHeaders() })
+    const demoParam = includeDemo ? '?includeDemo=true' : '';
+    fetch(`/api/admin/stats${demoParam}`, { headers: authHeaders() })
       .then(r => r.json())
-      .then(d => { if (d.ok) setStats(d.stats); else setError(d.error ?? '取得に失敗しました'); })
+      .then(d => {
+        if (d.ok) { setStats(d.stats); setDemoHiddenCount(d.demoHiddenCount ?? 0); }
+        else setError(d.error ?? '取得に失敗しました');
+      })
       .catch(() => setError('通信エラー'));
     // 自治体別の内訳（regionが入っている投稿のみ。regionが空の投稿は全国集計側にのみ含まれる）
     fetch('/api/admin/stats/by-region', { headers: authHeaders() })
@@ -112,7 +118,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
       .then(d => { if (d.ok) setRegionValence(d.regions); })
       .catch(() => {});
     // 分野別の数字は取れなくてもホーム全体は表示する（エラーにしない）
-    fetch('/api/admin/biz-stats', { headers: authHeaders() })
+    fetch(`/api/admin/biz-stats${demoParam}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setBiz(d.biz); })
       .catch(() => {});
@@ -121,7 +127,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
       .then(r => r.json())
       .then(d => { if (d.ok) setAttention(d.result?.attention_items ?? []); })
       .catch(() => {});
-  }, [authHeaders]);
+  }, [authHeaders, includeDemo]);
 
   async function exportData(format: 'csv' | 'geojson') {
     setExporting(format);
@@ -174,6 +180,17 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
             })}
           </div>
         </Card>
+      )}
+
+      {(includeDemo || demoHiddenCount > 0) && (
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '5px 12px',
+          borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+          background: includeDemo ? '#E5A13918' : '#f4f4f4', color: includeDemo ? '#B7791F' : '#999',
+        }}>
+          <input type="checkbox" checked={includeDemo} onChange={e => setIncludeDemo(e.target.checked)} />
+          🎭 商談デモ用データ{includeDemo ? 'を件数に含めて表示中' : `（${demoHiddenCount}件）を件数から除いています`}
+        </label>
       )}
 
       {/* 全体のいまを4つで押さえる */}
