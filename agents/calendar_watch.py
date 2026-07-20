@@ -1,5 +1,5 @@
 """カレンダー番人 — 会長のGoogleカレンダー（hitomap.info@gmail.com）から
-今日・明日の予定を読み、agents/work/calendar_watch.json に書き出す。
+直近2週間分の予定を読み、agents/work/calendar_watch.json に書き出す。
 
 【スコープは読み取り専用】(calendar.readonly)。このスクリプトは予定を
 一切作成・変更・削除しない。憲法：AIが先に実行してから報告するような
@@ -93,11 +93,14 @@ def _fetch_events(creds, start: datetime, end: datetime) -> list[dict]:
     return events
 
 
+RANGE_DAYS = 14  # 直近2週間分（本日を含む）
+
+
 def main():
     with common.running("calendar_watch"):
         now = datetime.now(JST)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        window_end = today_start + timedelta(days=2)  # 今日・明日ぶん
+        window_end = today_start + timedelta(days=RANGE_DAYS)
 
         try:
             creds = _get_credentials()
@@ -117,15 +120,20 @@ def main():
             })
             return
 
-        today = [ev for ev in events if (ev["start"] or "")[:10] == now.strftime("%Y-%m-%d")]
-        tomorrow_str = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-        tomorrow = [ev for ev in events if (ev["start"] or "")[:10] == tomorrow_str]
+        # 本日から2週間ぶん、日付ごとにグルーピングする（予定が無い日も空配列で含める）
+        days = []
+        for offset in range(RANGE_DAYS):
+            date_str = (today_start + timedelta(days=offset)).strftime("%Y-%m-%d")
+            day_events = [ev for ev in events if (ev["start"] or "")[:10] == date_str]
+            days.append({"date": date_str, "events": day_events})
 
         common.write_result("calendar_watch", {
             "connected": True,
             "calendar_id": CALENDAR_ID,
-            "today": today,
-            "tomorrow": tomorrow,
+            "days": days,
+            # 既存の消費先（運営ダッシュボードの「営業」タブ等）向けに後方互換で残す
+            "today": days[0]["events"] if days else [],
+            "tomorrow": days[1]["events"] if len(days) > 1 else [],
             "as_of": now.strftime("%Y-%m-%d %H:%M"),
         })
 

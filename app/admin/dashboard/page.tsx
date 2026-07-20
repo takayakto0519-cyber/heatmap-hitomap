@@ -32,7 +32,7 @@ type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'tr
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
   overview: { label: 'ホーム', icon: '🏠', group: '', desc: '全体の状況をひと目で確認' },
   secretary: { label: '秘書', icon: '🗒', group: '秘書', desc: '今日の予定とTo-Doを1枚で確認' },
-  calendar: { label: 'カレンダー', icon: '📅', group: '秘書', desc: '連携しているGoogleカレンダーの今日・明日の予定を確認' },
+  calendar: { label: 'カレンダー', icon: '📅', group: '秘書', desc: '連携しているGoogleカレンダーの直近2週間の予定を確認' },
   settings: { label: 'サイト設定', icon: '🎨', group: 'サイト編集', desc: 'トップの大見出し・お知らせ帯の文言を書き換える' },
   blocks: { label: 'ページ編集', icon: '🧩', group: 'サイト編集', desc: '各ページのセクションを追加・並び替え（プレビュー付き）' },
   posts: { label: '実績ブログ', icon: '📝', group: 'サイト編集', desc: 'イベント記録・参加者の声を書いて公開' },
