@@ -6,6 +6,7 @@
 // 個人を特定できる値は一切表示せず、少人数（5人未満）の地域は非表示にする。
 import { useEffect, useMemo, useState } from 'react';
 import { computeFollowUp } from '@/lib/followUp';
+import { smoutSearchUrl } from '@/lib/smout';
 
 interface RelationStats {
   totalContributors: number;
@@ -47,6 +48,8 @@ interface MunicipalityProfile {
   email_sent_content: string | null;
   email_reply: string | null;
   followed_up_at: string | null;
+  smout_sent_at: string | null;
+  smout_reply: string | null;
   on_hold: boolean;
   is_priority_pick: boolean;
   updated_at: string;
@@ -187,6 +190,12 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   }
   async function markFollowedUp(id: string) {
     await patchProfile(id, { followed_up_at: new Date().toISOString() });
+  }
+  async function markSmoutSent(id: string) {
+    await patchProfile(id, { smout_sent_at: new Date().toISOString() });
+  }
+  async function unmarkSmoutSent(id: string) {
+    await patchProfile(id, { smout_sent_at: null });
   }
 
   async function lookupRegion(region: string) {
@@ -358,6 +367,39 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
           <textarea defaultValue={p.email_reply ?? ''} rows={3} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
             placeholder="返信メールの本文を貼り付けておくと、ここに残ります"
             onBlur={e => { if (e.target.value !== (p.email_reply ?? '')) patchProfile(p.id, { email_reply: e.target.value || null }); }} />
+        </div>
+
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#FBF6EE', border: '1px solid #F0E4CE' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#B7791F' }}>
+            📣 SMOUT
+            <span style={{ fontWeight: 400, color: '#aaa', marginLeft: 6, fontSize: 10.5 }}>公式APIが無いため手動記録</span>
+          </p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0', flexWrap: 'wrap' }}>
+            {p.smout_sent_at ? (
+              <>
+                <span style={{ fontSize: 11.5, color: '#27AE60', fontWeight: 700 }}>✓ 送信済み（{new Date(p.smout_sent_at).toLocaleDateString('ja-JP')}）</span>
+                {(() => {
+                  const fu = computeFollowUp({ email_sent_at: p.smout_sent_at, email_reply: p.smout_reply, followed_up_at: p.followed_up_at });
+                  return fu ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: fu.color, padding: '2px 9px', borderRadius: 10, background: fu.color + '18' }}>
+                      {fu.label}
+                    </span>
+                  ) : null;
+                })()}
+                <button onClick={() => markFollowedUp(p.id)} style={{ fontSize: 11, background: 'none', border: '1px solid #B7791F', color: '#B7791F', borderRadius: 999, padding: '3px 10px', cursor: 'pointer' }}>フォロー済みにする</button>
+                <button onClick={() => unmarkSmoutSent(p.id)} style={{ fontSize: 11, background: 'none', border: '1px solid #ccc', borderRadius: 999, padding: '3px 10px', cursor: 'pointer' }}>取り消す</button>
+              </>
+            ) : (
+              <button onClick={() => markSmoutSent(p.id)} style={{ fontSize: 11.5, fontWeight: 700, background: '#E5A139', color: '#fff', border: 'none', borderRadius: 999, padding: '5px 12px', cursor: 'pointer' }}>
+                SMOUTで送信済みにする
+              </button>
+            )}
+            <a href={smoutSearchUrl(p.region_name)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#B7791F' }}>SMOUT ↗</a>
+          </div>
+          <label style={labelStyle}>届いた返信（貼り付けて保存）</label>
+          <textarea defaultValue={p.smout_reply ?? ''} rows={3} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+            placeholder="SMOUT上で届いた返信を貼り付けておくと、ここに残ります"
+            onBlur={e => { if (e.target.value !== (p.smout_reply ?? '')) patchProfile(p.id, { smout_reply: e.target.value || null }); }} />
         </div>
       </div>
     );

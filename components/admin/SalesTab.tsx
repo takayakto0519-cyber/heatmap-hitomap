@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { computeEn, EN_KINDS, type EnKind, type EnRecord, type EnBreakdown } from '@/lib/enScore';
 import { computeFollowUp } from '@/lib/followUp';
+import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 
 // ---------- データ型（各既存APIと同じ形） ----------
@@ -70,17 +71,6 @@ interface RankedFeedItem {
   isSent: boolean; // 一度でも接触・送信済みなら true（候補一覧から分けて表示する）
 }
 
-// 自治体名の表記ゆれ（「佐野市（栃木県・デジタル推進課）」⇄「佐野市（栃木県）」等）を吸収するため、
-// 括弧書きを除いた市区町村・都道府県の芯の部分だけで部分一致させる
-function coreRegionName(name: string): string {
-  return name.replace(/[（(].*$/, '').trim();
-}
-// SMOUT（smout.jp）は地域ページのURLが内部IDベース（例: /areas/243/）で自治体名から直接組み立てられないため、
-// Google検索経由でその地域のSMOUTページに辿り着けるようにする（存在しないリンクを作らないための代替）
-function smoutSearchUrl(name: string): string {
-  const core = coreRegionName(name);
-  return `https://www.google.com/search?q=${encodeURIComponent(`site:smout.jp ${core}`)}`;
-}
 function findProfileFor(orgName: string, profiles: MunicipalityProfile[]): MunicipalityProfile | undefined {
   const core = coreRegionName(orgName);
   if (!core) return undefined;

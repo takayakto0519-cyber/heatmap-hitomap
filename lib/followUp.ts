@@ -22,6 +22,8 @@ function daysBetween(iso: string, now: number): number {
 
 // 未送信なら追跡対象外（null）。返信済みならフォロー不要。
 // 手動フォロー（電話・対面など）を記録した場合は followed_up_at を起点に日数を数え直す。
+// チャンネルを問わず使える汎用関数。email/SMOUT等、sent_at・reply・followed_up_atの
+// 組を渡せば同じ基準で判定する（呼び出し側でチャンネルごとのフィールドを詰め替えて渡す）。
 export function computeFollowUp(p: FollowUpInput, now: number = Date.now()): FollowUpInfo | null {
   if (!p.email_sent_at) return null;
   if (p.email_reply && p.email_reply.trim()) {
