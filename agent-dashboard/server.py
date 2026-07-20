@@ -23,37 +23,30 @@ AFFILIATE_RESULTS = AFFILIATE_DIR / "results.json"
 # 2026-07-09実装。ローカルで完結する読み取り専用エージェント（agents/*.py、Windowsタスクスケジューラ登録済み）。
 LOCAL_AGENTS_DIR = DASHBOARD_DIR.parent / "agents"
 LOCAL_AGENTS_WORK = LOCAL_AGENTS_DIR / "work"
-LOCAL_AGENTS = [
-    {"id": "approval_watch", "name": "3. 06番地滞留監視",       "emoji": "🐹", "floor": "A", "schedule": "毎日 08:00"},
-    {"id": "report_screen",  "name": "19. 通報一次スクリーニングAI", "emoji": "🦫", "floor": "D", "schedule": "毎日 07:30"},
-    {"id": "trace_qa",       "name": "22. データ整合性夜間QA番人", "emoji": "🦔", "floor": "D", "schedule": "毎日 02:00"},
-    {"id": "deadline_watch", "name": "54. 課題締切トラッキングAI", "emoji": "🐰", "floor": "K", "schedule": "毎日 07:00"},
-    {"id": "spam_detect",    "name": "23. 不正投稿検知AI",       "emoji": "🐝", "floor": "D", "schedule": "毎日 03:00"},
-    {"id": "news_digest",    "name": "60. 今日のニュース抽出AI",  "emoji": "🐦", "floor": "B", "schedule": "8時間ごと（06:30起点）"},
-    {"id": "financial_snapshot", "name": "42. 財務・事業ダッシュボードAI要約", "emoji": "🐷", "floor": "H", "schedule": "毎日 07:45"},
-    {"id": "case_pipeline_watch", "name": "8. 案件パイプライン番人", "emoji": "🐿️", "floor": "B", "schedule": "毎日 08:15"},
-    {"id": "revenue_initiative_watch", "name": "収益化イニシアチブ番人", "emoji": "🐸", "floor": "J", "schedule": "毎日 08:30"},
-    {"id": "office_diary", "name": "101. ビル日報AI", "emoji": "🐤", "floor": "A", "schedule": "毎日 09:15"},
-    {"id": "lead_temperature", "name": "4. リード温度感スコアリングAI", "emoji": "🐧", "floor": "B", "schedule": "毎日 08:45"},
-    {"id": "payment_watch", "name": "6. 入金照合番人", "emoji": "🐮", "floor": "H", "schedule": "毎日 08:50"},
-    {"id": "lost_deal_archive", "name": "10. 失注理由アーカイブAI", "emoji": "🐋", "floor": "B", "schedule": "毎週月 09:00"},
-    {"id": "schedule_watch", "name": "25. スケジュール番人", "emoji": "🐈", "floor": "A", "schedule": "毎日 07:15"},
-    {"id": "burnout_watch", "name": "27. 燃え尽き検知番人", "emoji": "🐨", "floor": "A", "schedule": "毎日 21:00"},
-    {"id": "line_mission", "name": "LINE縁ミッション生成", "emoji": "🐇", "floor": "E", "schedule": "毎日確認（2週に一度発火）"},
-    {"id": "email_queue", "name": "営業メール下書きキュー", "emoji": "🐢", "floor": "B", "schedule": "毎日 08:35"},
-    {"id": "trace_pattern", "name": "62. 痕跡データパターン分析AI", "emoji": "🦩", "floor": "I", "schedule": "毎日 02:30"},
-    {"id": "relation_population", "name": "63. 関係人口ダッシュボードAI", "emoji": "🦚", "floor": "G", "schedule": "毎日 02:40"},
-    {"id": "calendar_watch", "name": "29. カレンダー番人", "emoji": "🦉", "floor": "A", "schedule": "毎日 06:50"},
-    {"id": "competitor_market_research", "name": "9. 競合・市場調査エージェント", "emoji": "🦫", "floor": "B", "schedule": "毎日 06:00"},
-    {"id": "marketing_digest", "name": "マーケティング日報", "emoji": "🦔", "floor": "B", "schedule": "毎日 08:40"},
-    {"id": "competitor_feature_monitor", "name": "42. 競合プロダクト機能差分モニタAI", "emoji": "🦎", "floor": "I", "schedule": "毎日 06:10"},
-    {"id": "ab_test_summary_watch", "name": "79. UI改善A/Bテスト自動集計AI", "emoji": "🐁", "floor": "I", "schedule": "毎日 03:10"},
-    {"id": "command_center", "name": "80. 統合司令室AI", "emoji": "🦅", "floor": "I", "schedule": "毎日 09:30"},
-    {"id": "new_biz_signal_watch", "name": "50. 新規事業仮説の種探しAI", "emoji": "🐣", "floor": "J", "schedule": "毎日 05:40"},
-    {"id": "global_market_watch", "name": "51. 海外展開リサーチAI", "emoji": "🦜", "floor": "J", "schedule": "毎日 06:20"},
-    {"id": "academic_partnership_watch", "name": "52. 産学連携リサーチAI", "emoji": "🦉", "floor": "J", "schedule": "毎日 06:30"},
-    {"id": "memorial_anniversary_watch", "name": "53. 周年史アーカイブAI", "emoji": "🕊️", "floor": "J", "schedule": "毎日 07:05"},
-]
+# 番人一覧の一次情報源は lib/agents/roster.ts。`node scripts/export-agent-roster.mjs` が
+# 書き出す agents/roster.generated.json を読む（三重管理をやめ、roster.ts 1箇所に集約）。
+def _load_local_agents():
+    roster_json = LOCAL_AGENTS_DIR / "roster.generated.json"
+    try:
+        data = json.loads(roster_json.read_text(encoding="utf-8"))
+        scripts = data.get("scripts") or []
+        if scripts:
+            return [
+                {"id": a["id"], "name": a["name"], "emoji": a["emoji"],
+                 "floor": a["floor"], "schedule": a.get("schedule", "")}
+                for a in scripts
+            ]
+    except Exception:
+        pass
+    # フォールバック：JSON未生成でもwork/*.jsonから最低限拾う
+    return [
+        {"id": p.stem, "name": p.stem, "emoji": "🤖", "floor": "A", "schedule": ""}
+        for p in sorted(LOCAL_AGENTS_WORK.glob("*.json"))
+        if p.stem != "xp"
+    ]
+
+
+LOCAL_AGENTS = _load_local_agents()
 LOCAL_AGENT_IDS = {a["id"] for a in LOCAL_AGENTS}
 
 # --- ここから 2026-07-18 追加：AgentRoom風UIの編集・XP・日報のための土台 ---
@@ -156,47 +149,18 @@ MOOMOO_AGENTS = {
     "cloud_backup":            ("クラウド保存", "🐫", "H"),
 }
 
-# 戦略メモ_エージェント構想_20260708.md の59案。まだ実装されていない「空きオフィス」。
-VACANT_AGENTS = [
-    ("A", 5, "意思決定ログ検索AI"),
-    # 1.秘書AI・2.スケジュール番人・4.議事録要約AI・6.燃え尽き検知番人 → 2026-07-18 実装済み
+# 「空きオフィス」も roster.generated.json（roster.ts由来）から読む。
+# 番人＋スキルでロードマップをほぼ実装済みのため、通常は空（0件）。将来また空きが出れば反映される。
+def _load_vacant_agents():
+    roster_json = LOCAL_AGENTS_DIR / "roster.generated.json"
+    try:
+        data = json.loads(roster_json.read_text(encoding="utf-8"))
+        return [(v["floor"], v.get("num") or 0, v["name"]) for v in (data.get("vacant") or [])]
+    except Exception:
+        return []
 
-    # 7.企業版プロファイリング・10.リード温度・11.ピッチ差分・12.名刺フォロー → 2026-07-18 実装済み
-    # 9.競合・市場調査エージェント → 2026-07-20 実装済み（competitor_market_research.py）
 
-    # 8. 縁のデータベース番人 → 2026-07-18 実装済み（case_pipeline_watch.py、下記LOCAL_AGENTSに登録）
-    # 14. 提案書ドラフトAI → 2026-07-18 案件カルテ制で部分実装（.claude/skills/case-pipeline/SKILL.md セクションD）
-    ("C", 13, "X/Note下書きAI"), ("C", 15, "痕跡ストーリー化AI"),
-    ("C", 16, "共鳴分析AI"), ("C", 17, "採用PR動画構成案AI"), ("C", 18, "メディア言及モニタAI"),
-
-    ("D", 20, "スポンサー・自治体トリアージAI"),
-    ("D", 21, "イベント公開前チェックAI"),
-    ("D", 24, "オンボーディング離脱分析AI"),
-
-    ("E", 25, "ホスト伴走AI"), ("E", 26, "参加者共鳴マッチングAI"),
-    ("E", 27, "コミュニティ健全性番人"), ("E", 28, "推譲サイクル可視化AI"),
-    ("E", 29, "離脱予兆検知AI"),
-
-    ("F", 30, "社員トレーディングカード自動生成AI"), ("F", 31, "インターン参加者事前マッチングAI"),
-    ("F", 32, "4フェーズ進行管理AI"), ("F", 33, "痕跡解読トレーニングAI"),
-    ("F", 34, "OB/OGネットワークAI"),
-
-    ("G", 38, "デジタル観光大使AIナビゲーター"),
-    ("G", 39, "学校遠足安全管理AI"),
-    # 35関係人口・36地域特集ページ・37移住定住導線・40ふるさと納税・41提案書カスタマイズ → 2026-07-18 実装済み(63,66,67,65,64)
-
-    ("H", 43, "投資リターン追跡・リバランス提案AI"),
-    ("H", 44, "事業別採算モニタAI"), ("H", 45, "助成金・補助金スキャンAI"),
-
-    # 46統合司令室・48UI改善A/Bテスト自動集計・49競合プロダクト機能差分モニタ → 2026-07-20 実装済み
-    # 47痕跡データパターン分析 → 2026-07-18 実装済み(62)
-
-    # 50新規事業仮説の種探し・51海外展開リサーチ・52産学連携リサーチ・53周年史アーカイブ → 2026-07-20 実装済み
-
-    ("K", 55, "文献収集AI"),
-    ("K", 56, "参考文献フォーマッターAI"), ("K", 57, "授業ノート構造化AI"),
-    ("K", 58, "レポート骨子AI"), ("K", 59, "ゼミ・グループ課題進捗トラッカーAI"),
-]
+VACANT_AGENTS = _load_vacant_agents()
 
 
 _live_pids_cache: tuple[float, set[str]] = (0.0, set())
