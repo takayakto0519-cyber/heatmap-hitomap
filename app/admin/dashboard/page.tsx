@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import type { Trace, Sponsor, Route } from '@/lib/types';
 import { EMOTIONS, getEmotion } from '@/lib/emotions';
@@ -2473,6 +2473,17 @@ function MinutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
     if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
   }
 
+  // 同じ日付の議事録を1つの日付見出しの下にまとめる（entriesは既にentry_date DESCで取得済みのため順序はそのまま保たれる）
+  const groupedByDate = useMemo(() => {
+    const map = new Map<string, MeetingMinute[]>();
+    for (const e of entries) {
+      const list = map.get(e.entry_date) ?? [];
+      list.push(e);
+      map.set(e.entry_date, list);
+    }
+    return Array.from(map.entries());
+  }, [entries]);
+
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
 
   return (
@@ -2513,48 +2524,55 @@ function MinutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
       )}
 
       {entries.length === 0 && <p style={{ color: '#aaa' }}>まだ議事録がありません。</p>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {entries.map(e => {
-          const edit = editing[e.id] ?? { title: '', participants: '', body: '' };
-          return (
-            <Card key={e.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>
-                  {new Date(e.entry_date + 'T00:00:00').toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}
-                </p>
-                <button onClick={() => deleteEntry(e.id)} style={{
-                  padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
-                }}>削除</button>
-              </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {groupedByDate.map(([date, group]) => (
+          <div key={date}>
+            <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14, color: '#38ADA9' }}>
+              {new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}
+              <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#aaa' }}>{group.length}件</span>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {group.map(e => {
+                const edit = editing[e.id] ?? { title: '', participants: '', body: '' };
+                return (
+                  <Card key={e.id}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button onClick={() => deleteEntry(e.id)} style={{
+                        padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                      }}>削除</button>
+                    </div>
 
-              <input
-                value={edit.title}
-                onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, title: ev.target.value } }))}
-                onBlur={() => { if (edit.title !== (e.title ?? '')) updateEntry(e.id, { title: edit.title || null }); }}
-                placeholder="タイトル"
-                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontWeight: 700, margin: '8px 0 6px' }}
-              />
-              <input
-                value={edit.participants}
-                onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, participants: ev.target.value } }))}
-                onBlur={() => { if (edit.participants !== (e.participants ?? '')) updateEntry(e.id, { participants: edit.participants || null }); }}
-                placeholder="参加者"
-                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 12, color: '#888', marginBottom: 6 }}
-              />
-              <textarea
-                value={edit.body}
-                onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, body: ev.target.value } }))}
-                onBlur={() => { if (edit.body !== (e.body ?? '')) updateEntry(e.id, { body: edit.body }); }}
-                placeholder="内容・決定事項・宿題など自由に書く"
-                rows={6}
-                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
-              />
-              <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
-                最終更新: {new Date(e.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
-              </p>
-            </Card>
-          );
-        })}
+                    <input
+                      value={edit.title}
+                      onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, title: ev.target.value } }))}
+                      onBlur={() => { if (edit.title !== (e.title ?? '')) updateEntry(e.id, { title: edit.title || null }); }}
+                      placeholder="タイトル"
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontWeight: 700, margin: '0 0 6px' }}
+                    />
+                    <input
+                      value={edit.participants}
+                      onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, participants: ev.target.value } }))}
+                      onBlur={() => { if (edit.participants !== (e.participants ?? '')) updateEntry(e.id, { participants: edit.participants || null }); }}
+                      placeholder="参加者"
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 12, color: '#888', marginBottom: 6 }}
+                    />
+                    <textarea
+                      value={edit.body}
+                      onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, body: ev.target.value } }))}
+                      onBlur={() => { if (edit.body !== (e.body ?? '')) updateEntry(e.id, { body: edit.body }); }}
+                      placeholder="内容・決定事項・宿題など自由に書く"
+                      rows={6}
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                    />
+                    <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                      最終更新: {new Date(e.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+                    </p>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -2608,13 +2626,48 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [dashForm, setDashForm] = useState<Record<string, {
     region: string; label: string; useBbox: boolean;
     minLat: string; maxLat: string; minLng: string; maxLng: string;
+    municipalityQuery: string; boundaryGeoJson: unknown | null;
   }>>({});
   const [dashLoading, setDashLoading] = useState<Record<string, boolean>>({});
   const [dashResult, setDashResult] = useState<Record<string, string>>({});
   const [dashError, setDashError] = useState<Record<string, string>>({});
 
+  // 市区町村を「目次」のように検索して選べるようにする（緯度経度の手入力に代わる体験）。
+  // 一覧はscripts/fetch-municipality-boundaries.mjsが生成した軽量インデックス（ジオメトリなし）。
+  const [municipalities, setMunicipalities] = useState<{ code: string; name: string; pref: string }[]>([]);
+  useEffect(() => {
+    fetch('/data/municipalities-index.json').then(r => r.json()).then(setMunicipalities).catch(() => {});
+  }, []);
+
   function dashFormFor(id: string) {
-    return dashForm[id] ?? { region: '', label: '', useBbox: false, minLat: '', maxLat: '', minLng: '', maxLng: '' };
+    return dashForm[id] ?? { region: '', label: '', useBbox: false, minLat: '', maxLat: '', minLng: '', maxLng: '', municipalityQuery: '', boundaryGeoJson: null };
+  }
+
+  const [municipalityLoading, setMunicipalityLoading] = useState<Record<string, boolean>>({});
+
+  async function selectMunicipality(leadId: string, code: string, name: string) {
+    setMunicipalityLoading(prev => ({ ...prev, [leadId]: true }));
+    try {
+      const res = await fetch(`/api/admin/geo/municipality-boundary?code=${code}`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.ok) { setDashError(prev => ({ ...prev, [leadId]: data.error ?? '境界データの取得に失敗しました' })); return; }
+      setDashForm(prev => ({
+        ...prev,
+        [leadId]: {
+          ...dashFormFor(leadId),
+          region: name,
+          municipalityQuery: name,
+          useBbox: true,
+          minLat: String(data.bbox.minLat), maxLat: String(data.bbox.maxLat),
+          minLng: String(data.bbox.minLng), maxLng: String(data.bbox.maxLng),
+          boundaryGeoJson: data.geojson,
+        },
+      }));
+    } catch {
+      setDashError(prev => ({ ...prev, [leadId]: '通信エラー' }));
+    } finally {
+      setMunicipalityLoading(prev => ({ ...prev, [leadId]: false }));
+    }
   }
 
   async function issueDashboardToken(id: string) {
@@ -2633,6 +2686,7 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
         }
         Object.assign(body, nums);
       }
+      if (f.boundaryGeoJson) body.boundary_geojson = f.boundaryGeoJson;
       const res = await fetch(`/api/admin/client-leads/${id}/dashboard-token`, {
         method: 'POST', headers: authHeaders(), body: JSON.stringify(body),
       });
@@ -2972,6 +3026,46 @@ function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
                       Supabaseアカウント不要のトークン付きURLを発行します。既定では地域名（regionカラムと完全一致）で集計しますが、
                       地図範囲（緯度経度）を指定するとそちらを優先し、region表記のばらつきに左右されず対象エリアを絞り込めます。
                     </p>
+
+                    {/* 市区町村を検索して選ぶと、地図範囲(bbox)と境界ポリゴンが自動で入る */}
+                    <input
+                      placeholder="🔍 市区町村名で検索（例：佐野市）"
+                      value={dashFormFor(l.id).municipalityQuery}
+                      onChange={e => setDashForm(prev => ({ ...prev, [l.id]: { ...dashFormFor(l.id), municipalityQuery: e.target.value } }))}
+                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 4 }}
+                    />
+                    {dashFormFor(l.id).municipalityQuery.trim().length > 0 && !dashFormFor(l.id).boundaryGeoJson && (
+                      <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #DCE3F5', borderRadius: 8, marginBottom: 6, background: '#fff' }}>
+                        {municipalities
+                          .filter(m => m.name.includes(dashFormFor(l.id).municipalityQuery.trim()))
+                          .slice(0, 20)
+                          .map(m => (
+                            <button
+                              key={m.code} type="button"
+                              onClick={() => selectMunicipality(l.id, m.code, m.name)}
+                              disabled={municipalityLoading[l.id]}
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px',
+                                border: 'none', borderBottom: '1px solid #f0f0f0', background: 'none',
+                                fontSize: 12, color: '#333', cursor: 'pointer',
+                              }}
+                            >{m.pref} {m.name}</button>
+                          ))}
+                        {municipalities.filter(m => m.name.includes(dashFormFor(l.id).municipalityQuery.trim())).length === 0 && (
+                          <p style={{ margin: 0, padding: '6px 10px', fontSize: 11, color: '#999' }}>該当する市区町村がありません</p>
+                        )}
+                      </div>
+                    )}
+                    {Boolean(dashFormFor(l.id).boundaryGeoJson) && (
+                      <p style={{ margin: '0 0 6px', fontSize: 11, color: '#27AE60', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        ✓ {dashFormFor(l.id).region} の境界データを設定しました（地図はこの範囲でマスクされます）
+                        <button type="button" onClick={() => setDashForm(prev => ({ ...prev, [l.id]: { ...dashFormFor(l.id), boundaryGeoJson: null, municipalityQuery: '' } }))} style={{
+                          border: 'none', background: 'none', color: '#999', fontSize: 11, cursor: 'pointer', textDecoration: 'underline',
+                        }}>解除</button>
+                      </p>
+                    )}
+                    {municipalityLoading[l.id] && <p style={{ margin: '0 0 6px', fontSize: 11, color: '#999' }}>境界データを取得中…</p>}
+
                     <input
                       placeholder="対象の地域名 *（例：大阪府浪速区）"
                       value={dashFormFor(l.id).region}
