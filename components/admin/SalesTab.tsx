@@ -35,6 +35,7 @@ interface ClientDossier {
 interface MunicipalityProfile {
   id: string; region_name: string; opportunity_level: string; relation_population_initiative: string | null;
   engagement_stage: string; fit_assessment: string | null; opportunity_notes: string | null; evidence_summary: string | null;
+  email_sent_at: string | null;
 }
 
 // 自治体プロファイル（106件規模）は縁の台帳（client_leads）とは別の台帳のため、
@@ -62,6 +63,7 @@ interface RankedFeedItem {
   badgeColor: string;
   reason: string;
   leadId?: string; // 縁の台帳カードへスクロール用
+  isSent: boolean; // 一度でも接触・送信済みなら true（候補一覧から分けて表示する）
 }
 
 // 自治体名の表記ゆれ（「佐野市（栃木県・デジタル推進課）」⇄「佐野市（栃木県）」等）を吸収するため、
@@ -286,6 +288,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         key: `lead-${lead.id}`, kind: 'lead', icon: lead.client_type === 'school' ? '🏫' : '🏢',
         name: lead.org_name, score: en.enLive, badge: en.stage, badgeColor: en.stageColor,
         reason: en.nextMove.why, leadId: lead.id,
+        isSent: lead.status !== 'lead', // 「候補」から動いていれば、既に接触・送信済みとみなす
       });
     }
     // 既にリードとして台帳にある自治体は、自治体プロファイル側では重複させない
@@ -297,15 +300,20 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         name: p.region_name, score: municipalityScore(p),
         badge: `提案余地 ${p.opportunity_level}`, badgeColor: OPPORTUNITY_COLORS[p.opportunity_level] ?? '#999',
         reason: municipalityReason(p),
+        isSent: Boolean(p.email_sent_at),
       });
     }
     return items.sort((a, b) => b.score - a.score);
   }, [activeLedger, leads, municipalityProfiles]);
 
-  const [showAllRanked, setShowAllRanked] = useState(false);
-  const visibleRanked = showAllRanked ? rankedFeed : rankedFeed.slice(0, 15);
+  const activeRankedFeed = useMemo(() => rankedFeed.filter(item => !item.isSent), [rankedFeed]);
+  const sentRankedFeed = useMemo(() => rankedFeed.filter(item => item.isSent), [rankedFeed]);
 
-  if (loading) return <p style={{ fontSize: 13, color: '#999' }}>縁の台帳を読み込み中…</p>;
+  const [showAllRanked, setShowAllRanked] = useState(false);
+  const visibleRanked = showAllRanked ? activeRankedFeed : activeRankedFeed.slice(0, 15);
+  const [showSent, setShowSent] = useState(false);
+
+  if (loading) return <p style={{ fontSize: 13, color: '#999' }}>営業データを読み込み中…</p>;
 
   return (
     <div>
@@ -326,7 +334,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
           background: view === 'ledger' ? '#38ADA9' : '#fff', color: view === 'ledger' ? '#fff' : '#666',
           boxShadow: view === 'ledger' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-        }}>🧭 縁の台帳・営業</button>
+        }}>🧭 営業</button>
         <button onClick={() => setView('relation')} style={{
           padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
           background: view === 'relation' ? '#38ADA9' : '#fff', color: view === 'relation' ? '#fff' : '#666',
@@ -341,7 +349,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
       {needsMigration && (
         <div style={{ ...cardStyle, marginTop: 10, borderLeft: '4px solid #E5A139' }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#B7791F' }}>⚠ 縁の台帳のテーブルがまだ作成されていません</p>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#B7791F' }}>⚠ 営業データのテーブルがまだ作成されていません</p>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: '#777', lineHeight: 1.7 }}>
             <code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>supabase/migrations/20260719_add_en_records.sql</code> を
             SupabaseのSQL Editorで一度実行してください。それまでは証拠パック（メモ）とステータスだけでスコアを仮計算しています。
@@ -352,7 +360,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {/* ---------- 計器盤 ---------- */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: 10, margin: '14px 0 4px' }}>
         {[
-          { label: '台帳の縁', value: `${activeLedger.length}件`, sub: `記録 ${records.length}本`, color: '#4A69BD' },
+          { label: '営業対象', value: `${activeLedger.length}件`, sub: `記録 ${records.length}本`, color: '#4A69BD' },
           { label: '火が消えかけ', value: `${coldCount}件`, sub: '45日以上で❄', color: '#E55039' },
           { label: '承認待ち', value: `${pendingApproval.length}件`, sub: '06番地の確認', color: '#E5A139' },
           { label: '便り（未送信）', value: `${emails.filter(e => !e.sent).length}件`, sub: `下書き済 ${draftedUnsent.length}件`, color: '#8E44AD' },
@@ -386,7 +394,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                 <p style={{ margin: '2px 0 0', fontSize: 12, color: '#555' }}>動き：{m.how}</p>
               </div>
               {m.leadId ? (
-                <button onClick={() => scrollToLead(m.leadId!)} style={jumpBtnStyle}>台帳へ ↓</button>
+                <button onClick={() => scrollToLead(m.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
               ) : m.jumpTab ? (
                 <button onClick={() => goTab(m.jumpTab!)} style={jumpBtnStyle}>{m.jumpLabel} →</button>
               ) : null}
@@ -402,12 +410,13 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       )}
 
       {/* ---------- 縁ランキング（縁の台帳＋自治体プロファイルを統合） ---------- */}
-      <h2 style={sectionTitleStyle}>🏆 縁ランキング（全{rankedFeed.length}件・順位順）</h2>
+      <h2 style={sectionTitleStyle}>🏆 営業ランキング（未接触{activeRankedFeed.length}件・順位順）</h2>
       <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
-        「学校・法人」台帳のリードと「関係人口・自治体プロファイル」を、縁スコアの物差しで1本にまとめた順位です。
+        「学校・法人」のリードと「関係人口・自治体プロファイル」を、営業対象としての温度で1本にまとめた順位です。
         自治体プロファイルは提案余地・関わり方から換算した目安スコアです。理由の欄が、その順位にした根拠です。
+        すでに送信・接触済みの相手は下の「📤 送信済み・対応中」に移り、ここには出てきません。
       </p>
-      {rankedFeed.length === 0 ? (
+      {activeRankedFeed.length === 0 ? (
         <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>まだ順位付けできる相手がいません。</p></div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -428,24 +437,63 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
               </div>
               <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F', flexShrink: 0 }}>{item.score}</span>
               {item.kind === 'lead' ? (
-                <button onClick={() => scrollToLead(item.leadId!)} style={jumpBtnStyle}>台帳へ ↓</button>
+                <button onClick={() => scrollToLead(item.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
               ) : (
                 <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
               )}
             </div>
           ))}
-          {rankedFeed.length > 15 && (
+          {activeRankedFeed.length > 15 && (
             <button onClick={() => setShowAllRanked(v => !v)} style={{
               padding: '8px 0', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',
               color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            }}>{showAllRanked ? '折りたたむ' : `残り${rankedFeed.length - 15}件も見る`}</button>
+            }}>{showAllRanked ? '折りたたむ' : `残り${activeRankedFeed.length - 15}件も見る`}</button>
           )}
         </div>
       )}
 
-      {/* ---------- 縁の台帳 ---------- */}
+      {/* ---------- 送信済み・対応中（候補一覧から分けて表示） ---------- */}
+      {sentRankedFeed.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => setShowSent(v => !v)} style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+            padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fafafa',
+            color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>
+            <span>{showSent ? '▾' : '▸'}</span>
+            <span>📤 送信済み・対応中（{sentRankedFeed.length}件）</span>
+          </button>
+          {showSent && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+              {sentRankedFeed.map(item => (
+                <div key={item.key} style={{ ...cardStyle, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, opacity: 0.75 }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
+                      {item.name}
+                      <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: item.badgeColor + '18', color: item.badgeColor }}>
+                        {item.badge}
+                      </span>
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      理由：{item.reason}
+                    </p>
+                  </div>
+                  {item.kind === 'lead' ? (
+                    <button onClick={() => scrollToLead(item.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
+                  ) : (
+                    <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------- 営業リスト ---------- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 10px' }}>
-        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>📖 縁の台帳（温度順）</h2>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>📖 営業リスト（温度順）</h2>
         <button onClick={() => setLedgerFilter(f => (f === 'active' ? 'all' : 'active'))} style={{
           ...jumpBtnStyle, borderColor: '#ccc', color: '#888',
         }}>{ledgerFilter === 'active' ? '見送りも表示' : '見送りを隠す'}</button>
@@ -454,7 +502,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {visibleLedger.length === 0 ? (
         <div style={cardStyle}>
           <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
-            台帳が空です。「学校・法人」タブでリードを追加するか、Claude Codeセッションで「リード探して」と頼んでください。
+            営業リストが空です。「学校・法人」タブでリードを追加するか、Claude Codeセッションで「リード探して」と頼んでください。
           </p>
         </div>
       ) : (
@@ -628,7 +676,7 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
             <button onClick={submit} disabled={saving || !note.trim()} style={{
               padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700,
               background: saving || !note.trim() ? '#ccc' : EN_KINDS[addKind].color, color: '#fff', cursor: 'pointer',
-            }}>{saving ? '記録中…' : '台帳に記す'}</button>
+            }}>{saving ? '記録中…' : '記録する'}</button>
           </div>
         </div>
       )}
