@@ -6,6 +6,8 @@
 // 数値は /api/admin/stats（既存・ログイン確認兼用）と /api/admin/biz-stats（分野別）の2本から取る。
 import { useEffect, useState } from 'react';
 
+interface RegionValence { region: string; valence: { positive: number; negative: number; neutral: number; total: number } }
+
 interface Stats {
   totalTraces: number;
   pendingReview: number;
@@ -97,12 +99,18 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'geojson' | null>(null);
   const [attention, setAttention] = useState<AttentionItem[] | null>(null);
+  const [regionValence, setRegionValence] = useState<RegionValence[] | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/stats', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setStats(d.stats); else setError(d.error ?? '取得に失敗しました'); })
       .catch(() => setError('通信エラー'));
+    // 自治体別の内訳（regionが入っている投稿のみ。regionが空の投稿は全国集計側にのみ含まれる）
+    fetch('/api/admin/stats/by-region', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setRegionValence(d.regions); })
+      .catch(() => {});
     // 分野別の数字は取れなくてもホーム全体は表示する（エラーにしない）
     fetch('/api/admin/biz-stats', { headers: authHeaders() })
       .then(r => r.json())
@@ -303,12 +311,12 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         </div>
       </div>
 
-      {/* 自治体向けサマリー */}
+      {/* 全国集計サマリー（旧・自治体向けサマリー。特定自治体の数字ではないため誤解防止に改名） */}
       {stats.valence.total > 0 && (
         <Card style={{ marginTop: 16 }}>
-          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>😊 自治体向けサマリー（好悪の内訳）</p>
+          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>😊 全国集計サマリー（好悪の内訳・速報値）</p>
           <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>
-            全国公開済み投稿{stats.valence.total}件のうち、感情タグから機械的に判定した粗い内訳です。自治体向け提案の際にそのまま使えます。
+            全国公開済み投稿{stats.valence.total}件を全部まとめた、感情タグから機械的に判定した粗い内訳です。特定の自治体の数字ではありません。自治体ごとの内訳は下の「自治体別の内訳」、または「学校・法人」タブで発行した顧客専用ダッシュボードURLをご覧ください。
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#F3F9EA' }}>
@@ -324,6 +332,30 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
               <div style={{ fontSize: 11, color: '#E24B4A' }}>😟 否定的</div>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* 自治体別の内訳：regionが入っている公開投稿だけをregionごとに集計。件数が少ない地域も参考値として全部出す */}
+      {regionValence && regionValence.length > 0 && (
+        <Card style={{ marginTop: 10 }}>
+          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>🗾 自治体別の内訳</p>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>
+            投稿に紐づくregion（地域名）ごとの好悪内訳です。件数が少ない自治体は参考値として見てください。
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {regionValence.map(r => (
+              <div key={r.region} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: '#fafafa' }}>
+                <span style={{ flex: '0 0 120px', fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.region}</span>
+                <span style={{ fontSize: 11, color: '#aaa', flex: '0 0 50px' }}>{r.valence.total}件</span>
+                <span style={{ fontSize: 12, color: '#639922', fontWeight: 700 }}>😊{Math.round((r.valence.positive / r.valence.total) * 100)}%</span>
+                <span style={{ fontSize: 12, color: '#888' }}>😐{Math.round((r.valence.neutral / r.valence.total) * 100)}%</span>
+                <span style={{ fontSize: 12, color: '#E24B4A', fontWeight: 700 }}>😟{Math.round((r.valence.negative / r.valence.total) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '10px 0 0', fontSize: 11, color: '#999' }}>
+            契約先ごとの正式なダッシュボードURLは「学校・法人」タブから発行・確認できます。
+          </p>
         </Card>
       )}
 
