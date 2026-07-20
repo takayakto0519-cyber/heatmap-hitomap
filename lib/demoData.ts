@@ -6,3 +6,7 @@ export const DEMO_SESSION_CODE = 'demo-sales-20260720';
 export function isDemoLead(lead: { memo?: string | null; org_name?: string | null }): boolean {
   return lead.memo === DEMO_SESSION_CODE || Boolean(lead.org_name?.startsWith('【デモ】'));
 }
+
+export function isDemoTrace(trace: { session_code?: string | null; title?: string | null }): boolean {
+  return trace.session_code === DEMO_SESSION_CODE || Boolean(trace.title?.startsWith('【デモ】'));
+}

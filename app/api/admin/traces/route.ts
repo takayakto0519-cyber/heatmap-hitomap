@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isDemoTrace } from '@/lib/demoData';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q');
   const userId = req.nextUrl.searchParams.get('user_id');
   const includeDeleted = req.nextUrl.searchParams.get('include_deleted') === 'true';
+  // 商談デモの直前など、あえて見たいときだけ ?includeDemo=true を付けて呼ぶ（lib/demoDataと同じ流儀）
+  const includeDemo = req.nextUrl.searchParams.get('includeDemo') === 'true';
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
 
   const { supabaseServer } = await import('@/lib/supabase/server');
@@ -29,5 +32,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, traces: data ?? [] });
+
+  const allTraces = data ?? [];
+  const traces = includeDemo ? allTraces : allTraces.filter(t => !isDemoTrace(t));
+  const demoHiddenCount = allTraces.length - traces.length;
+
+  return NextResponse.json({ ok: true, traces, demoHiddenCount });
 }

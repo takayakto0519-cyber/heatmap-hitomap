@@ -8,6 +8,8 @@ import { inputStyle, AuthorLine, ContentTags, useAuthorMap } from '@/components/
 export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [q, setQ] = useState('');
   const [showDeleted, setShowDeleted] = useState(false);
+  const [includeDemo, setIncludeDemo] = useState(false);
+  const [demoHiddenCount, setDemoHiddenCount] = useState(0);
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,12 +20,16 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
     const params = new URLSearchParams({ status: 'all', limit: '100' });
     if (q.trim()) params.set('q', q.trim());
     if (showDeleted) params.set('include_deleted', 'true');
+    if (includeDemo) params.set('includeDemo', 'true');
     fetch(`/api/admin/traces?${params}`, { headers: authHeaders() })
       .then(r => r.json())
-      .then(d => { if (d.ok) setTraces(d.traces); else setError(d.error ?? '取得に失敗しました'); })
+      .then(d => {
+        if (d.ok) { setTraces(d.traces); setDemoHiddenCount(d.demoHiddenCount ?? 0); }
+        else setError(d.error ?? '取得に失敗しました');
+      })
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
-  }, [authHeaders, q, showDeleted]);
+  }, [authHeaders, q, showDeleted, includeDemo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -52,6 +58,17 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
           削除済みも表示
         </label>
       </div>
+
+      {(includeDemo || demoHiddenCount > 0) && (
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '5px 12px',
+          borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+          background: includeDemo ? '#E5A13918' : '#f4f4f4', color: includeDemo ? '#B7791F' : '#999',
+        }}>
+          <input type="checkbox" checked={includeDemo} onChange={e => setIncludeDemo(e.target.checked)} />
+          🎭 商談デモ用データ{includeDemo ? 'を表示中' : `（${demoHiddenCount}件）を隠しています`}
+        </label>
+      )}
 
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {loading ? <p style={{ color: '#999' }}>読み込み中…</p> : (
