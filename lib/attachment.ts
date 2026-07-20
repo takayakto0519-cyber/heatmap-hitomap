@@ -22,6 +22,7 @@ import { phaseOf } from '@/lib/emotionShift';
 import type { AttachmentFunnel, EventEmotionShift, ValenceSummary, MapBbox } from '@/lib/types';
 
 const SUPPRESS_THRESHOLD = 5; // regionAggregateのk-匿名しきい値と同じ思想
+const DEMO_SESSION_CODE = 'demo-sales-20260720'; // 営業デモ用の合成データ（app/api/admin/demo-data と同じ定数）。愛着の実測を混ぜないため除外する
 
 // PostgRESTの .in() はURLクエリに展開されるため、id数が多いとURL長制限に当たる。
 // 200件ずつに分割して取得し、結果を結合する。
@@ -55,7 +56,8 @@ export async function computeAttachmentFunnel(
     .from('traces')
     .select('id, user_id, created_at, revisit_of')
     .eq('is_deleted', false)
-    .not('user_id', 'is', null);
+    .not('user_id', 'is', null)
+    .or(`session_code.is.null,session_code.neq.${DEMO_SESSION_CODE}`);
   traceQuery = bbox
     ? traceQuery
         .gte('latitude', bbox.minLat).lte('latitude', bbox.maxLat)

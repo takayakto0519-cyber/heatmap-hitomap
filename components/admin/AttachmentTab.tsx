@@ -89,6 +89,7 @@ export default function AttachmentTab({ authHeaders }: { authHeaders: () => Head
   const [regionInput, setRegionInput] = useState('');
   const [eventInput, setEventInput] = useState('');
   const [eventOptions, setEventOptions] = useState<string[]>([]);
+  const [notReadyEventCount, setNotReadyEventCount] = useState(0);
   const [funnel, setFunnel] = useState<FunnelResult | null>(null);
   const [shift, setShift] = useState<EventShiftResult | null>(null);
   const [loadingRegion, setLoadingRegion] = useState(false);
@@ -99,10 +100,11 @@ export default function AttachmentTab({ authHeaders }: { authHeaders: () => Head
     fetch('/api/routes')
       .then(r => r.json())
       .then(d => {
-        const slugs = (d.routes ?? d ?? [])
-          .map((r: { event_slug?: string | null }) => r.event_slug)
-          .filter((s: string | null | undefined): s is string => !!s);
-        setEventOptions([...new Set(slugs)] as string[]);
+        const rows = (d.routes ?? d ?? []) as { event_slug?: string | null; event_starts_at?: string | null; event_ends_at?: string | null }[];
+        const withSlug = rows.filter(r => r.event_slug);
+        const ready = withSlug.filter(r => r.event_starts_at && r.event_ends_at);
+        setEventOptions([...new Set(ready.map(r => r.event_slug as string))]);
+        setNotReadyEventCount(withSlug.length - ready.length);
       })
       .catch(() => {});
   }, []);
@@ -176,9 +178,9 @@ export default function AttachmentTab({ authHeaders }: { authHeaders: () => Head
         )}
         {funnel && funnel.ok && !funnel.suppressed && funnel.stages && funnel.rates && (
           <div style={{ marginTop: 16 }} key={funnel.region + funnel.generatedAt}>
-            <StageBar label="① 地（記録した）" count={funnel.stages.chi} total={funnel.stages.chi} color="#38ADA9" hint="この地域に痕跡を残した人数（基準）" />
-            <StageBar label="② 理（つながった）" count={funnel.stages.ri} total={funnel.stages.chi} color="#4A69BD" hint={`地の人のうち他者と反応・コメントを交わした割合＝${funnel.rates.riRate}%`} delay={0.2} />
-            <StageBar label="③ 心（結ばれた）" count={funnel.stages.shin} total={funnel.stages.chi} color="#E5A139" hint={`地の人のうち再訪・その後記録・会いたい成立に至った割合＝${funnel.rates.shinRate}%`} delay={0.4} />
+            <StageBar label="① 地（記録した）" count={funnel.stages.chi} total={funnel.stages.chi} color="#38ADA9" hint="この地域で実名投稿した人数（基準）。増える条件：誰かがこの地域で新しく痕跡を残すだけでOK" />
+            <StageBar label="② 理（つながった）" count={funnel.stages.ri} total={funnel.stages.chi} color="#4A69BD" hint={`地の人のうち他者と反応・コメントを交わした割合＝${funnel.rates.riRate}%。増える条件：誰かが誰かの投稿にリアクション・コメントするだけでOK`} delay={0.2} />
+            <StageBar label="③ 心（結ばれた）" count={funnel.stages.shin} total={funnel.stages.chi} color="#E5A139" hint={`地の人のうち再訪・その後記録・会いたい成立に至った割合＝${funnel.rates.shinRate}%。増える条件：別日にもう一度その地域へ投稿する／「その後」を記録する／会いたい申請が成立する、のいずれか`} delay={0.4} />
           </div>
         )}
         {funnel && !funnel.ok && (
@@ -207,7 +209,10 @@ export default function AttachmentTab({ authHeaders }: { authHeaders: () => Head
             style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#8E44AD', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
           >{loadingEvent ? '集計中…' : '集計する'}</button>
         </div>
-        <p style={{ margin: '6px 0 0', fontSize: 11, color: '#aaa' }}>公開イベント（route/relay/煩悩）の event_slug を指定してください。開始・終了日時が未設定のイベントは比較できません。</p>
+        <p style={{ margin: '6px 0 0', fontSize: 11, color: '#aaa' }}>
+          候補に出るのは開始・終了日時が設定済みのイベントだけです（{eventOptions.length}件）。
+          {notReadyEventCount > 0 && `他に${notReadyEventCount}件のイベントは日時未設定のため計測できません。「公開イベント」タブで開始・終了日時を設定すると、ここに出てくるようになります。`}
+        </p>
 
         {shift && shift.suppressed && (
           <p style={{ marginTop: 14, fontSize: 12.5, color: '#B7791F', background: '#FFF8E8', padding: 10, borderRadius: 8 }}>
