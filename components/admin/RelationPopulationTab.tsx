@@ -202,15 +202,16 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     () => profiles.filter(p => p.email_sent_at).sort((a, b) => (b.email_sent_at ?? '').localeCompare(a.email_sent_at ?? '')),
     [profiles]
   );
-  const [showSent, setShowSent] = useState(false);
+  const [viewMode, setViewMode] = useState<'unsent' | 'sent'>('unsent');
+  const baseList = viewMode === 'unsent' ? unsent : sent;
 
   const priorityPicks = useMemo(
-    () => unsent.filter(p => p.is_priority_pick).sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja')),
-    [unsent]
+    () => (viewMode === 'unsent' ? unsent.filter(p => p.is_priority_pick).sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja')) : []),
+    [unsent, viewMode]
   );
 
   const visibleProfiles = useMemo(() => {
-    let list = unsent.filter(p => !p.is_priority_pick);
+    let list = viewMode === 'unsent' ? baseList.filter(p => !p.is_priority_pick) : baseList;
     if (levelFilter !== 'all') list = list.filter(p => p.opportunity_level === levelFilter);
     if (nameFilter.trim()) {
       const q = nameFilter.trim();
@@ -224,12 +225,12 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
       sorted.sort((a, b) => dir * ((OPPORTUNITY_RANK[a.opportunity_level] ?? 9) - (OPPORTUNITY_RANK[b.opportunity_level] ?? 9)));
     }
     return sorted;
-  }, [unsent, sortKey, nameFilter, levelFilter]);
+  }, [baseList, viewMode, sortKey, nameFilter, levelFilter]);
 
   const levelCounts = {
-    高: unsent.filter(p => p.opportunity_level === '高').length,
-    中: unsent.filter(p => p.opportunity_level === '中').length,
-    低: unsent.filter(p => p.opportunity_level === '低').length,
+    高: baseList.filter(p => p.opportunity_level === '高').length,
+    中: baseList.filter(p => p.opportunity_level === '中').length,
+    低: baseList.filter(p => p.opportunity_level === '低').length,
   };
 
   function ProfileCard({ p, highlight }: { p: MunicipalityProfile; highlight?: boolean }) {
@@ -416,16 +417,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
         )}
       </Card>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '24px 0 8px' }}>
-        <p style={{ margin: 0, fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出・スタートアップ受け入れの取り組みと提案余地）</p>
-        <button onClick={() => {
-          setShowSent(true);
-          requestAnimationFrame(() => document.getElementById('municipality-sent-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-        }} style={{
-          padding: '4px 12px', borderRadius: 999, border: '1px solid #ddd', background: '#fafafa',
-          color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-        }}>📤 送信済み（{sent.length}件）を見る ↓</button>
-      </div>
+      <p style={{ margin: '24px 0 8px', fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出・スタートアップ受け入れの取り組みと提案余地）</p>
       <Card>
         <div style={{ fontSize: 12, color: '#888', lineHeight: 1.8, marginBottom: 12 }}>
           <p style={{ margin: '0 0 6px' }}>
@@ -471,10 +463,18 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
               <input value={nameFilter} onChange={e => setNameFilter(e.target.value)} placeholder="自治体名で絞り込み"
                 style={{ ...inputStyle, maxWidth: 220 }} />
               <div style={{ display: 'flex', gap: 4 }}>
+                <span onClick={() => setViewMode('unsent')} style={pillStyle(viewMode === 'unsent', '#38ADA9')}>
+                  未送信（{unsent.length}）
+                </span>
+                <span onClick={() => setViewMode('sent')} style={pillStyle(viewMode === 'sent', '#999')}>
+                  📤 送信済み（{sent.length}）
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
                 {(['all', '高', '中', '低'] as const).map(lv => (
                   <span key={lv} onClick={() => setLevelFilter(lv)}
                     style={pillStyle(levelFilter === lv, lv === 'all' ? '#38ADA9' : OPPORTUNITY_COLORS[lv])}>
-                    {lv === 'all' ? `未送信（${unsent.length}）` : `${lv}（${levelCounts[lv]}）`}
+                    {lv === 'all' ? `すべて（${baseList.length}）` : `${lv}（${levelCounts[lv]}）`}
                   </span>
                 ))}
               </div>
@@ -487,28 +487,12 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
             </div>
 
             {visibleProfiles.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>該当する自治体プロファイルがありません。</p>
+              <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>
+                {viewMode === 'sent' ? '送信済みの自治体プロファイルがありません。' : '該当する自治体プロファイルがありません。'}
+              </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {visibleProfiles.map(p => <ProfileCard key={p.id} p={p} />)}
-              </div>
-            )}
-
-            {sent.length > 0 && (
-              <div id="municipality-sent-section" style={{ marginTop: 20 }}>
-                <button onClick={() => setShowSent(v => !v)} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                  padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fafafa',
-                  color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}>
-                  <span>{showSent ? '▾' : '▸'}</span>
-                  <span>📤 送信済み（{sent.length}）</span>
-                </button>
-                {showSent && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-                    {sent.map(p => <ProfileCard key={p.id} p={p} />)}
-                  </div>
-                )}
               </div>
             )}
           </>
