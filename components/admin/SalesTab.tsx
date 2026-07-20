@@ -381,6 +381,17 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
             <p style={{ margin: 0, fontSize: 11, color: '#aaa' }}>{kpi.sub}</p>
           </div>
         ))}
+        <button onClick={() => {
+          setShowSent(true);
+          requestAnimationFrame(() => document.getElementById('sent-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }} style={{
+          ...cardStyle, padding: '12px 14px', borderTop: '3px solid #999', textAlign: 'left',
+          border: 'none', cursor: sentRankedFeed.length > 0 ? 'pointer' : 'default', fontFamily: 'inherit',
+        }}>
+          <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>📤 送信済み・対応中</p>
+          <p style={{ margin: '4px 0 2px', fontSize: 17, fontWeight: 800, color: '#333' }}>{sentRankedFeed.length}件</p>
+          <p style={{ margin: 0, fontSize: 11, color: '#38ADA9', fontWeight: 700 }}>{sentRankedFeed.length > 0 ? 'クリックで表示 ↓' : '一覧の下に表示されます'}</p>
+        </button>
       </div>
 
       {/* ---------- 朝の一枚 ---------- */}
@@ -420,7 +431,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
       {/* ---------- 送信済み・対応中（候補一覧から分けて表示） ---------- */}
       {sentRankedFeed.length > 0 && (
-        <div style={{ marginTop: 16 }}>
+        <div id="sent-section" style={{ marginTop: 16 }}>
           <button onClick={() => setShowSent(v => !v)} style={{
             display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
             padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fafafa',

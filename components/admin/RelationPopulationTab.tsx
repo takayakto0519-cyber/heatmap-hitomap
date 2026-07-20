@@ -416,7 +416,16 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
         )}
       </Card>
 
-      <p style={{ margin: '24px 0 8px', fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出・スタートアップ受け入れの取り組みと提案余地）</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '24px 0 8px' }}>
+        <p style={{ margin: 0, fontWeight: 800, fontSize: 14 }}>🏛 自治体プロファイル（関係人口創出・スタートアップ受け入れの取り組みと提案余地）</p>
+        <button onClick={() => {
+          setShowSent(true);
+          requestAnimationFrame(() => document.getElementById('municipality-sent-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }} style={{
+          padding: '4px 12px', borderRadius: 999, border: '1px solid #ddd', background: '#fafafa',
+          color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+        }}>📤 送信済み（{sent.length}件）を見る ↓</button>
+      </div>
       <Card>
         <div style={{ fontSize: 12, color: '#888', lineHeight: 1.8, marginBottom: 12 }}>
           <p style={{ margin: '0 0 6px' }}>
@@ -486,7 +495,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
             )}
 
             {sent.length > 0 && (
-              <div style={{ marginTop: 20 }}>
+              <div id="municipality-sent-section" style={{ marginTop: 20 }}>
                 <button onClick={() => setShowSent(v => !v)} style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
                   padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fafafa',
