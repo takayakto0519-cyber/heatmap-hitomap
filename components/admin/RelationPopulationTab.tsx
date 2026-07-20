@@ -196,13 +196,20 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     }
   }
 
-  const priorityPicks = useMemo(
-    () => profiles.filter(p => p.is_priority_pick).sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja')),
+  const unsent = useMemo(() => profiles.filter(p => !p.email_sent_at), [profiles]);
+  const sent = useMemo(
+    () => profiles.filter(p => p.email_sent_at).sort((a, b) => (b.email_sent_at ?? '').localeCompare(a.email_sent_at ?? '')),
     [profiles]
+  );
+  const [showSent, setShowSent] = useState(false);
+
+  const priorityPicks = useMemo(
+    () => unsent.filter(p => p.is_priority_pick).sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja')),
+    [unsent]
   );
 
   const visibleProfiles = useMemo(() => {
-    let list = profiles.filter(p => !p.is_priority_pick);
+    let list = unsent.filter(p => !p.is_priority_pick);
     if (levelFilter !== 'all') list = list.filter(p => p.opportunity_level === levelFilter);
     if (nameFilter.trim()) {
       const q = nameFilter.trim();
@@ -216,12 +223,12 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
       sorted.sort((a, b) => dir * ((OPPORTUNITY_RANK[a.opportunity_level] ?? 9) - (OPPORTUNITY_RANK[b.opportunity_level] ?? 9)));
     }
     return sorted;
-  }, [profiles, sortKey, nameFilter, levelFilter]);
+  }, [unsent, sortKey, nameFilter, levelFilter]);
 
   const levelCounts = {
-    高: profiles.filter(p => p.opportunity_level === '高').length,
-    中: profiles.filter(p => p.opportunity_level === '中').length,
-    低: profiles.filter(p => p.opportunity_level === '低').length,
+    高: unsent.filter(p => p.opportunity_level === '高').length,
+    中: unsent.filter(p => p.opportunity_level === '中').length,
+    低: unsent.filter(p => p.opportunity_level === '低').length,
   };
 
   function ProfileCard({ p, highlight }: { p: MunicipalityProfile; highlight?: boolean }) {
@@ -449,7 +456,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
                 {(['all', '高', '中', '低'] as const).map(lv => (
                   <span key={lv} onClick={() => setLevelFilter(lv)}
                     style={pillStyle(levelFilter === lv, lv === 'all' ? '#38ADA9' : OPPORTUNITY_COLORS[lv])}>
-                    {lv === 'all' ? `すべて（${profiles.length}）` : `${lv}（${levelCounts[lv]}）`}
+                    {lv === 'all' ? `未送信（${unsent.length}）` : `${lv}（${levelCounts[lv]}）`}
                   </span>
                 ))}
               </div>
@@ -466,6 +473,24 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {visibleProfiles.map(p => <ProfileCard key={p.id} p={p} />)}
+              </div>
+            )}
+
+            {sent.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <button onClick={() => setShowSent(v => !v)} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                  padding: '10px 14px', borderRadius: 10, border: '1.5px solid #ddd', background: '#fafafa',
+                  color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  <span>{showSent ? '▾' : '▸'}</span>
+                  <span>📤 送信済み（{sent.length}）</span>
+                </button>
+                {showSent && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                    {sent.map(p => <ProfileCard key={p.id} p={p} />)}
+                  </div>
+                )}
               </div>
             )}
           </>
