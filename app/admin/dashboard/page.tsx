@@ -17,6 +17,8 @@ import AIOpsTab from '@/components/admin/AIOpsTab';
 import SalesTab from '@/components/admin/SalesTab';
 import AgentStatusTab from '@/components/admin/AgentStatusTab';
 import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
+import CalendarTab from '@/components/admin/CalendarTab';
+import SecretaryTab from '@/components/admin/SecretaryTab';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 
 const LocationPickerMap = dynamic(() => import('@/components/form/LocationPickerMap'), {
@@ -24,11 +26,13 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'agentstatus' | 'leads' | 'attachment' | 'patterns' | 'aiops' | 'minutes';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'agentstatus' | 'leads' | 'attachment' | 'patterns' | 'aiops' | 'minutes' | 'secretary' | 'calendar';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
   overview: { label: 'ホーム', icon: '🏠', group: '', desc: '全体の状況をひと目で確認' },
+  secretary: { label: '秘書', icon: '🗒', group: '秘書', desc: '今日の予定とTo-Doを1枚で確認' },
+  calendar: { label: 'カレンダー', icon: '📅', group: '秘書', desc: '連携しているGoogleカレンダーの今日・明日の予定を確認' },
   settings: { label: 'サイト設定', icon: '🎨', group: 'サイト編集', desc: 'トップの大見出し・お知らせ帯の文言を書き換える' },
   blocks: { label: 'ページ編集', icon: '🧩', group: 'サイト編集', desc: '各ページのセクションを追加・並び替え（プレビュー付き）' },
   posts: { label: '実績ブログ', icon: '📝', group: 'サイト編集', desc: 'イベント記録・参加者の声を書いて公開' },
@@ -53,7 +57,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   minutes: { label: '議事録', icon: '🗒', group: '経営管理', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
-const TAB_GROUPS = ['サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究', 'AIエージェント', '経営管理'];
+const TAB_GROUPS = ['秘書', 'サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究', 'AIエージェント', '経営管理'];
 
 // ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
 const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
@@ -402,6 +406,8 @@ export default function AdminDashboardPage() {
           {tab === 'aiops' && <AIOpsTab authHeaders={authHeaders} />}
           {tab === 'agentstatus' && <AgentStatusTab authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
+          {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} />}
+          {tab === 'calendar' && <CalendarTab authHeaders={authHeaders} />}
         </div>
       </main>
     </div>
