@@ -8,6 +8,7 @@
 // agents/sync_status_to_supabase.py が1時間おきに書き込むSupabaseのスナップショット
 // （＝会長のPCが最後に同期した時点の状況）を代わりに表示する。
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SKILLS, FLOORS as ROSTER_FLOORS } from '@/lib/agents/roster';
 
 interface Floor { id: string; name: string; emoji: string; order: number }
 interface AgentStatus {
@@ -254,6 +255,82 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
             color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 4,
           }}>{showVacant ? '空きオフィスを隠す' : `空きオフィス（未着工 ${vacant.length}件）を表示`}</button>
         </>
+      )}
+
+      <SkillInventory />
+    </div>
+  );
+}
+
+// 🧩 スキル名簿 — 番人（Python自動実行）とは別に、会話で呼び出す Claude Code スキル群を
+// フロア別に一覧する。これまでダッシュボードに一切出ていなかった〜105スキルを初めて可視化し、
+// 「このビルに番人＋スキルで何体居るか」の全体像を見せる。会話起動のため最終実行時刻は出さない。
+function SkillInventory() {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const byFloor = useMemo(() => {
+    const map = new Map<string, typeof SKILLS>();
+    for (const s of SKILLS) {
+      const list = map.get(s.floor) ?? [];
+      list.push(s);
+      map.set(s.floor, list);
+    }
+    return map;
+  }, []);
+  const floors = [...ROSTER_FLOORS].sort((a, b) => a.order - b.order).filter(f => byFloor.has(f.id));
+
+  async function copyInvoke(invoke: string) {
+    try { await navigator.clipboard.writeText(invoke); setCopied(invoke); setTimeout(() => setCopied(null), 1200); } catch { /* noop */ }
+  }
+
+  return (
+    <div style={{ marginTop: 22, borderTop: '1px solid #e5e8e7', paddingTop: 16 }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#444' }}>🧩 スキル名簿（会話で呼び出すAI）</span>
+        <span style={{ ...pillStyle(true, '#8E44AD') }}>{SKILLS.length}体</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#888' }}>{open ? '▲ 閉じる' : '▼ 一覧を見る'}</span>
+      </button>
+      <p style={{ margin: '6px 0 0', fontSize: 11.5, color: '#999', lineHeight: 1.7 }}>
+        番人（上の稼働状況）は自動で動くAI、こちらは会長がチャットで「◯◯して」と呼ぶAIです。
+        番人とスキルを合わせてビルの全戦力になります。
+        名前の右の <code style={{ background: '#f4f4f4', padding: '0 4px', borderRadius: 4 }}>/xxx</code> を押すとコマンドをコピーできます。
+      </p>
+
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          {floors.map(floor => {
+            const list = (byFloor.get(floor.id) ?? []).slice().sort((a, b) => (a.num ?? 999) - (b.num ?? 999));
+            return (
+              <div key={floor.id} style={{ marginBottom: 14 }}>
+                <p style={{ margin: '0 0 6px', fontSize: 12.5, fontWeight: 800, color: '#555' }}>
+                  {floor.emoji} {floor.name}
+                  <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: '#999' }}>{list.length}体</span>
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
+                  {list.map(s => (
+                    <div key={s.id} style={{ ...cardStyle, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{s.emoji}</span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.num ? `${s.num}. ` : ''}{s.name}
+                      </span>
+                      {s.invoke && (
+                        <button onClick={() => copyInvoke(s.invoke!)} title="コマンドをコピー" style={{
+                          flexShrink: 0, fontFamily: 'monospace', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                          border: '1px solid #d9c7e8', borderRadius: 8, padding: '2px 6px',
+                          background: copied === s.invoke ? '#8E44AD' : '#faf6ff', color: copied === s.invoke ? '#fff' : '#8E44AD',
+                        }}>{copied === s.invoke ? '✓コピー' : s.invoke}</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
