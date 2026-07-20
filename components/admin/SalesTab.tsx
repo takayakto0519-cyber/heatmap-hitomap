@@ -13,6 +13,7 @@ import { scoreLead } from '@/lib/leadTemperature';
 import { municipalityScore, SALES_SCORE_CRITERIA } from '@/lib/salesScore';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
+import OutreachStatus from '@/components/admin/OutreachStatus';
 
 // ---------- データ型（各既存APIと同じ形） ----------
 interface ClientLead {
@@ -31,7 +32,11 @@ interface BusinessCase {
   id: string; org_name: string; client_type: string; stage: string;
   evidence: string | null; proposal_link: string | null; next_action: string | null; lead_ref: string | null;
 }
-interface EmailTarget { id: string; company: string; email: string | null; hook: string | null; drafted: boolean; sent: boolean; }
+interface EmailTarget {
+  id: string; company: string; email: string | null; hook: string | null; drafted: boolean; sent: boolean;
+  updated_at?: string | null;
+  email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null;
+}
 interface ClientDossier {
   id: string; org_name: string; plan: string | null; monthly_fee: number | null;
   contact_name: string | null; start_date: string | null; next_meeting: string | null; notes: string | null;
@@ -613,36 +618,60 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </div>
       )}
 
-      {/* ---------- 便り（営業メール） ---------- */}
+      {/* ---------- 便り（営業メール）：送信後まで1つのライフサイクルで管理 ---------- */}
       <h2 style={sectionTitleStyle}>📮 便り（営業メール）の進み具合</h2>
-      {emails.filter(e => !e.sent).length === 0 ? (
-        <div style={cardStyle}>
-          <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
-            未送信の便りはありません。送り先の追加はAIエージェント運営タブ、下書きはClaude Codeセッション（/sales-email）で。
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {emails.filter(e => !e.sent).map(e => (
-            <div key={e.id} style={{ ...cardStyle, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>{e.company}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{e.email || '宛先未記入'}{e.hook ? ` ・ ${e.hook}` : ''}</p>
-              </div>
-              <button onClick={() => patchEmail(e.id, { drafted: !e.drafted })} style={{
-                padding: '4px 10px', borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                border: `1.5px solid ${e.drafted ? '#4A90E2' : '#ddd'}`,
-                background: e.drafted ? '#4A90E218' : '#fff', color: e.drafted ? '#4A90E2' : '#999',
-              }}>{e.drafted ? '✓ 下書き済み' : '下書き未'}</button>
-              <button onClick={() => patchEmail(e.id, { sent: true })} style={{
-                padding: '4px 10px', borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                border: '1.5px solid #38ADA9', background: '#fff', color: '#38ADA9',
-              }}>送った</button>
+      {(() => {
+        // 送信時刻(email_sent_at)を正とし、旧sent(bool)だけの行はupdated_atで補完する
+        const effSentAt = (e: EmailTarget) => e.email_sent_at ?? (e.sent ? (e.updated_at ?? null) : null);
+        const isReplied = (e: EmailTarget) => Boolean(e.email_reply && e.email_reply.trim());
+        const unsent = emails.filter(e => !effSentAt(e));
+        const awaiting = emails.filter(e => effSentAt(e) && !isReplied(e));
+
+        function markSent(e: EmailTarget) { patchEmail(e.id, { sent: true, email_sent_at: new Date().toISOString() }); }
+        function markFollowedUp(e: EmailTarget) { patchEmail(e.id, { followed_up_at: new Date().toISOString() }); }
+        function markReplied(e: EmailTarget) { patchEmail(e.id, { email_reply: '（返信あり）' }); }
+        function unsend(e: EmailTarget) { patchEmail(e.id, { sent: false, email_sent_at: null }); }
+
+        const row = (e: EmailTarget, sentAt: string | null) => (
+          <div key={e.id} style={{ ...cardStyle, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>{e.company}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{e.email || '宛先未記入'}{e.hook ? ` ・ ${e.hook}` : ''}</p>
             </div>
-          ))}
-          <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>※送信はご自身のメールソフトから。ここは記録だけ。</p>
-        </div>
-      )}
+            <OutreachStatus
+              state={{ drafted: e.drafted, email_sent_at: sentAt, email_reply: e.email_reply, followed_up_at: e.followed_up_at }}
+              onMarkDrafted={() => patchEmail(e.id, { drafted: !e.drafted })}
+              onMarkSent={() => markSent(e)}
+              onMarkFollowedUp={() => markFollowedUp(e)}
+              onMarkReplied={() => markReplied(e)}
+              onUnsend={() => unsend(e)}
+            />
+          </div>
+        );
+
+        if (unsent.length === 0 && awaiting.length === 0) {
+          return (
+            <div style={cardStyle}>
+              <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
+                便りはありません。送り先の追加・下書きはClaude Codeセッション（/sales-email）で。
+              </p>
+            </div>
+          );
+        }
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {unsent.length > 0 && (
+              <p style={{ margin: '0 0 -2px', fontSize: 12, fontWeight: 700, color: '#666' }}>未送信（{unsent.length}）</p>
+            )}
+            {unsent.map(e => row(e, null))}
+            {awaiting.length > 0 && (
+              <p style={{ margin: '10px 0 -2px', fontSize: 12, fontWeight: 700, color: '#666' }}>送信済み・返信待ち（{awaiting.length}）</p>
+            )}
+            {awaiting.map(e => row(e, effSentAt(e)))}
+            <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>※送信はご自身のメールソフトから。ここは記録だけ。返信が来たら「返信きた」を押すと一覧から下がります。</p>
+          </div>
+        );
+      })()}
       </>}
     </div>
   );
