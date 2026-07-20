@@ -23,8 +23,16 @@ interface Opportunity {
   status: OppStatus;
   memo: string | null;
   source: string | null;
+  fit_score: number | null;
+  fit_notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+function fitColor(score: number): string {
+  if (score >= 70) return '#27AE60';
+  if (score >= 40) return '#E5A139';
+  return '#999';
 }
 
 const OPP_TYPE_META: Record<OppType, { label: string; icon: string; color: string }> = {
@@ -82,6 +90,7 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
 
   const [typeFilter, setTypeFilter] = useState<OppType | 'all'>('all');
   const [showClosed, setShowClosed] = useState(false);
+  const [sortMode, setSortMode] = useState<'deadline' | 'fit'>('deadline');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,6 +163,8 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
 
   const noDeadline = withoutDeadline.filter(i => activeStatuses.has(i.status) && (typeFilter === 'all' || i.opp_type === typeFilter));
 
+  const byFit = [...upcoming, ...noDeadline].sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
+
   const urgentCount = upcoming.filter(i => daysUntil(i.deadline!) <= 14).length;
   const typeCounts = useMemo(() => {
     const counts: Record<OppType, number> = { municipal_support: 0, subsidy: 0, contest: 0, funding_event: 0 };
@@ -208,7 +219,19 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
             boxShadow: typeFilter === t ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
           }}>{OPP_TYPE_META[t].icon} {OPP_TYPE_META[t].label}</button>
         ))}
-        <button onClick={() => setShowForm(v => !v)} style={{ ...btnStyle, marginLeft: 'auto' }}>{showForm ? 'キャンセル' : '＋ 案件を追加'}</button>
+        <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', background: '#f0f0f0', borderRadius: 16, padding: 2 }}>
+          <button onClick={() => setSortMode('deadline')} style={{
+            padding: '5px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+            background: sortMode === 'deadline' ? '#fff' : 'transparent', color: sortMode === 'deadline' ? '#333' : '#999',
+            boxShadow: sortMode === 'deadline' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+          }}>📅 締切順</button>
+          <button onClick={() => setSortMode('fit')} style={{
+            padding: '5px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+            background: sortMode === 'fit' ? '#fff' : 'transparent', color: sortMode === 'fit' ? '#333' : '#999',
+            boxShadow: sortMode === 'fit' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+          }}>🎯 相性順</button>
+        </div>
+        <button onClick={() => setShowForm(v => !v)} style={btnStyle}>{showForm ? 'キャンセル' : '＋ 案件を追加'}</button>
       </div>
 
       {showForm && (
@@ -265,24 +288,39 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
         </div>
       )}
 
-      {/* 締切が近い順の一覧 */}
-      <h2 style={sectionTitleStyle}>📅 締切が近い順（{upcoming.length}件）</h2>
-      {upcoming.length === 0 ? (
-        <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>該当する案件がありません。</p></div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {upcoming.map(o => (
-            <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />
-          ))}
-        </div>
-      )}
-
-      {noDeadline.length > 0 && (
+      {sortMode === 'fit' ? (
         <>
-          <h2 style={sectionTitleStyle}>❓ 締切不明・随時受付（{noDeadline.length}件）</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {noDeadline.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />)}
-          </div>
+          <h2 style={sectionTitleStyle}>🎯 ヒトマップとの相性順（{byFit.length}件）</h2>
+          {byFit.length === 0 ? (
+            <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>該当する案件がありません。</p></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {byFit.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />)}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* 締切が近い順の一覧 */}
+          <h2 style={sectionTitleStyle}>📅 締切が近い順（{upcoming.length}件）</h2>
+          {upcoming.length === 0 ? (
+            <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>該当する案件がありません。</p></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {upcoming.map(o => (
+                <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />
+              ))}
+            </div>
+          )}
+
+          {noDeadline.length > 0 && (
+            <>
+              <h2 style={sectionTitleStyle}>❓ 締切不明・随時受付（{noDeadline.length}件）</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {noDeadline.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />)}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -332,6 +370,12 @@ function OppCard({ o, onPatch, onRemove, muted }: {
             {o.prize_amount && ` ・ 💴${o.prize_amount}`}
           </p>
         </div>
+        {o.fit_score != null && (
+          <span title={o.fit_notes ?? ''} style={{
+            padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 800, flexShrink: 0,
+            background: fitColor(o.fit_score) + '18', color: fitColor(o.fit_score),
+          }}>ヒトマップ度 {o.fit_score}</span>
+        )}
         {urgency && (
           <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 800, background: urgency.bg, color: urgency.color, flexShrink: 0 }}>
             {urgency.label}
@@ -345,6 +389,7 @@ function OppCard({ o, onPatch, onRemove, muted }: {
         {o.announcement_date && ` ・ 発表予定：${o.announcement_date}`}
       </p>
 
+      {o.fit_notes && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#666' }}><strong style={{ color: fitColor(o.fit_score ?? 0), fontWeight: 700 }}>相性：</strong>{o.fit_notes}</p>}
       {o.memo && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#555', whiteSpace: 'pre-wrap' }}>{o.memo}</p>}
 
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 10 }}>

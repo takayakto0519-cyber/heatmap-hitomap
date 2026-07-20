@@ -6,6 +6,7 @@ const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const ALLOWED_FIELDS = [
   'title', 'organizer', 'opp_type', 'region', 'deadline', 'deadline_note',
   'announcement_date', 'prize_amount', 'url', 'status', 'memo', 'source',
+  'fit_score', 'fit_notes',
 ];
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
