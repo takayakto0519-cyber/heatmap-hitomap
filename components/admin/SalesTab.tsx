@@ -268,13 +268,16 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
   // ---------- 台帳の並び・絞り込み ----------
   const [ledgerFilter, setLedgerFilter] = useState<'active' | 'all'>('active');
-  const visibleLedger = (ledgerFilter === 'all' ? ledger : activeLedger)
-    .slice()
-    .sort((a, b) => b.en.enLive - a.en.enLive);
 
   function scrollToLead(leadId: string) {
     document.getElementById(`en-card-${leadId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+
+  const ledgerById = useMemo(() => {
+    const map = new Map<string, typeof activeLedger[number]>();
+    for (const entry of ledger) map.set(entry.lead.id, entry);
+    return map;
+  }, [ledger]);
 
   // ---------- 縁ランキング（縁の台帳＋自治体プロファイルを1本の順位にまとめる） ----------
   // 自治体プロファイル（100件超）は縁の台帳のリード数（数件）とは桁違いに多く、
@@ -409,49 +412,6 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </div>
       )}
 
-      {/* ---------- 縁ランキング（縁の台帳＋自治体プロファイルを統合） ---------- */}
-      <h2 style={sectionTitleStyle}>🏆 営業ランキング（未接触{activeRankedFeed.length}件・順位順）</h2>
-      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
-        「学校・法人」のリードと「関係人口・自治体プロファイル」を、営業対象としての温度で1本にまとめた順位です。
-        自治体プロファイルは提案余地・関わり方から換算した目安スコアです。理由の欄が、その順位にした根拠です。
-        すでに送信・接触済みの相手は下の「📤 送信済み・対応中」に移り、ここには出てきません。
-      </p>
-      {activeRankedFeed.length === 0 ? (
-        <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>まだ順位付けできる相手がいません。</p></div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {visibleRanked.map((item, i) => (
-            <div key={item.key} style={{ ...cardStyle, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#bbb', width: 22, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
-                  {item.name}
-                  <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: item.badgeColor + '18', color: item.badgeColor }}>
-                    {item.badge}
-                  </span>
-                </p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  理由：{item.reason}
-                </p>
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F', flexShrink: 0 }}>{item.score}</span>
-              {item.kind === 'lead' ? (
-                <button onClick={() => scrollToLead(item.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
-              ) : (
-                <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
-              )}
-            </div>
-          ))}
-          {activeRankedFeed.length > 15 && (
-            <button onClick={() => setShowAllRanked(v => !v)} style={{
-              padding: '8px 0', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',
-              color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            }}>{showAllRanked ? '折りたたむ' : `残り${activeRankedFeed.length - 15}件も見る`}</button>
-          )}
-        </div>
-      )}
-
       {/* ---------- 送信済み・対応中（候補一覧から分けて表示） ---------- */}
       {sentRankedFeed.length > 0 && (
         <div style={{ marginTop: 16 }}>
@@ -491,15 +451,20 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </div>
       )}
 
-      {/* ---------- 営業リスト ---------- */}
+      {/* ---------- 営業リスト（縁の台帳＋自治体プロファイルを1本の温度順にまとめる） ---------- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 10px' }}>
-        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>📖 営業リスト（温度順）</h2>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>📖 営業リスト（未接触{activeRankedFeed.length}件・温度順）</h2>
         <button onClick={() => setLedgerFilter(f => (f === 'active' ? 'all' : 'active'))} style={{
           ...jumpBtnStyle, borderColor: '#ccc', color: '#888',
         }}>{ledgerFilter === 'active' ? '見送りも表示' : '見送りを隠す'}</button>
         <button onClick={load} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>↻ 更新</button>
       </div>
-      {visibleLedger.length === 0 ? (
+      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
+        「学校・法人」のリードと「関係人口・自治体プロファイル」を、営業対象としての温度で1本にまとめた順位です。
+        自治体プロファイルは提案余地・関わり方から換算した目安スコアです。理由の欄が、その順位にした根拠です。
+        すでに送信・接触済みの相手は下の「📤 送信済み・対応中」に移り、ここには出てきません。
+      </p>
+      {activeRankedFeed.length === 0 ? (
         <div style={cardStyle}>
           <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
             営業リストが空です。「学校・法人」タブでリードを追加するか、Claude Codeセッションで「リード探して」と頼んでください。
@@ -507,7 +472,47 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {visibleLedger.map(({ lead, records: leadRecords, en }) => (
+          {visibleRanked.map((item, i) => {
+            if (item.kind === 'lead') {
+              const entry = ledgerById.get(item.leadId!);
+              if (!entry) return null;
+              return (
+                <EnCard
+                  key={item.key} lead={entry.lead} records={entry.records} en={entry.en}
+                  onAddRecord={addRecord} onRemoveRecord={removeRecord}
+                  onStatusChange={(status) => patchLead(entry.lead.id, { status })}
+                  goTab={goTab}
+                  municipalityProfile={findProfileFor(entry.lead.org_name, municipalityProfiles)}
+                />
+              );
+            }
+            return (
+              <div key={item.key} style={{ ...cardStyle, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#bbb', width: 22, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
+                    {item.name}
+                    <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: item.badgeColor + '18', color: item.badgeColor }}>
+                      {item.badge}
+                    </span>
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    理由：{item.reason}
+                  </p>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F', flexShrink: 0 }}>{item.score}</span>
+                <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+              </div>
+            );
+          })}
+          {activeRankedFeed.length > 15 && (
+            <button onClick={() => setShowAllRanked(v => !v)} style={{
+              padding: '8px 0', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',
+              color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}>{showAllRanked ? '折りたたむ' : `残り${activeRankedFeed.length - 15}件も見る`}</button>
+          )}
+          {ledgerFilter === 'all' && ledger.filter(e => e.lead.status === 'lost').map(({ lead, records: leadRecords, en }) => (
             <EnCard
               key={lead.id} lead={lead} records={leadRecords} en={en}
               onAddRecord={addRecord} onRemoveRecord={removeRecord}
