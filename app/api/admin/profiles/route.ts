@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const [{ data: profiles, error: profileError }, { data: traces, error: traceError }, { data: follows }] = await Promise.all([
     supabaseServer.from('profiles').select('id, username, display_name, bio, avatar_url, created_at, auto_approve'),
     supabaseServer.from('traces')
-      .select('id, user_id, title, photo_url, emotion_key, visibility, why, created_at')
+      .select('id, user_id, title, photo_url, emotion_key, visibility, why, interpretation, self_reflection, region, category, created_at')
       .eq('is_deleted', false).not('user_id', 'is', null)
       .order('created_at', { ascending: false }),
     supabaseServer.from('follows').select('follower_id, followee_id'),
@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
   const RECENT_TRACES_PER_USER = 8;
   interface RecentTrace {
     id: string; title: string; photo_url: string | null; emotion_key: string | null;
-    visibility: string; why: string | null; created_at: string;
+    visibility: string; why: string | null; interpretation: string | null; self_reflection: string | null;
+    region: string | null; category: string | null; created_at: string;
   }
   const traceStats = new Map<string, { count: number; lastPostedAt: string; recent: RecentTrace[] }>();
   for (const t of (traces ?? []) as (RecentTrace & { user_id: string })[]) {

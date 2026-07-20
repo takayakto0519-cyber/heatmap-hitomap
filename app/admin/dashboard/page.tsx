@@ -87,6 +87,10 @@ interface AdminUserRecentTrace {
   emotion_key: string | null;
   visibility: string;
   why: string | null;
+  interpretation: string | null;
+  self_reflection: string | null;
+  region: string | null;
+  category: string | null;
   created_at: string;
 }
 
