@@ -13,7 +13,6 @@ import SnsTab from '@/components/admin/SnsTab';
 import AgentsHub from '@/components/admin/AgentsHub';
 import SalesTab from '@/components/admin/SalesTab';
 import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
-import CalendarTab from '@/components/admin/CalendarTab';
 import SecretaryTab from '@/components/admin/SecretaryTab';
 import ReviewTab from '@/components/admin/ReviewTab';
 import TracesTab from '@/components/admin/TracesTab';
@@ -26,19 +25,20 @@ import UsersTab from '@/components/admin/UsersTab';
 import EventPlansTab from '@/components/admin/EventPlansTab';
 import BizModelIdeasTab from '@/components/admin/BizModelIdeasTab';
 import MinutesTab from '@/components/admin/MinutesTab';
-import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
 import { inputStyle } from '@/components/admin/adminShared';
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'leads' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'calendar';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
 
-// 旧タブID（別々だったAIエージェント2タブ）からの後方互換。?tab=aiops / ?tab=agentstatus を agents に寄せる。
-const LEGACY_TAB_ALIAS: Record<string, Tab> = { aiops: 'agents', agentstatus: 'agents' };
+// 旧タブIDからの後方互換：
+// - ?tab=aiops / ?tab=agentstatus → agents（AIエージェント2タブ統合）
+// - ?tab=leads → sales（学校・法人は営業ハブのサブビューへ吸収）
+// - ?tab=calendar → secretary（カレンダーは秘書タブに内包）
+const LEGACY_TAB_ALIAS: Record<string, Tab> = { aiops: 'agents', agentstatus: 'agents', leads: 'sales', calendar: 'secretary' };
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
   overview: { label: 'ホーム', icon: '🏠', group: '', desc: '全体の状況をひと目で確認' },
-  secretary: { label: '秘書', icon: '🗒', group: '秘書', desc: '今日の予定とTo-Doを1枚で確認' },
-  calendar: { label: 'カレンダー', icon: '📅', group: '秘書', desc: '連携しているGoogleカレンダーの直近2週間の予定を確認' },
+  secretary: { label: '秘書', icon: '🗒', group: '秘書', desc: '今日の予定・To-Do・カレンダー・議事録をまとめて確認' },
   settings: { label: 'サイト設定', icon: '🎨', group: 'サイト編集', desc: 'トップの大見出し・お知らせ帯の文言を書き換える' },
   blocks: { label: 'ページ編集', icon: '🧩', group: 'サイト編集', desc: '各ページのセクションを追加・並び替え（プレビュー付き）' },
   posts: { label: '実績ブログ', icon: '📝', group: 'サイト編集', desc: 'イベント記録・参加者の声を書いて公開' },
@@ -53,16 +53,15 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   quests: { label: 'クエスト', icon: '🎯', group: '体験づくり', desc: 'クエストの作成・管理' },
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   bizmodels: { label: 'ビジネスモデル案', icon: '💡', group: '調査・研究', desc: '新しい事業案を書き溜め、検証状況を追う' },
-  funding: { label: 'コンテスト・助成金', icon: '🏆', group: '学校・法人', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
-  sales: { label: '営業', icon: '🧭', group: '学校・法人', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。関係人口・自治体プロファイルも統合' },
-  leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
+  funding: { label: 'コンテスト・助成金', icon: '🏆', group: '営業・自治体', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
+  sales: { label: '営業', icon: '🧭', group: '営業・自治体', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。学校・法人／関係人口・自治体プロファイルも統合' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
   agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: '番人の稼働状況・スキル名簿(全戦力)と、収益化・案件・顧問先などの運営データを1箇所で' },
-  minutes: { label: '議事録', icon: '🗒', group: '経営管理', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
+  minutes: { label: '議事録', icon: '🗒', group: '秘書', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
-const TAB_GROUPS = ['秘書', 'サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '学校・法人', '調査・研究', 'AIエージェント', '経営管理'];
+const TAB_GROUPS = ['秘書', 'サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '営業・自治体', '調査・研究', 'AIエージェント'];
 
 // ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
 const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
@@ -291,13 +290,11 @@ export default function AdminDashboardPage() {
           {tab === 'bizmodels' && <BizModelIdeasTab authHeaders={authHeaders} />}
           {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} />}
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={id => goTab(id as Tab)} />}
-          {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
           {tab === 'agents' && <AgentsHub authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
           {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} />}
-          {tab === 'calendar' && <CalendarTab authHeaders={authHeaders} />}
         </div>
       </main>
     </div>

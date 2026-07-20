@@ -31,6 +31,9 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
   const [items, setItems] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // ナビ整理で独立タブ「カレンダー」を廃止し、ここに内包（サイドバー整理2026-07-20）。
+  // 普段はコンパクト表示、必要な時だけフル（今日・明日の全件）に切り替える。
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,7 +87,11 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={cardStyle}>
-        <CalendarPanel authHeaders={authHeaders} compact showTomorrow={false} />
+        <CalendarPanel authHeaders={authHeaders} compact={!showFullCalendar} showTomorrow={showFullCalendar} />
+        <button onClick={() => setShowFullCalendar(v => !v)} style={{
+          marginTop: 8, padding: '4px 10px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
+          color: '#38ADA9', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+        }}>{showFullCalendar ? '▴ コンパクト表示に戻す' : '▾ フルカレンダー（今日・明日）を見る'}</button>
       </div>
 
       <div style={cardStyle}>

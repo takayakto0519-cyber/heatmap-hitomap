@@ -14,6 +14,7 @@ import { municipalityScore, SALES_SCORE_CRITERIA } from '@/lib/salesScore';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
+import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
 
 // ---------- データ型（各既存APIと同じ形） ----------
 interface ClientLead {
@@ -128,7 +129,14 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [needsMigration, setNeedsMigration] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [view, setView] = useState<'ledger' | 'relation'>('ledger');
+  // ナビ整理で独立タブ「学校・法人」を廃止し、営業ハブのサブビューに吸収（サイドバー整理2026-07-20）
+  const [view, setView] = useState<'ledger' | 'relation' | 'leads'>('ledger');
+  // EnCard内の「学校・法人タブへ」ボタン用：'leads'は独立タブではなくこのタブのサブビューなので、
+  // ページ遷移ではなくローカルのview切替に差し替える（他の宛先はそのままpage.tsxのgoTabへ）
+  const goTabOrSwitchView = useCallback((target: string) => {
+    if (target === 'leads') { setView('leads'); return; }
+    goTab(target);
+  }, [goTab]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -378,9 +386,15 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           background: view === 'relation' ? '#38ADA9' : '#fff', color: view === 'relation' ? '#fff' : '#666',
           boxShadow: view === 'relation' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
         }}>🔁 関係人口・自治体プロファイル</button>
+        <button onClick={() => setView('leads')} style={{
+          padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+          background: view === 'leads' ? '#38ADA9' : '#fff', color: view === 'leads' ? '#fff' : '#666',
+          boxShadow: view === 'leads' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+        }}>🎓 学校・法人（台帳）</button>
       </div>
 
       {view === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
+      {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
 
       {view === 'ledger' && <>
       {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
@@ -571,7 +585,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                   key={item.key} lead={entry.lead} records={entry.records} en={entry.en}
                   onAddRecord={addRecord} onRemoveRecord={removeRecord}
                   onStatusChange={(status) => patchLead(entry.lead.id, { status })}
-                  goTab={goTab}
+                  goTab={goTabOrSwitchView}
                   municipalityProfile={findProfileFor(entry.lead.org_name, municipalityProfiles)}
                 />
               );
@@ -611,7 +625,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
               key={lead.id} lead={lead} records={leadRecords} en={en}
               onAddRecord={addRecord} onRemoveRecord={removeRecord}
               onStatusChange={(status) => patchLead(lead.id, { status })}
-              goTab={goTab}
+              goTab={goTabOrSwitchView}
               municipalityProfile={findProfileFor(lead.org_name, municipalityProfiles)}
             />
           ))}

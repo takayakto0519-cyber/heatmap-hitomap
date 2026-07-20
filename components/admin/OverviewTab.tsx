@@ -199,7 +199,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         {biz ? (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {LEAD_PIPELINE.map(s => (
-              <button key={s.key} onClick={() => goTab('leads')} style={{
+              <button key={s.key} onClick={() => goTab('sales')} style={{
                 flex: '1 1 90px', textAlign: 'center', padding: '10px 4px', borderRadius: 8,
                 border: '1px solid #eee', background: '#fafafa', cursor: 'pointer', fontFamily: 'inherit',
               }}>
