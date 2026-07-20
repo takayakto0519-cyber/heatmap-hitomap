@@ -13,9 +13,8 @@ import AttachmentTab from '@/components/admin/AttachmentTab';
 import TracePatternTab from '@/components/admin/TracePatternTab';
 import SettingsTab from '@/components/admin/SettingsTab';
 import SnsTab from '@/components/admin/SnsTab';
-import AIOpsTab from '@/components/admin/AIOpsTab';
+import AgentsHub from '@/components/admin/AgentsHub';
 import SalesTab from '@/components/admin/SalesTab';
-import AgentStatusTab from '@/components/admin/AgentStatusTab';
 import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
 import CalendarTab from '@/components/admin/CalendarTab';
 import SecretaryTab from '@/components/admin/SecretaryTab';
@@ -26,7 +25,10 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'agentstatus' | 'leads' | 'attachment' | 'patterns' | 'aiops' | 'minutes' | 'secretary' | 'calendar';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'leads' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'calendar';
+
+// 旧タブID（別々だったAIエージェント2タブ）からの後方互換。?tab=aiops / ?tab=agentstatus を agents に寄せる。
+const LEGACY_TAB_ALIAS: Record<string, Tab> = { aiops: 'agents', agentstatus: 'agents' };
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -52,8 +54,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
-  aiops: { label: 'AIエージェント運営', icon: '🤖', group: 'AIエージェント', desc: '収益化イニシアチブ・案件パイプライン・顧問先カルテ・LINE縁ミッション・営業メール送り先の管理' },
-  agentstatus: { label: '稼働状況', icon: '🏢', group: 'AIエージェント', desc: 'ローカルAIエージェント（番人）の稼働状況・空きオフィスを確認（会長のPCでのみ実データ表示）' },
+  agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: '番人の稼働状況・スキル名簿(全戦力)と、収益化・案件・顧問先などの運営データを1箇所で' },
   minutes: { label: '議事録', icon: '🗒', group: '経営管理', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
@@ -218,7 +219,10 @@ export default function AdminDashboardPage() {
     // ?tab= ディープリンク（/admin/posts 等の旧URLからのリダイレクト受け口）。
     // 不正な値は無視して overview のまま。
     const param = new URLSearchParams(window.location.search).get('tab');
-    if (param && param in TAB_META) setTab(param as Tab);
+    if (param) {
+      const resolved = LEGACY_TAB_ALIAS[param] ?? (param in TAB_META ? (param as Tab) : null);
+      if (resolved) setTab(resolved);
+    }
     // 旧・単独ページ（/admin/posts /admin/blocks）が使っていた hm-admin-pw も受け入れて、
     // リダイレクトで来た人が再ログインせずに済むようにする
     const saved = sessionStorage.getItem('admin_dashboard_password') ?? sessionStorage.getItem('hm-admin-pw');
@@ -270,10 +274,12 @@ export default function AdminDashboardPage() {
     id === 'review' ? (badgeCounts?.pendingReview ?? 0) : id === 'reports' ? (badgeCounts?.pendingReports ?? 0) : 0;
 
   function goTab(id: Tab) {
-    setTab(id);
+    // 旧タブID（aiops/agentstatus）で呼ばれても新しい agents ハブに寄せる
+    const resolved = (LEGACY_TAB_ALIAS[id] ?? id) as Tab;
+    setTab(resolved);
     setNavOpen(false);
     // タブをURLにも反映して、リロード・共有で同じタブに戻れるようにする
-    window.history.replaceState(null, '', id === 'overview' ? '/admin/dashboard' : `/admin/dashboard?tab=${id}`);
+    window.history.replaceState(null, '', resolved === 'overview' ? '/admin/dashboard' : `/admin/dashboard?tab=${resolved}`);
   }
 
   const navButtonStyle = (active: boolean, urgent: boolean): React.CSSProperties => ({
@@ -403,8 +409,7 @@ export default function AdminDashboardPage() {
           {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
-          {tab === 'aiops' && <AIOpsTab authHeaders={authHeaders} />}
-          {tab === 'agentstatus' && <AgentStatusTab authHeaders={authHeaders} />}
+          {tab === 'agents' && <AgentsHub authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
           {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} />}
           {tab === 'calendar' && <CalendarTab authHeaders={authHeaders} />}
