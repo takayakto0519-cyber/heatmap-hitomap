@@ -1,7 +1,7 @@
 'use client';
 
 import type { Trace } from '@/lib/types';
-import { getEmotion } from '@/lib/emotions';
+import { getEmotion, meanValence, getShiftColor } from '@/lib/emotions';
 
 interface Props {
   traces: Trace[];
@@ -45,15 +45,20 @@ function buildBuckets(traces: Trace[]): Bucket[] {
   return buckets;
 }
 
-function buildSummary(buckets: Bucket[]): string | null {
+// 先頭バケットと末尾バケットのvalence差分から「あたたかくなった／沈んだ／変わらない」を色でも示す
+// （lib/attachment.tsのイベント前後比較・EnListの縁の物語と同じgetShiftColorを地域ページにも展開）
+function buildSummary(buckets: Bucket[]): { text: string; color: string } | null {
   const withDominant = buckets.filter(b => b.dominant);
   if (withDominant.length < 2) return null;
   const first = withDominant[0].dominant!;
   const last = withDominant[withDominant.length - 1].dominant!;
+  const firstValence = meanValence(withDominant[0].traces.map(t => t.emotion_key)) ?? 0;
+  const lastValence = meanValence(withDominant[withDominant.length - 1].traces.map(t => t.emotion_key)) ?? 0;
+  const color = getShiftColor(lastValence - firstValence);
   if (first.key === last.key) {
-    return `この地域では一貫して${first.emoji}「${first.label}」を感じる投稿が多く見られます。`;
+    return { text: `この地域では一貫して${first.emoji}「${first.label}」を感じる投稿が多く見られます。`, color };
   }
-  return `この地域は最初は${first.emoji}「${first.label}」が多かったが、最近は${last.emoji}「${last.label}」が増えています。`;
+  return { text: `この地域は最初は${first.emoji}「${first.label}」が多かったが、最近は${last.emoji}「${last.label}」が増えています。`, color };
 }
 
 export default function RegionTimeline({ traces, onTraceClick }: Props) {
@@ -67,9 +72,9 @@ export default function RegionTimeline({ traces, onTraceClick }: Props) {
       <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 800, color: '#444' }}>🕰 この地域の変遷</p>
       {summary && (
         <p style={{
-          margin: '0 0 10px', fontSize: 13, color: '#38ADA9', background: '#E8F8F7',
-          padding: '10px 12px', borderRadius: 10, lineHeight: 1.6,
-        }}>{summary}</p>
+          margin: '0 0 10px', fontSize: 13, color: summary.color, background: summary.color + '14',
+          padding: '10px 12px', borderRadius: 10, lineHeight: 1.6, fontWeight: 700,
+        }}>{summary.text}</p>
       )}
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
         {buckets.map((b, i) => {

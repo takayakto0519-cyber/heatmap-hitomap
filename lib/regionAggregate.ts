@@ -8,7 +8,7 @@
 // ============================================================
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { summarizeValence } from '@/lib/emotions';
-import type { RegionAggregateCell, RegionAggregateResponse, MapBbox } from '@/lib/types';
+import type { RegionAggregateCell, RegionAggregateResponse, RegionTrendResponse, MapBbox } from '@/lib/types';
 
 export const DEFAULT_GRID_SIZE_DEG = 0.01; // 目安で約1km四方
 export const DEFAULT_THRESHOLD = 5;        // このしきい値未満の件数のセルは表示しない
@@ -113,6 +113,65 @@ export async function computeRegionAggregate(
     suppressedCells,
     cells,
   };
+}
+
+// ============================================================
+// 自治体向け時系列トレンド（有料ダッシュボード用）
+//
+// computeRegionAggregateは今この瞬間のグリッド1枚だけで、「6ヶ月で感情が
+// 改善した」という時間軸の証拠を出せない。created_atを月次バケットに分け、
+// 既存のsummarizeValenceをバケットごとに通すだけで実装する（新しい集計
+// アルゴリズムは発明しない）。k-匿名はバケット単位でthreshold未満なら
+// valenceを隠す（computeRegionAggregateのセル抑制と同じ発想）。
+// ============================================================
+export async function computeRegionTrend(
+  supabaseServer: SupabaseClient,
+  region: string,
+  threshold: number = DEFAULT_THRESHOLD,
+  bbox?: MapBbox | null
+): Promise<RegionTrendResponse> {
+  const generatedAt = new Date().toISOString();
+
+  let query = supabaseServer
+    .from('traces')
+    .select('created_at, emotion_key')
+    .eq('is_deleted', false)
+    .eq('visibility', 'public');
+
+  query = bbox
+    ? query
+        .gte('latitude', bbox.minLat).lte('latitude', bbox.maxLat)
+        .gte('longitude', bbox.minLng).lte('longitude', bbox.maxLng)
+    : query.eq('region', region);
+
+  const { data, error } = await query;
+
+  if (error) {
+    return { ok: false, region, generatedAt, threshold, buckets: [], error: error.message };
+  }
+
+  const rows = (data ?? []) as { created_at: string; emotion_key: string | null }[];
+  const byMonth = new Map<string, (string | null)[]>();
+  for (const row of rows) {
+    const month = row.created_at.slice(0, 7); // 'YYYY-MM'
+    if (!byMonth.has(month)) byMonth.set(month, []);
+    byMonth.get(month)!.push(row.emotion_key);
+  }
+
+  const buckets = [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, emotionKeys]) => {
+      const count = emotionKeys.length;
+      const suppressed = count < threshold;
+      return {
+        month,
+        count,
+        suppressed,
+        ...(suppressed ? {} : { valence: summarizeValence(emotionKeys) }),
+      };
+    });
+
+  return { ok: true, region, generatedAt, threshold, buckets };
 }
 
 // ============================================================

@@ -289,6 +289,26 @@ export interface RegionAggregateResponse {
 }
 
 // ------------------------------------------------------------
+// 自治体向け時系列トレンド（Phase 4）：月次バケットごとのvalence内訳。
+// 「感情が改善した」証拠を示すための集計。個別トレースは一切含めない。
+// ------------------------------------------------------------
+export interface RegionTrendBucket {
+  month: string; // 'YYYY-MM'
+  count: number;
+  suppressed: boolean; // このバケットの件数がしきい値未満で内訳を隠した場合true
+  valence?: { positive: number; negative: number; neutral: number };
+}
+
+export interface RegionTrendResponse {
+  ok: boolean;
+  region: string;
+  generatedAt: string;
+  threshold: number;
+  buckets: RegionTrendBucket[];
+  error?: string;
+}
+
+// ------------------------------------------------------------
 // 愛着計測（縁の螺旋 地→理→心 の段階ファネル）。
 // 「出会い→感情→愛着」の過程を数えるための集計レスポンス。
 // 個人を特定できる値（user_id等）は一切含めない。個人単位の系列データは
@@ -315,6 +335,13 @@ export interface AttachmentFunnel {
   rates?: {
     riRate: number;   // 地→理 到達率（%）
     shinRate: number; // 地→心 到達率（%）
+  };
+  // 各段階に属する人たちが残した記録の感情価内訳（好意的／否定的／中立）。
+  // 「感情が良い方向に動いた人ほど深い関係に至るか」を見るための追加軸（本義＝出会い→感情→愛着の検証）
+  valenceByStage?: {
+    chi: ValenceSummary;
+    ri: ValenceSummary;
+    shin: ValenceSummary;
   };
   error?: string;
 }
@@ -376,6 +403,12 @@ export interface MapBbox {
   maxLng: number;
 }
 
+// 行政区域境界のジオメトリ（lib/municipalityBoundary.tsのBoundaryGeometryと同じ形）。
+// @types/geojsonは導入せず、必要な2種類だけの最小限の型で済ませる。
+export type BoundaryGeometry =
+  | { type: 'Polygon'; coordinates: number[][][] }
+  | { type: 'MultiPolygon'; coordinates: number[][][][] };
+
 export interface DashboardAccess {
   id: string;
   client_lead_id: string | null;
@@ -390,6 +423,8 @@ export interface DashboardAccess {
   bbox_max_lat: number | null;
   bbox_min_lng: number | null;
   bbox_max_lng: number | null;
+  // 地図表示側のマスク・パン制限にのみ使う（データ絞り込みは引き続きbboxで行う。point-in-polygonは重いため）
+  boundary_geojson: BoundaryGeometry | null;
 }
 
 export interface IssueDashboardTokenResponse {
@@ -403,7 +438,10 @@ export interface DashboardResponse {
   ok: boolean;
   label: string | null;
   aggregate?: RegionAggregateResponse;
+  trend?: RegionTrendResponse; // 月次valenceトレンド（「感情が改善した」の時系列証拠）
   funnel?: AttachmentFunnel; // 愛着ファネル（地・理・心）。件数と割合のみ
+  boundaryGeojson?: BoundaryGeometry | null; // 設定されていれば地図マスク用の境界ポリゴン
+  bbox?: MapBbox | null;
   error?: string;
 }
 

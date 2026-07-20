@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polygon, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -23,7 +23,7 @@ function FlyToHandler({ pos, zoom = 17, bounds }: {
   }, [pos, zoom, map]);
   return null;
 }
-import { getEmotionColor, getEmotion } from '@/lib/emotions';
+import { getEmotionColor, getEmotion, getValenceGradientColor } from '@/lib/emotions';
 import { getCategory } from '@/lib/categories';
 import { getArchiveType, getVoiceRelation } from '@/lib/archiveTypes';
 import { GSI_TILE_URL, GSI_ATTRIBUTION, GSI_MAX_ZOOM } from '@/lib/mapTiles';
@@ -47,6 +47,20 @@ function createFlagPin(emoji: string, color: string) {
   "><span style="transform:rotate(45deg);font-size:14px;">${emoji}</span></div>`;
   return L.divIcon({ html, iconSize: [30, 30], iconAnchor: [15, 29], popupAnchor: [0, -28], className: '' });
 }
+
+// 自治体ごとの専用地図：境界の外側を覆い隠すマスク用ヘルパー。
+// GeoJSONの座標は[lng, lat]、LeafletのPolygonは[lat, lng]なので変換するだけ（turf等は不要）。
+// 「世界を覆う矩形」から「境界ポリゴンの外周リング」をくり抜く（Polygonのpositionsに複数リングを渡すと
+// react-leafletが自動でfillRule:evenoddのくり抜き描画をしてくれる、Leaflet標準機能のみで実現）。
+// 注：境界ポリゴンが「穴」（内側に別の行政区域を含む等）を持つ場合、その穴の中もマスクされたままになる
+// （実用上は問題にならない既知の割り切り）。
+function ringsFromGeometry(
+  geo: { type: 'Polygon'; coordinates: number[][][] } | { type: 'MultiPolygon'; coordinates: number[][][][] }
+): [number, number][][] {
+  const polygons = geo.type === 'MultiPolygon' ? geo.coordinates : [geo.coordinates];
+  return polygons.map((rings) => rings[0].map(([lng, lat]) => [lat, lng] as [number, number]));
+}
+const WORLD_RING: [number, number][] = [[-89, -179], [-89, 179], [89, 179], [89, -179]];
 
 // スタート・ゴールの間の経由地点。番号つきの小さな丸ピンで、経路上の順番が分かるようにする
 function createWaypointPin(n: number) {
@@ -148,6 +162,108 @@ function createChimeiLabel(title: string, yomi: string | null, color: string) {
   return L.divIcon({ html, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -18], className: '' });
 }
 
+// pin/heat 両モードで共有する痕跡ポップアップの中身。
+// heatモードでも「なぜ・誰と」の物語（why/companion_tag）が読めるようにする。
+function TracePopupContent({ t, reactionCount, onTraceClick, teamColor }: {
+  t: Trace;
+  reactionCount: number;
+  onTraceClick?: (trace: Trace) => void;
+  teamColor?: string;
+}) {
+  const archiveType = getArchiveType(t.archive_type);
+  const emotion = archiveType ? null : getEmotion(t.emotion_key);
+  const category = archiveType ? null : getCategory(t.category);
+  const voiceRelation = getVoiceRelation(t.voice_relation);
+  const sourceIsUrl = !!t.source_ref && /^https?:\/\//.test(t.source_ref);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {t.photo_url && (
+        <img src={t.photo_url} alt={t.title} loading="lazy"
+          style={{ width: '100%', borderRadius: 8, objectFit: 'cover', maxHeight: 130 }} />
+      )}
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        {t.team && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 20,
+            background: (teamColor ?? '#8E44AD') + '22', color: teamColor ?? '#8E44AD', fontSize: 11, fontWeight: 700,
+          }}>🏳 {t.team}</span>
+        )}
+        {archiveType && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 20,
+            background: archiveType.color + '22', color: archiveType.color, fontSize: 11, fontWeight: 700,
+          }}>{archiveType.emoji} {archiveType.label}</span>
+        )}
+        {emotion && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 20,
+            background: emotion.color + '22', color: emotion.color, fontSize: 11, fontWeight: 700,
+          }}>{emotion.emoji} {emotion.label}</span>
+        )}
+        {category && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 20,
+            background: '#f0f0f0', color: '#666', fontSize: 11,
+          }}>{category.emoji} {category.label}</span>
+        )}
+      </div>
+      {!archiveType && t.intensity && (
+        <span style={{ fontSize: 11, color: '#bbb' }}>
+          {'●'.repeat(t.intensity)}{'○'.repeat(5 - t.intensity)}
+        </span>
+      )}
+      {reactionCount > 0 && (
+        <span style={{ fontSize: 11, color: '#FF6B9D', fontWeight: 700 }}>
+          🔥 共感 {reactionCount}
+        </span>
+      )}
+      <strong style={{ fontSize: 13 }}>
+        {t.title}
+        {t.yomi && <span style={{ fontWeight: 400, color: '#999', fontSize: 11 }}>（{t.yomi}）</span>}
+      </strong>
+      {(t.era_label || voiceRelation) && (
+        <span style={{ fontSize: 11, color: '#888' }}>
+          {[t.era_label, voiceRelation ? `語り手：${voiceRelation.label}` : null].filter(Boolean).join(' · ')}
+        </span>
+      )}
+      {t.why && <p style={{ margin: 0, fontSize: 12, color: '#555' }}>{t.why}</p>}
+      {t.companion_tag && (
+        <span style={{ fontSize: 12, color: '#4A69BD', fontWeight: 700 }}>
+          🤝 {t.trace_type === 'person' ? '出会った人' : '一緒にいた'}：{t.companion_tag}
+        </span>
+      )}
+      {t.audio_url && (
+        <audio controls src={t.audio_url} style={{ width: '100%', height: 32 }} />
+      )}
+      {t.video_url && (
+        <video controls src={t.video_url} style={{ width: '100%', maxHeight: 130, borderRadius: 6, background: '#000' }} />
+      )}
+      {t.source_ref && (
+        sourceIsUrl ? (
+          <a href={t.source_ref} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 11, color: '#2E86C1', wordBreak: 'break-all' }}>
+            📚 {t.source_ref}
+          </a>
+        ) : (
+          <span style={{ fontSize: 11, color: '#888' }}>📚 {t.source_ref}</span>
+        )
+      )}
+      {onTraceClick && (
+        <button
+          onClick={() => onTraceClick(t)}
+          style={{
+            marginTop: 2, padding: '6px 0', background: 'none',
+            border: 'none', color: '#FF6B9D', fontWeight: 700,
+            fontSize: 12, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          くわしく見る →
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
   const map = useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
   useEffect(() => { onZoom(map.getZoom()); }, [map, onZoom]);
@@ -227,9 +343,16 @@ interface Props {
   pins?: { lat: number; lng: number; emoji: string; color: string; label: string }[];
   // スタート・ゴールの間の経由地点（番号つきピン）。routeLineと組み合わせて経路を線で見せる
   waypoints?: { lat: number; lng: number; label: string }[];
+  // 自治体ごとの専用地図（自治体向けダッシュボード）：境界の外側をマスクし、外へパンできないようにする
+  boundaryGeoJson?: { type: 'Polygon'; coordinates: number[][][] } | { type: 'MultiPolygon'; coordinates: number[][][][] } | null;
+  maxBounds?: [[number, number], [number, number]];
+  maxBoundsViscosity?: number;
+  // 自治体向けダッシュボード専用：個別tracesの代わりに、集計済みグリッドセル（5件未満は既に抑制済み）から
+  // heat円を描く。指定時はheatモードの描画元をtraces由来から切り替える（k-匿名の原則を守るため）
+  aggregateCells?: { gridLat: number; gridLng: number; count: number }[];
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins, waypoints }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins, waypoints, boundaryGeoJson, maxBounds, maxBoundsViscosity, aggregateCells }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -248,8 +371,17 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       minZoom={allowWideZoom ? undefined : MIN_TOWN_SCALE_ZOOM}
       style={{ height: '100%', width: '100%' }}
       scrollWheelZoom
+      maxBounds={maxBounds}
+      maxBoundsViscosity={maxBounds ? (maxBoundsViscosity ?? 1) : undefined}
     >
       <TileLayer attribution={GSI_ATTRIBUTION} url={GSI_TILE_URL} maxZoom={GSI_MAX_ZOOM} />
+      {boundaryGeoJson && (
+        <Polygon
+          positions={[WORLD_RING, ...ringsFromGeometry(boundaryGeoJson)]}
+          pathOptions={{ stroke: false, fillColor: '#0d1b12', fillOpacity: 0.55, fillRule: 'evenodd' }}
+          interactive={false}
+        />
+      )}
       <LocateControl onLocate={onLocate} />
       <FlyToHandler pos={flyTo} zoom={flyToZoom} bounds={fitBounds} />
       <ZoomTracker onZoom={setCurrentZoom} />
@@ -276,26 +408,33 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
         </Marker>
       ))}
 
-      {mode === 'heat'
+      {mode === 'heat' && aggregateCells
+        ? aggregateCells.map((c, i) => (
+            // 自治体向けダッシュボード用：個別tracesではなく、既に5件未満が抑制済みの集計セルから描く（k-匿名を守る）
+            <Circle key={`agg-${i}`} center={[c.gridLat, c.gridLng]}
+              radius={Math.min(300, 60 + c.count * 8)}
+              pathOptions={{ color: '#38ADA9', fillColor: '#38ADA9', fillOpacity: Math.min(0.15 + c.count * 0.02, 0.55), weight: 0 }} />
+          ))
+        : mode === 'heat'
         ? traces.filter(t => !t.archive_type).map((t) => {
-            const color = getEmotionColor(t.emotion_key);
             const reactionCount = reactionCounts?.[t.id] ?? 0;
-            // 誰かが共感するほど、その痕跡のヒートは濃く・広くなる
-            const radius = 44 * (t.intensity ?? 3) * (1 + Math.min(reactionCount, 10) * 0.15);
-            // 情報を詰め込むヒートマップではなく、感情が積み重なるキャンバスの印象にするため、単体の主張は抑えめに・重なりで濃さが出るようにする
-            const fillOpacity = Math.min(0.18 + reactionCount * 0.035, 0.6);
+            // 半径は感情の強度(intensity)のみで決める。共感数(reactionCount)で混ぜると
+            // 「バズった投稿」と「本人にとって強い感情だった投稿」の区別がつかなくなるため。
+            const radius = 44 * (t.intensity ?? 3);
+            const { color, opacity: fillOpacity } = getValenceGradientColor(t.emotion_keys?.length ? t.emotion_keys : [t.emotion_key], t.intensity);
             return (
               <Circle key={t.id} center={[t.latitude, t.longitude]} radius={radius}
-                pathOptions={{ color, fillColor: color, fillOpacity, weight: 0 }} />
+                pathOptions={{ color, fillColor: color, fillOpacity, weight: 0 }}>
+                <Popup minWidth={220} maxWidth={260}>
+                  <TracePopupContent t={t} reactionCount={reactionCount} onTraceClick={onTraceClick} />
+                </Popup>
+              </Circle>
             );
           })
         : (
         <MarkerClusterGroup chunkedLoading maxClusterRadius={60} spiderfyOnMaxZoom>
         {traces.map((t) => {
             const archiveType = getArchiveType(t.archive_type);
-            const emotion = archiveType ? null : getEmotion(t.emotion_key);
-            const category = archiveType ? null : getCategory(t.category);
-            const voiceRelation = getVoiceRelation(t.voice_relation);
             const reactionCount = reactionCounts?.[t.id] ?? 0;
             const isMine = Boolean(currentUserId) && t.user_id === currentUserId;
             const teamColor = teamColors && t.team ? teamColors[t.team] : undefined;
@@ -307,90 +446,10 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
               : (t.photo_url && currentZoom >= PHOTO_THUMB_ZOOM
                   ? createPhotoPin(t.photo_url, teamColor ?? getEmotionColor(t.emotion_key), isMine, avatarUrl)
                   : createEmotionPin(t.emotion_key, reactionCount, isMine, teamColor, avatarUrl));
-            const sourceIsUrl = !!t.source_ref && /^https?:\/\//.test(t.source_ref);
             return (
               <Marker key={t.id} position={[t.latitude, t.longitude]} icon={icon}>
                 <Popup minWidth={220} maxWidth={260}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {t.photo_url && (
-                      <img src={t.photo_url} alt={t.title} loading="lazy"
-                        style={{ width: '100%', borderRadius: 8, objectFit: 'cover', maxHeight: 130 }} />
-                    )}
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                      {t.team && (
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 20,
-                          background: (teamColor ?? '#8E44AD') + '22', color: teamColor ?? '#8E44AD', fontSize: 11, fontWeight: 700,
-                        }}>🏳 {t.team}</span>
-                      )}
-                      {archiveType && (
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 20,
-                          background: archiveType.color + '22', color: archiveType.color, fontSize: 11, fontWeight: 700,
-                        }}>{archiveType.emoji} {archiveType.label}</span>
-                      )}
-                      {emotion && (
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 20,
-                          background: emotion.color + '22', color: emotion.color, fontSize: 11, fontWeight: 700,
-                        }}>{emotion.emoji} {emotion.label}</span>
-                      )}
-                      {category && (
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 20,
-                          background: '#f0f0f0', color: '#666', fontSize: 11,
-                        }}>{category.emoji} {category.label}</span>
-                      )}
-                    </div>
-                    {!archiveType && t.intensity && (
-                      <span style={{ fontSize: 11, color: '#bbb' }}>
-                        {'●'.repeat(t.intensity)}{'○'.repeat(5 - t.intensity)}
-                      </span>
-                    )}
-                    {reactionCount > 0 && (
-                      <span style={{ fontSize: 11, color: '#FF6B9D', fontWeight: 700 }}>
-                        🔥 共感 {reactionCount}
-                      </span>
-                    )}
-                    <strong style={{ fontSize: 13 }}>
-                      {t.title}
-                      {t.yomi && <span style={{ fontWeight: 400, color: '#999', fontSize: 11 }}>（{t.yomi}）</span>}
-                    </strong>
-                    {(t.era_label || voiceRelation) && (
-                      <span style={{ fontSize: 11, color: '#888' }}>
-                        {[t.era_label, voiceRelation ? `語り手：${voiceRelation.label}` : null].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
-                    {t.why && <p style={{ margin: 0, fontSize: 12, color: '#555' }}>{t.why}</p>}
-                    {t.audio_url && (
-                      <audio controls src={t.audio_url} style={{ width: '100%', height: 32 }} />
-                    )}
-                    {t.video_url && (
-                      <video controls src={t.video_url} style={{ width: '100%', maxHeight: 130, borderRadius: 6, background: '#000' }} />
-                    )}
-                    {t.source_ref && (
-                      sourceIsUrl ? (
-                        <a href={t.source_ref} target="_blank" rel="noopener noreferrer"
-                          style={{ fontSize: 11, color: '#2E86C1', wordBreak: 'break-all' }}>
-                          📚 {t.source_ref}
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: 11, color: '#888' }}>📚 {t.source_ref}</span>
-                      )
-                    )}
-                    {onTraceClick && (
-                      <button
-                        onClick={() => onTraceClick(t)}
-                        style={{
-                          marginTop: 2, padding: '6px 0', background: 'none',
-                          border: 'none', color: '#FF6B9D', fontWeight: 700,
-                          fontSize: 12, cursor: 'pointer', textAlign: 'left',
-                        }}
-                      >
-                        くわしく見る →
-                      </button>
-                    )}
-                  </div>
+                  <TracePopupContent t={t} reactionCount={reactionCount} onTraceClick={onTraceClick} teamColor={teamColor} />
                 </Popup>
               </Marker>
             );

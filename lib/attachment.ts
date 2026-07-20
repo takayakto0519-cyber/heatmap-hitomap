@@ -54,7 +54,7 @@ export async function computeAttachmentFunnel(
   // bboxが指定されていれば region完全一致の代わりに地図上の範囲で絞り込む（regionAggregate.tsと同じ思想）
   let traceQuery = supabaseServer
     .from('traces')
-    .select('id, user_id, created_at, revisit_of')
+    .select('id, user_id, created_at, revisit_of, emotion_key, emotion_keys')
     .eq('is_deleted', false)
     .not('user_id', 'is', null)
     .or(`session_code.is.null,session_code.neq.${DEMO_SESSION_CODE}`);
@@ -69,15 +69,19 @@ export async function computeAttachmentFunnel(
     return { ok: false, region, generatedAt, suppressed: false, error: error.message };
   }
 
-  const traces = (traceRows ?? []) as { id: string; user_id: string; created_at: string; revisit_of: string | null }[];
+  const traces = (traceRows ?? []) as { id: string; user_id: string; created_at: string; revisit_of: string | null; emotion_key: string | null; emotion_keys: string[] | null }[];
   const traceOwner = new Map<string, string>();          // trace_id → user_id
   const userDates = new Map<string, Set<string>>();      // user_id → 記録した日付の集合
   const usersWithRevisitRecord = new Set<string>();      // 「その後」を記録した人
+  const userEmotionKeys = new Map<string, (string | null)[]>(); // user_id → その人が残した感情キー（valenceByStage用）
   for (const t of traces) {
     traceOwner.set(t.id, t.user_id);
     if (!userDates.has(t.user_id)) userDates.set(t.user_id, new Set());
     userDates.get(t.user_id)!.add(dateKey(t.created_at));
     if (t.revisit_of) usersWithRevisitRecord.add(t.user_id);
+    const keys = t.emotion_keys && t.emotion_keys.length > 0 ? t.emotion_keys : [t.emotion_key];
+    if (!userEmotionKeys.has(t.user_id)) userEmotionKeys.set(t.user_id, []);
+    userEmotionKeys.get(t.user_id)!.push(...keys);
   }
 
   const chiUsers = new Set(userDates.keys());
@@ -134,6 +138,10 @@ export async function computeAttachmentFunnel(
   const ri = riUsers.size;
   const shin = shinUsers.size;
 
+  // 段階ごとの所属ユーザーが残した感情キーをまとめてvalence集計する（k-匿名のしきい値はchi全体の人数で担保済み）
+  const emotionsOfUsers = (users: Set<string>): (string | null)[] =>
+    [...users].flatMap(u => userEmotionKeys.get(u) ?? []);
+
   return {
     ok: true,
     region,
@@ -143,6 +151,11 @@ export async function computeAttachmentFunnel(
     rates: {
       riRate: Math.round((ri / chi) * 100),
       shinRate: Math.round((shin / chi) * 100),
+    },
+    valenceByStage: {
+      chi: summarizeValence(emotionsOfUsers(chiUsers)),
+      ri: summarizeValence(emotionsOfUsers(riUsers)),
+      shin: summarizeValence(emotionsOfUsers(shinUsers)),
     },
   };
 }

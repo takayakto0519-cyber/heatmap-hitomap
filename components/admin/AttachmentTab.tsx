@@ -5,6 +5,8 @@
 // 自治体向け「関係人口・愛着レポート」の下書きにそのまま使える。
 import { useEffect, useState } from 'react';
 
+interface ValenceSummary { positive: number; negative: number; neutral: number; total: number }
+
 interface FunnelResult {
   ok: boolean;
   region: string;
@@ -12,10 +14,9 @@ interface FunnelResult {
   suppressed: boolean;
   stages?: { chi: number; ri: number; shin: number };
   rates?: { riRate: number; shinRate: number };
+  valenceByStage?: { chi: ValenceSummary; ri: ValenceSummary; shin: ValenceSummary };
   error?: string;
 }
-
-interface ValenceSummary { positive: number; negative: number; neutral: number; total: number }
 
 interface EventShiftResult {
   ok: boolean;
@@ -181,6 +182,19 @@ export default function AttachmentTab({ authHeaders }: { authHeaders: () => Head
             <StageBar label="① 地（記録した）" count={funnel.stages.chi} total={funnel.stages.chi} color="#38ADA9" hint="この地域で実名投稿した人数（基準）。増える条件：誰かがこの地域で新しく痕跡を残すだけでOK" />
             <StageBar label="② 理（つながった）" count={funnel.stages.ri} total={funnel.stages.chi} color="#4A69BD" hint={`地の人のうち他者と反応・コメントを交わした割合＝${funnel.rates.riRate}%。増える条件：誰かが誰かの投稿にリアクション・コメントするだけでOK`} delay={0.2} />
             <StageBar label="③ 心（結ばれた）" count={funnel.stages.shin} total={funnel.stages.chi} color="#E5A139" hint={`地の人のうち再訪・その後記録・会いたい成立に至った割合＝${funnel.rates.shinRate}%。増える条件：別日にもう一度その地域へ投稿する／「その後」を記録する／会いたい申請が成立する、のいずれか`} delay={0.4} />
+
+            {funnel.valenceByStage && (
+              <div style={{ marginTop: 8 }}>
+                <p style={{ margin: '0 0 8px', fontSize: 11.5, color: '#999' }}>
+                  各段階の人たちが残した記録の感情価。「心（結ばれた）」ほど好意的な割合が高いかを見る
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <ValenceRow label="① 地" v={funnel.valenceByStage.chi} />
+                  <ValenceRow label="② 理" v={funnel.valenceByStage.ri} />
+                  <ValenceRow label="③ 心" v={funnel.valenceByStage.shin} />
+                </div>
+              </div>
+            )}
           </div>
         )}
         {funnel && !funnel.ok && (

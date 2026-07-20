@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import EmotionPicker from '@/components/form/EmotionPicker';
 import FaceEmotionSuggest from '@/components/form/FaceEmotionSuggest';
+import { TRACE_TYPES } from '@/lib/traceTypes';
 import type { CreateTraceResponse } from '@/lib/types';
+import type { Quest } from '@/lib/quests';
+import { getEmotion } from '@/lib/emotions';
+import { computeBadges, type Badge } from '@/lib/badges';
 
 const LocationPickerMap = dynamic(
   () => import('@/components/form/LocationPickerMap'),
@@ -82,6 +86,8 @@ export default function PostPage() {
   const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [emotionKeys, setEmotionKeys] = useState<string[]>([]);
   const [intensity, setIntensity] = useState(3);
+  const [traceType, setTraceType] = useState<string | null>(null);
+  const [companionTag, setCompanionTag] = useState('');
   const [title, setTitle] = useState('');
   const [why, setWhy] = useState('');
   const [interpretation, setInterpretation] = useState('');
@@ -98,6 +104,22 @@ export default function PostPage() {
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [restoredNotice, setRestoredNotice] = useState(false);
   const [quickSaveMsg, setQuickSaveMsg] = useState('');
+
+  // 今日の問い（お題）：map/page.tsxと同じAPIを使い、記録画面自体でもきっかけを示す
+  // （続けて記録するハードルを下げる施策・2026-07-21）
+  const [currentQuest, setCurrentQuest] = useState<Quest & { quest_type?: string; target_emotion_key?: string | null } | null>(null);
+  const [questDismissed, setQuestDismissed] = useState(false);
+
+  // 投稿完了直後にバッジ・連続記録をその場で見せる演出（続けて記録するハードルを下げる施策）。
+  // ログインユーザーのみ対象。取得できなければ静かにスキップして通常どおり遷移する。
+  const [celebration, setCelebration] = useState<{ badges: Badge[]; totalPosts: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/quests/active')
+      .then((r) => r.json())
+      .then((d) => { if (d.ok) setCurrentQuest(d.quest); })
+      .catch(() => {});
+  }, []);
 
   // 「その後」の記録：TraceDetailの「その後を記録する」から遷移してきた場合、
   // 元の痕跡のidと位置をクエリパラメータで受け取る
@@ -128,6 +150,8 @@ export default function PostPage() {
         if (Array.isArray(d.emotionKeys)) setEmotionKeys(d.emotionKeys as string[]);
         else if (d.emotionKey) setEmotionKeys([d.emotionKey as string]);
         if (typeof d.intensity === 'number') setIntensity(d.intensity);
+        if (d.traceType) setTraceType(d.traceType as string);
+        if (d.companionTag) setCompanionTag(d.companionTag as string);
         if (d.title) setTitle(d.title as string);
         if (d.why) setWhy(d.why as string);
         if (d.interpretation) setInterpretation(d.interpretation as string);
@@ -151,13 +175,13 @@ export default function PostPage() {
     if (!hasContent) return;
     try {
       localStorage.setItem(FORM_AUTOSAVE_KEY, JSON.stringify({
-        lat, lng, emotionKeys, intensity, title, why, interpretation,
+        lat, lng, emotionKeys, intensity, traceType, companionTag, title, why, interpretation,
         selfReflection, wantRevisit, wantToShare, nickname, activeDraftId,
       }));
     } catch {
       // 保存できなくても投稿自体は継続できる
     }
-  }, [lat, lng, emotionKeys, intensity, title, why, interpretation, selfReflection, wantRevisit, wantToShare, nickname, activeDraftId]);
+  }, [lat, lng, emotionKeys, intensity, traceType, companionTag, title, why, interpretation, selfReflection, wantRevisit, wantToShare, nickname, activeDraftId]);
 
   function clearAutosave() {
     try { localStorage.removeItem(FORM_AUTOSAVE_KEY); } catch { /* 無視 */ }
@@ -294,6 +318,8 @@ export default function PostPage() {
           emotion_key: emotionKeys[0] ?? null,
           emotion_keys: emotionKeys.length > 0 ? emotionKeys : null,
           intensity,
+          trace_type: traceType,
+          companion_tag: companionTag.trim() || null,
           nickname: nickname.trim() || null,
           revisit_of: revisitOf,
         }),
@@ -303,6 +329,26 @@ export default function PostPage() {
       if (data.ok || res.status === 503) {
         clearAutosave();
         if (activeDraftId) removeLocationDraft(activeDraftId);
+
+        // 投稿直後にバッジ・連続記録をその場で見せる（ログイン中のみ。取れなければ即遷移）
+        try {
+          const { createAuthBrowserClient } = await import('@/lib/supabase/authClient');
+          const supabase = createAuthBrowserClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const [tracesRes, routeRes] = await Promise.all([
+              fetch(`/api/traces?user_id=${user.id}&limit=500`).then((r) => r.json()).catch(() => null),
+              fetch(`/api/routes/completions?user_id=${user.id}`).then((r) => r.json()).catch(() => null),
+            ]);
+            if (tracesRes?.ok) {
+              const badges = computeBadges(tracesRes.traces ?? [], routeRes?.ok ? routeRes.count ?? 0 : 0);
+              setCelebration({ badges, totalPosts: (tracesRes.traces ?? []).length });
+              return; // 遷移はcelebrationの「続ける」ボタンで行う
+            }
+          }
+        } catch {
+          // 取得できなくても投稿自体は成功しているので、そのまま通常どおり遷移する
+        }
         router.push('/report');
       } else {
         setSubmitError(data.error ?? '送信に失敗しました');
@@ -317,6 +363,43 @@ export default function PostPage() {
   const canSubmit = Boolean(lat && lng && locationConfirmed && !submitting);
   const statusText = uploadProgress || (submitting ? '記録中…' : '記録する →');
 
+  // 投稿直後のバッジ・連続記録の演出（続けて記録するハードルを下げる施策）。
+  // フォームは表示せず、この画面だけを見せて「続ける」を押すとレポートへ遷移する。
+  if (celebration) {
+    return (
+      <main style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px', textAlign: 'center' }}>
+        <p style={{ fontSize: 48, margin: '0 0 8px' }}>✨</p>
+        <h1 style={{ fontSize: 20, margin: '0 0 4px' }}>記録しました</h1>
+        <p style={{ color: '#888', fontSize: 13, margin: '0 0 24px' }}>これで{celebration.totalPosts}件目の痕跡です</p>
+        {celebration.badges.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+            {celebration.badges.map((b) => (
+              <div key={b.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                background: '#FFF8F5', border: '1.5px solid #FFE3D6', borderRadius: 14, textAlign: 'left',
+              }}>
+                <span style={{ fontSize: 30 }}>{b.emoji}</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>{b.label}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#999' }}>{b.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: '#aaa', marginBottom: 28 }}>次の記録で最初のバッジが手に入ります</p>
+        )}
+        <button type="button" onClick={() => router.push('/report')}
+          style={{
+            width: '100%', padding: '14px', background: '#FF6B9D', color: '#fff',
+            border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}>
+          続ける →
+        </button>
+      </main>
+    );
+  }
+
   return (
     <>
       {/* メインコンテンツ（下部fixedボタン分の余白） */}
@@ -329,6 +412,37 @@ export default function PostPage() {
           </button>
           <h1 style={{ margin: 0, fontSize: 20 }}>{revisitOf ? 'その後を記録する' : '痕跡を記録する'}</h1>
         </div>
+
+        {/* 今日の問い：記録画面自体できっかけを示す（map/page.tsxと同じAPI・見た目を踏襲） */}
+        {!questDismissed && currentQuest && (
+          <div style={{
+            background: 'linear-gradient(135deg, #F8F4E9, #FFF)', border: '1.5px solid #F3EDDE',
+            borderRadius: 14, padding: '12px 14px', marginBottom: 16, position: 'relative',
+          }}>
+            <button type="button" onClick={() => setQuestDismissed(true)} style={{
+              position: 'absolute', top: 8, right: 10, background: 'none', border: 'none',
+              color: '#A79E8A', fontSize: 16, cursor: 'pointer', lineHeight: 1,
+            }}>✕</button>
+            <p style={{ margin: '0 0 4px', fontSize: 11, color: '#8A6B3F', fontWeight: 700 }}>今日の問い</p>
+            <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#23231F' }}>
+              {currentQuest.emoji} {currentQuest.title}
+            </p>
+            {currentQuest.quest_type === 'emotion' && currentQuest.target_emotion_key && (
+              <p style={{ margin: '0 0 4px' }}>
+                <span style={{
+                  display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+                  background: getEmotion(currentQuest.target_emotion_key)?.color + '22',
+                  color: getEmotion(currentQuest.target_emotion_key)?.color, fontSize: 12, fontWeight: 700,
+                }}>
+                  {getEmotion(currentQuest.target_emotion_key)?.emoji} {getEmotion(currentQuest.target_emotion_key)?.label}
+                </span>
+              </p>
+            )}
+            <p style={{ margin: 0, fontSize: 12, color: '#726C5E', lineHeight: 1.6, paddingRight: 20 }}>
+              {currentQuest.hint}
+            </p>
+          </div>
+        )}
 
         {revisitOf && (
           <p style={{
@@ -496,6 +610,36 @@ export default function PostPage() {
               selectedKeys={emotionKeys}
               onAdd={(key) => setEmotionKeys((prev) => prev.includes(key) ? prev : [...prev, key])}
             />
+          </section>
+
+          {/* ③.5 何と出会った？ ヒトマップの本義（出会い→感情→愛着）を結ぶ唯一の項目のため、
+              折りたたみの奥ではなく感情選択のすぐ後、常に見える位置に置く */}
+          <section style={sectionStyle}>
+            <label style={labelStyle}>🤝 何と出会った？（任意）</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: traceType === 'person' ? 12 : 0 }}>
+              {TRACE_TYPES.map((tt) => (
+                <button key={tt.key} type="button"
+                  onClick={() => setTraceType(traceType === tt.key ? null : tt.key)}
+                  style={{
+                    flex: 1, padding: '11px 8px', borderRadius: 10, fontSize: 14,
+                    border: `2px solid ${traceType === tt.key ? tt.color : '#ddd'}`,
+                    background: traceType === tt.key ? tt.color + '18' : '#fff',
+                    color: traceType === tt.key ? tt.color : '#999',
+                    fontWeight: traceType === tt.key ? 700 : 400, cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}>
+                  {tt.emoji} {tt.label}
+                </button>
+              ))}
+            </div>
+            {traceType === 'person' && (
+              <>
+                <input type="text" value={companionTag} onChange={(e) => setCompanionTag(e.target.value)}
+                  placeholder="誰と出会いましたか？（例：地元のおばあちゃん）"
+                  style={inputStyle} />
+                <p style={hintStyle}>人との出会いは、この町とあなたを結ぶいちばん強い縁になります</p>
+              </>
+            )}
           </section>
 
           {/* ④ タイトル（任意。空欄なら感情＋日付から自動生成される） */}

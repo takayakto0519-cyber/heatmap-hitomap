@@ -3,7 +3,7 @@
 // 有効なトークンでも、返すのは lib/regionAggregate.ts の集計結果のみ。
 // 個別トレースの座標・写真・自由記述は一切含まれない。
 import { NextRequest, NextResponse } from 'next/server';
-import { computeRegionAggregate } from '@/lib/regionAggregate';
+import { computeRegionAggregate, computeRegionTrend } from '@/lib/regionAggregate';
 import { computeAttachmentFunnel } from '@/lib/attachment';
 import type { DashboardAccess, DashboardResponse, MapBbox } from '@/lib/types';
 
@@ -46,15 +46,19 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     .eq('id', typedAccess.id);
 
   const bbox = bboxOf(typedAccess);
-  const [aggregate, funnel] = await Promise.all([
+  const [aggregate, funnel, trend] = await Promise.all([
     computeRegionAggregate(supabaseServer, typedAccess.region, undefined, undefined, bbox),
     computeAttachmentFunnel(supabaseServer, typedAccess.region, bbox),
+    computeRegionTrend(supabaseServer, typedAccess.region, undefined, bbox),
   ]);
 
   return NextResponse.json<DashboardResponse>({
     ok: true,
     label: typedAccess.label,
     aggregate,
+    trend,
     funnel,
+    boundaryGeojson: typedAccess.boundary_geojson,
+    bbox,
   });
 }

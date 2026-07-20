@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import { corpColor, corpFont } from '@/components/corp/tokens';
-import { computeRegionAggregate } from '@/lib/regionAggregate';
+import { computeRegionAggregate, computeRegionTrend } from '@/lib/regionAggregate';
 import { computeAttachmentFunnel } from '@/lib/attachment';
+import { getShiftColor } from '@/lib/emotions';
+import DashboardTraceMap from '@/components/dashboard/DashboardTraceMap';
 import type { DashboardAccess, MapBbox } from '@/lib/types';
 
 function bboxOf(access: DashboardAccess): MapBbox | null {
@@ -38,18 +40,19 @@ async function loadDashboard(token: string) {
   // 感情の内訳（従来）に加えて、愛着ファネル（地・理・心）も併せて取得する。
   // どちらも件数・割合のみで個人を特定できる値は含まない。
   const bbox = bboxOf(typedAccess);
-  const [aggregate, funnel] = await Promise.all([
+  const [aggregate, funnel, trend] = await Promise.all([
     computeRegionAggregate(supabaseServer, typedAccess.region, undefined, undefined, bbox),
     computeAttachmentFunnel(supabaseServer, typedAccess.region, bbox),
+    computeRegionTrend(supabaseServer, typedAccess.region, undefined, bbox),
   ]);
-  return { access: typedAccess, aggregate, funnel, bbox };
+  return { access: typedAccess, aggregate, funnel, trend, bbox };
 }
 
 export default async function CustomerDashboardPage({ params }: { params: { token: string } }) {
   const data = await loadDashboard(params.token);
   if (!data) notFound();
 
-  const { access, aggregate, funnel, bbox } = data;
+  const { access, aggregate, funnel, trend, bbox } = data;
   const totalShown = aggregate.cells.reduce((sum, c) => sum + c.count, 0);
   const valence = aggregate.cells.reduce(
     (acc, c) => ({
@@ -61,6 +64,17 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
   );
   const valenceTotal = valence.positive + valence.negative + valence.neutral;
   const pct = (n: number) => (valenceTotal > 0 ? Math.round((n / valenceTotal) * 100) : 0);
+
+  // 月次トレンド：非公開でないバケットのうち、最初と最後の好意的率の差分で「改善しているか」を色で示す
+  const visibleTrendBuckets = trend.ok ? trend.buckets.filter(b => !b.suppressed && b.valence) : [];
+  const positiveRate = (v: { positive: number; negative: number; neutral: number }) => {
+    const t = v.positive + v.negative + v.neutral;
+    return t > 0 ? v.positive / t : 0;
+  };
+  const trendDelta = visibleTrendBuckets.length >= 2
+    ? positiveRate(visibleTrendBuckets[visibleTrendBuckets.length - 1].valence!) - positiveRate(visibleTrendBuckets[0].valence!)
+    : 0;
+  const trendColor = getShiftColor(trendDelta);
 
   return (
     <div style={{ minHeight: '100dvh', background: corpColor.ground, fontFamily: corpFont.body }}>
@@ -104,6 +118,44 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
                 </div>
               ))}
             </div>
+          )}
+        </section>
+
+        {/* 月次トレンド——「感情が改善しているか」を時系列で示す。しきい値未満の月は非表示 */}
+        <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px', marginBottom: 24 }}>
+          <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>感情の推移（月次）</p>
+          <p style={{ margin: '0 0 20px', fontSize: 12, color: corpColor.inkSoft, lineHeight: 1.8 }}>
+            月ごとの好意的な感情の割合です。件数が少ない月（{trend.threshold}件未満）は個人特定を避けるため表示していません。
+          </p>
+          {visibleTrendBuckets.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: corpColor.inkSoft, lineHeight: 1.9 }}>
+              現時点では、月ごとの傾向を示すのに十分なデータがありません。記録が積み重なると、ここに表示されます。
+            </p>
+          ) : (
+            <>
+              {visibleTrendBuckets.length >= 2 && (
+                <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: trendColor }}>
+                  {trendDelta > 0.05 ? '📈 好意的な感情の割合が上昇しています'
+                    : trendDelta < -0.05 ? '📉 好意的な感情の割合が下降しています'
+                    : '➡️ 好意的な感情の割合はおおむね横ばいです'}
+                </p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {visibleTrendBuckets.map((b, i) => {
+                  const rate = Math.round(positiveRate(b.valence!) * 100);
+                  const isLatest = i === visibleTrendBuckets.length - 1;
+                  return (
+                    <div key={b.month} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ width: 56, fontSize: 12, color: corpColor.inkSoft, flexShrink: 0 }}>{b.month}</span>
+                      <div style={{ flex: 1, height: 8, background: corpColor.groundDeep, position: 'relative' }}>
+                        <div style={{ width: `${rate}%`, height: '100%', background: isLatest ? trendColor : corpColor.moss }} />
+                      </div>
+                      <span style={{ width: 70, fontSize: 12, color: corpColor.ink, textAlign: 'right', flexShrink: 0 }}>{rate}%（{b.count}件）</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </section>
 
@@ -151,6 +203,19 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
             </div>
           )}
         </section>
+
+        {/* 境界データ（自治体の行政区域）が設定されている場合のみ、その自治体だけをマスクした地図を表示する */}
+        {access.boundary_geojson && bbox && (
+          <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px', marginBottom: 24 }}>
+            <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>地図で見る</p>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: corpColor.inkSoft, lineHeight: 1.8 }}>
+              {access.region}の外側はマスクしています。個別の投稿の位置・写真・本文は表示されません（上記と同じ集計データのみ）。
+            </p>
+            <div style={{ height: 420 }}>
+              <DashboardTraceMap aggregateCells={aggregate.cells} boundaryGeoJson={access.boundary_geojson} bbox={bbox} />
+            </div>
+          </section>
+        )}
 
         <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px' }}>
           <p style={{ margin: '0 0 20px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>エリア別の記録密度</p>
