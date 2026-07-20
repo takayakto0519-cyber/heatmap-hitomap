@@ -9,6 +9,7 @@ Supabaseの email_sent_at / email_reply を更新する。
 対象は municipality_profiles テーブルのうち contact_email が入力されている行のみ。
 その宛先とのスレッドを検索し、
   - こちらから送ったメールがあれば email_sent_at を埋める（未設定の場合のみ）
+  - 実際に送信した本文を email_sent_content に反映する（毎回最新のものに更新）
   - 相手から届いた返信があれば、その本文を email_reply に反映する（毎回上書き）
   - 前回までemail_replyが空だった自治体に新しく返信が付いた場合、Discordに通知する
     （.env.localのHITOMAP_DISCORD_WEBHOOK_URLまたはDISCORD_WEBHOOK_URLを使用。未設定なら通知はスキップ）
@@ -97,14 +98,16 @@ def _plain_text(payload: dict) -> str:
 
 
 def _check_thread_for_contact(service, contact_email: str) -> dict:
-    """宛先とのやり取りを検索し、送信済みか・相手からの返信本文があるかを返す。"""
+    """宛先とのやり取りを検索し、送信済みか・実際に送った本文・相手からの返信本文があるかを返す。"""
     query = f"to:{contact_email} OR from:{contact_email}"
     resp = service.users().threads().list(userId="me", q=query, maxResults=5).execute()
     thread_ids = [t["id"] for t in resp.get("threads", [])]
     if not thread_ids:
-        return {"sent": False, "reply": None}
+        return {"sent": False, "sent_content": None, "reply": None}
 
     sent = False
+    sent_content = None
+    sent_date = None
     reply_text = None
     reply_date = None
     for tid in thread_ids:
@@ -115,12 +118,16 @@ def _check_thread_for_contact(service, contact_email: str) -> dict:
             date = _header(headers, "Date")
             if sender == OWN_ADDRESS.lower():
                 sent = True
+                text = _plain_text(msg.get("payload", {})) or msg.get("snippet", "")
+                if text and (sent_date is None or date > sent_date):
+                    sent_content = text.strip()
+                    sent_date = date
             elif sender == contact_email.lower():
                 text = _plain_text(msg.get("payload", {})) or msg.get("snippet", "")
                 if text and (reply_date is None or date > reply_date):
                     reply_text = text.strip()
                     reply_date = date
-    return {"sent": sent, "reply": reply_text}
+    return {"sent": sent, "sent_content": sent_content, "reply": reply_text}
 
 
 def _send_discord_message(webhook_url: str, content: str) -> int:
@@ -194,7 +201,7 @@ def main():
         service = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
         req = urllib.request.Request(
-            f"{url}/rest/v1/municipality_profiles?select=id,region_name,contact_email,email_sent_at,email_reply&contact_email=not.is.null",
+            f"{url}/rest/v1/municipality_profiles?select=id,region_name,contact_email,email_sent_at,email_sent_content,email_reply&contact_email=not.is.null",
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
         )
         with urllib.request.urlopen(req, timeout=20) as res:
@@ -217,6 +224,8 @@ def main():
             if status["sent"] and not p.get("email_sent_at"):
                 from datetime import datetime, timezone
                 patch["email_sent_at"] = datetime.now(timezone.utc).isoformat()
+            if status["sent_content"] and status["sent_content"] != (p.get("email_sent_content") or ""):
+                patch["email_sent_content"] = status["sent_content"]
             if status["reply"] and status["reply"] != (p.get("email_reply") or ""):
                 patch["email_reply"] = status["reply"]
                 new_replies.append({"region_name": p["region_name"], "reply": status["reply"]})

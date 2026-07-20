@@ -43,6 +43,7 @@ interface MunicipalityProfile {
   contact_email: string | null;
   email_draft: string | null;
   email_sent_at: string | null;
+  email_sent_content: string | null;
   email_reply: string | null;
   is_priority_pick: boolean;
   updated_at: string;
@@ -314,6 +315,14 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
               </button>
             )}
           </div>
+          {p.email_sent_content && (
+            <>
+              <label style={labelStyle}>Gmailで実際に送信した本文（gmail_watch番人が自動取得・読み取り専用）</label>
+              <div style={{ padding: '8px 10px', background: '#fafafa', borderRadius: 8, fontSize: 12, color: '#555', whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
+                {p.email_sent_content}
+              </div>
+            </>
+          )}
           <label style={labelStyle}>届いた返信（貼り付けて保存）</label>
           <textarea defaultValue={p.email_reply ?? ''} rows={3} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
             placeholder="返信メールの本文を貼り付けておくと、ここに残ります"
