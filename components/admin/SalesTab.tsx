@@ -71,6 +71,12 @@ interface RankedFeedItem {
 function coreRegionName(name: string): string {
   return name.replace(/[（(].*$/, '').trim();
 }
+// SMOUT（smout.jp）は地域ページのURLが内部IDベース（例: /areas/243/）で自治体名から直接組み立てられないため、
+// Google検索経由でその地域のSMOUTページに辿り着けるようにする（存在しないリンクを作らないための代替）
+function smoutSearchUrl(name: string): string {
+  const core = coreRegionName(name);
+  return `https://www.google.com/search?q=${encodeURIComponent(`site:smout.jp ${core}`)}`;
+}
 function findProfileFor(orgName: string, profiles: MunicipalityProfile[]): MunicipalityProfile | undefined {
   const core = coreRegionName(orgName);
   if (!core) return undefined;
@@ -442,7 +448,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                   {item.kind === 'lead' ? (
                     <button onClick={() => scrollToLead(item.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
                   ) : (
-                    <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+                    <>
+                      <a href={smoutSearchUrl(item.name)} target="_blank" rel="noopener noreferrer" style={{ ...jumpBtnStyle, textDecoration: 'none', display: 'inline-block' }}>SMOUT ↗</a>
+                      <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+                    </>
                   )}
                 </div>
               ))}
@@ -502,6 +511,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                   </p>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F', flexShrink: 0 }}>{item.score}</span>
+                <a href={smoutSearchUrl(item.name)} target="_blank" rel="noopener noreferrer" style={{ ...jumpBtnStyle, textDecoration: 'none', display: 'inline-block' }}>SMOUT ↗</a>
                 <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
               </div>
             );
