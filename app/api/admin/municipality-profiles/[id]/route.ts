@@ -7,7 +7,7 @@ const ALLOWED_FIELDS = [
   'region_name', 'engagement_stage', 'evidence_summary', 'relation_population_initiative',
   'fit_assessment', 'opportunity_level', 'opportunity_notes', 'source_links',
   'contact_email', 'email_draft', 'email_sent_at', 'email_sent_content', 'email_reply', 'is_priority_pick',
-  'followed_up_at',
+  'followed_up_at', 'on_hold',
 ];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

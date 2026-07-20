@@ -47,6 +47,7 @@ interface MunicipalityProfile {
   email_sent_content: string | null;
   email_reply: string | null;
   followed_up_at: string | null;
+  on_hold: boolean;
   is_priority_pick: boolean;
   updated_at: string;
 }
@@ -253,12 +254,16 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
           <b style={{ fontSize: 14 }}>
-            {highlight && '🌟 '}{p.region_name}
+            {highlight && '🌟 '}{p.on_hold && '⏸ '}{p.region_name}
           </b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span onClick={() => patchProfile(p.id, { is_priority_pick: !p.is_priority_pick })} style={{
               fontSize: 11, cursor: 'pointer', color: p.is_priority_pick ? '#E5A139' : '#ccc', fontWeight: 700,
             }} title="営業価値の高い最優先自治体としてピン留め">{p.is_priority_pick ? '★ 最優先' : '☆ ピン留め'}</span>
+            <button onClick={() => patchProfile(p.id, { on_hold: !p.on_hold })} style={{
+              fontSize: 11, color: p.on_hold ? '#fff' : '#888', fontWeight: 700, cursor: 'pointer',
+              background: p.on_hold ? '#999' : 'none', border: '1px solid #ccc', borderRadius: 999, padding: '3px 10px',
+            }} title="メール送信・フォローを一時的に止める（削除はしない）">{p.on_hold ? '再開する' : 'メール送信を保留にする'}</button>
             <button onClick={() => removeProfile(p.id)} style={{ fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer' }}>削除</button>
           </div>
         </div>

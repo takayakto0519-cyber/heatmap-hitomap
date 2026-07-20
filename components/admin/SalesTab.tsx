@@ -36,7 +36,7 @@ interface ClientDossier {
 interface MunicipalityProfile {
   id: string; region_name: string; opportunity_level: string; relation_population_initiative: string | null;
   engagement_stage: string; fit_assessment: string | null; opportunity_notes: string | null; evidence_summary: string | null;
-  email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null;
+  email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null; on_hold: boolean;
 }
 interface CalendarEvent {
   title: string; start: string | null; end: string | null; all_day: boolean; location: string; html_link: string;
@@ -223,7 +223,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const pendingApproval = cases.filter(c => c.stage === '承認待ち');
   const draftedUnsent = emails.filter(e => e.drafted && !e.sent);
   const overdueFollowUps = useMemo(
-    () => municipalityProfiles.filter(p => computeFollowUp(p)?.status === 'overdue'),
+    () => municipalityProfiles.filter(p => !p.on_hold && computeFollowUp(p)?.status === 'overdue'),
     [municipalityProfiles]
   );
 
@@ -252,6 +252,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     }
     // 返信が無いまま日数が経った自治体（送った後も使えるダッシュボードにするための要フォロー）
     for (const p of municipalityProfiles) {
+      if (p.on_hold) continue;
       const fu = computeFollowUp(p);
       if (fu?.status !== 'overdue') continue;
       items.push({
@@ -340,6 +341,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     // 既にリードとして台帳にある自治体は、自治体プロファイル側では重複させない
     const leadCoreNames = new Set(leads.map(l => coreRegionName(l.org_name)));
     for (const p of municipalityProfiles) {
+      if (p.on_hold) continue;
       if (leadCoreNames.has(coreRegionName(p.region_name))) continue;
       items.push({
         key: `muni-${p.id}`, kind: 'municipality', icon: '🏛',
