@@ -44,7 +44,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   bizmodels: { label: 'ビジネスモデル案', icon: '💡', group: '調査・研究', desc: '新しい事業案を書き溜め、検証状況を追う' },
   funding: { label: 'コンテスト・助成金', icon: '🏆', group: '学校・法人', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
-  sales: { label: '縁の司令室', icon: '🧭', group: '学校・法人', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。関係人口・自治体プロファイルも統合' },
+  sales: { label: '営業', icon: '🧭', group: '学校・法人', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。関係人口・自治体プロファイルも統合' },
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
