@@ -1,4 +1,4 @@
-// GET /api/cron/gmail-watch — Vercel Cronから毎朝07:10 JST(=22:10 UTC)に呼ばれる。
+// GET /api/cron/gmail-watch — Vercel Cronから8時間おき(毎日01:10/09:10/17:10 JST)に呼ばれる。
 // agents/gmail_watch.py（会長のPC上のWindowsタスクスケジューラでしか動かない）と同じロジックを、
 // PCが閉じていても動くようVercel Cron + lib/gmailServer.tsに移植したもの。
 //
