@@ -310,19 +310,22 @@ function SkillInventory() {
                   {floor.emoji} {floor.name}
                   <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: '#999' }}>{list.length}体</span>
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 6 }}>
                   {list.map(s => (
-                    <div key={s.id} style={{ ...cardStyle, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, flexShrink: 0 }}>{s.emoji}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {s.num ? `${s.num}. ` : ''}{s.name}
-                      </span>
+                    <div key={s.id} style={{ ...cardStyle, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>{s.emoji}</span>
+                        <span title={`${s.num ? s.num + '. ' : ''}${s.name}`} style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.num ? `${s.num}. ` : ''}{s.name}
+                        </span>
+                      </div>
                       {s.invoke && (
-                        <button onClick={() => copyInvoke(s.invoke!)} title="コマンドをコピー" style={{
-                          flexShrink: 0, fontFamily: 'monospace', fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                          border: '1px solid #d9c7e8', borderRadius: 8, padding: '2px 6px',
+                        <button onClick={() => copyInvoke(s.invoke!)} title="クリックでコマンドをコピー" style={{
+                          alignSelf: 'flex-start', maxWidth: '100%', fontFamily: 'monospace', fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
+                          border: '1px solid #d9c7e8', borderRadius: 8, padding: '2px 8px',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           background: copied === s.invoke ? '#8E44AD' : '#faf6ff', color: copied === s.invoke ? '#fff' : '#8E44AD',
-                        }}>{copied === s.invoke ? '✓コピー' : s.invoke}</button>
+                        }}>{copied === s.invoke ? '✓ コピーしました' : s.invoke}</button>
                       )}
                     </div>
                   ))}

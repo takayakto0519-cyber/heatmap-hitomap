@@ -71,6 +71,19 @@ function Kpi({ label, value, urgent, onClick }: { label: string; value: number |
   );
 }
 
+// 統合司令室(command_center)が抽出した「今すぐ判断が要ること」1件分
+interface AttentionItem { agent_id: string; floor: string; name: string; headline: string }
+// 要注意項目から運営ダッシュボードのタブへ飛べるものは飛ばす
+const ATTENTION_JUMP: Record<string, { tab: string; label: string }> = {
+  report_screen: { tab: 'reports', label: '通報へ' },
+  spam_detect: { tab: 'traces', label: '投稿管理へ' },
+  trace_qa: { tab: 'traces', label: '投稿管理へ' },
+  deadline_watch: { tab: 'funding', label: 'コンテスト・助成金へ' },
+  case_pipeline_watch: { tab: 'sales', label: '営業へ' },
+  payment_watch: { tab: 'aiops', label: '案件へ' },
+  burnout_watch: { tab: 'secretary', label: '秘書へ' },
+};
+
 export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, tabGroups, siteLinks }: {
   authHeaders: () => HeadersInit;
   goTab: (id: string) => void;
@@ -83,6 +96,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
   const [biz, setBiz] = useState<BizStats | null>(null);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'geojson' | null>(null);
+  const [attention, setAttention] = useState<AttentionItem[] | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/stats', { headers: authHeaders() })
@@ -93,6 +107,11 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
     fetch('/api/admin/biz-stats', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setBiz(d.biz); })
+      .catch(() => {});
+    // 統合司令室AIの「今すぐ判断が要ること」（番人が拾った要注意項目）
+    fetch('/api/admin/command-center', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setAttention(d.result?.attention_items ?? []); })
       .catch(() => {});
   }, [authHeaders]);
 
@@ -122,6 +141,33 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
 
   return (
     <div>
+      {/* 今日の要注意（統合司令室AIが全番人の結果から抽出） */}
+      {attention && attention.length > 0 && (
+        <Card style={{ marginBottom: 16, borderLeft: '4px solid #E55039', background: '#FFF7F5' }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14, color: '#C0392B' }}>
+            ⚠ 今日の要注意（{attention.length}件）
+            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>統合司令室AIが番人の報告から拾った、いま判断が要ること</span>
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {attention.map((it, i) => {
+              const jump = ATTENTION_JUMP[it.agent_id];
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: '#fff' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#E55039', background: '#E5503914', padding: '1px 7px', borderRadius: 8, flexShrink: 0 }}>{it.name}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: '#444' }}>{it.headline}</span>
+                  {jump && (
+                    <button onClick={() => goTab(jump.tab)} style={{
+                      flexShrink: 0, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      border: '1px solid #E55039', borderRadius: 12, padding: '2px 10px', background: '#fff', color: '#E55039',
+                    }}>{jump.label} →</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* 全体のいまを4つで押さえる */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
         <Kpi label="総投稿数" value={stats.totalTraces} />
