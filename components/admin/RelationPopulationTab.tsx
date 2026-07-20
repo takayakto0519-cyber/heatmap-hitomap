@@ -169,7 +169,9 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     await loadProfiles();
   }
   async function patchProfile(id: string, fields: Partial<MunicipalityProfile>) {
-    await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const res = await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const data = await res.json().catch(() => ({ ok: false, error: '通信エラー' }));
+    if (!data.ok) { setError(data.error ?? '更新に失敗しました'); return; }
     await loadProfiles();
   }
   async function removeProfile(id: string) {
