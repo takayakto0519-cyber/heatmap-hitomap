@@ -5,6 +5,7 @@
 // 複数の実験回に関わった人＝関係人口の芽、また来たいと答えた人＝関係の温度。
 // 個人を特定できる値は一切表示せず、少人数（5人未満）の地域は非表示にする。
 import { useEffect, useMemo, useState } from 'react';
+import { computeFollowUp } from '@/lib/followUp';
 
 interface RelationStats {
   totalContributors: number;
@@ -45,6 +46,7 @@ interface MunicipalityProfile {
   email_sent_at: string | null;
   email_sent_content: string | null;
   email_reply: string | null;
+  followed_up_at: string | null;
   is_priority_pick: boolean;
   updated_at: string;
 }
@@ -180,6 +182,9 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   async function unmarkSent(id: string) {
     await patchProfile(id, { email_sent_at: null });
   }
+  async function markFollowedUp(id: string) {
+    await patchProfile(id, { followed_up_at: new Date().toISOString() });
+  }
 
   async function lookupRegion(region: string) {
     if (!region.trim()) return;
@@ -198,8 +203,14 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   }
 
   const unsent = useMemo(() => profiles.filter(p => !p.email_sent_at), [profiles]);
+  const FOLLOWUP_RANK: Record<string, number> = { overdue: 0, due_soon: 1, ok: 2, replied: 3 };
   const sent = useMemo(
-    () => profiles.filter(p => p.email_sent_at).sort((a, b) => (b.email_sent_at ?? '').localeCompare(a.email_sent_at ?? '')),
+    () => profiles.filter(p => p.email_sent_at).sort((a, b) => {
+      const fa = computeFollowUp(a); const fb = computeFollowUp(b);
+      const ra = FOLLOWUP_RANK[fa?.status ?? ''] ?? 9; const rb = FOLLOWUP_RANK[fb?.status ?? ''] ?? 9;
+      if (ra !== rb) return ra - rb;
+      return (fb?.daysSince ?? 0) - (fa?.daysSince ?? 0);
+    }),
     [profiles]
   );
   const [viewMode, setViewMode] = useState<'unsent' | 'sent'>('unsent');
@@ -308,6 +319,18 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
             {p.email_sent_at ? (
               <>
                 <span style={{ fontSize: 11.5, color: '#27AE60', fontWeight: 700 }}>✓ 送信済み（{new Date(p.email_sent_at).toLocaleDateString('ja-JP')}）</span>
+                {(() => {
+                  const fu = computeFollowUp(p);
+                  return fu ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: fu.color, padding: '2px 9px', borderRadius: 10, background: fu.color + '18' }}>
+                      {fu.label}
+                    </span>
+                  ) : null;
+                })()}
+                {p.followed_up_at && (
+                  <span style={{ fontSize: 10.5, color: '#999' }}>最終フォロー：{new Date(p.followed_up_at).toLocaleDateString('ja-JP')}</span>
+                )}
+                <button onClick={() => markFollowedUp(p.id)} style={{ fontSize: 11, background: 'none', border: '1px solid #38ADA9', color: '#38ADA9', borderRadius: 999, padding: '3px 10px', cursor: 'pointer' }}>フォロー済みにする</button>
                 <button onClick={() => unmarkSent(p.id)} style={{ fontSize: 11, background: 'none', border: '1px solid #ccc', borderRadius: 999, padding: '3px 10px', cursor: 'pointer' }}>取り消す</button>
               </>
             ) : (
