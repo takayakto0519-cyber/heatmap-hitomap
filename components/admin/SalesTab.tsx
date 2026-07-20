@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { computeEn, EN_KINDS, type EnKind, type EnRecord, type EnBreakdown } from '@/lib/enScore';
 import { computeFollowUp } from '@/lib/followUp';
+import { scoreLead } from '@/lib/leadTemperature';
+import { municipalityScore, SALES_SCORE_CRITERIA } from '@/lib/salesScore';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 
@@ -43,16 +45,8 @@ interface CalendarEvent {
   title: string; start: string | null; end: string | null; all_day: boolean; location: string; html_link: string;
 }
 
-// 自治体プロファイル（106件規模）は縁の台帳（client_leads）とは別の台帳のため、
-// 素点を縁スコア（0-200）と同じ物差しに換算して1本のランキングにまとめる。
-// 「提案余地」の高低＋「関わり方」の進み具合を反映する簡易換算（en scoreの厳密な内訳計算はしない）。
-const OPPORTUNITY_SCORE: Record<string, number> = { 高: 140, 中: 80, 低: 30 };
-const ENGAGEMENT_BONUS: Record<string, number> = { contracted: 40, proposed: 20, lead: 0, observing: -10 };
-function municipalityScore(p: MunicipalityProfile): number {
-  const base = OPPORTUNITY_SCORE[p.opportunity_level] ?? 30;
-  const bonus = ENGAGEMENT_BONUS[p.engagement_stage] ?? 0;
-  return Math.max(0, Math.min(200, base + bonus));
-}
+// 自治体プロファイルのスコア換算は lib/salesScore.ts に集約（縁スコアと同じ0-200の物差しだが
+// 「手動評価ベースの見立て」であり意味が違うため、ランキングでは種別バッジを付けて区別する）。
 function municipalityReason(p: MunicipalityProfile): string {
   return p.fit_assessment?.trim() || p.opportunity_notes?.trim() || p.relation_population_initiative?.trim()
     || p.evidence_summary?.trim() || '詳細は関係人口・自治体プロファイルで確認してください';
@@ -350,6 +344,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [showAllRanked, setShowAllRanked] = useState(false);
   const visibleRanked = showAllRanked ? activeRankedFeed : activeRankedFeed.slice(0, 15);
   const [showSent, setShowSent] = useState(false);
+  const [showCriteria, setShowCriteria] = useState(false);
 
   if (loading) return <p style={{ fontSize: 13, color: '#999' }}>営業データを読み込み中…</p>;
 
@@ -512,17 +507,48 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
       {/* ---------- 営業リスト（縁の台帳＋自治体プロファイルを1本の温度順にまとめる） ---------- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 10px' }}>
-        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>📖 営業リスト（未接触{activeRankedFeed.length}件・温度順）</h2>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>📖 営業リスト（未接触{activeRankedFeed.length}件・価値の高い順）</h2>
         <button onClick={() => setLedgerFilter(f => (f === 'active' ? 'all' : 'active'))} style={{
           ...jumpBtnStyle, borderColor: '#ccc', color: '#888',
         }}>{ledgerFilter === 'active' ? '見送りも表示' : '見送りを隠す'}</button>
         <button onClick={load} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>↻ 更新</button>
       </div>
-      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
-        「学校・法人」のリードと「関係人口・自治体プロファイル」を、営業対象としての温度で1本にまとめた順位です。
-        自治体プロファイルは提案余地・関わり方から換算した目安スコアです。理由の欄が、その順位にした根拠です。
+      <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>
+        「学校・法人」のリードと「関係人口・自治体プロファイル」を、営業対象としての価値で1本にまとめた順位です。
+        リードは<b>縁スコア</b>（積み上げて稼いだ関係の深さ）、自治体は<b>手動評価</b>（提案余地タグからの見立て）で、
+        同じ数値でも意味が違います。理由の欄が、その順位にした根拠です。
         すでに送信・接触済みの相手は下の「📤 送信済み・対応中」に移り、ここには出てきません。
       </p>
+
+      {/* ---------- スコアの見方（基準の明示。docs/営業スコアの基準_20260720.md と同じ内容） ---------- */}
+      <button onClick={() => setShowCriteria(v => !v)} style={{
+        ...jumpBtnStyle, borderColor: '#B7791F', color: '#B7791F', marginBottom: 10,
+      }}>{showCriteria ? '▲ スコアの見方を閉じる' : '▼ スコアの見方（何を根拠に順位を付けているか）'}</button>
+      {showCriteria && (
+        <div style={{ ...cardStyle, marginBottom: 12, background: '#FffdF7' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#777', lineHeight: 1.7 }}>
+            営業リストの並び順は「意味の違う2種類のスコア（縁＝稼いだ深さ／手動評価＝見立て）」を同じ0〜200の物差しで並べたものです。
+            各行の色バッジで種別が分かります。以下が全スコアの配点基準です。
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {SALES_SCORE_CRITERIA.map(block => (
+              <div key={block.key}>
+                <p style={{ margin: '0 0 3px', fontSize: 12.5, fontWeight: 800, color: '#444' }}>{block.icon} {block.title}</p>
+                <p style={{ margin: '0 0 5px', fontSize: 11, color: '#999', lineHeight: 1.6 }}>{block.meaning}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px', fontSize: 11, color: '#666' }}>
+                  {block.rows.map((r, ri) => (
+                    <div key={ri} style={{ display: 'contents' }}>
+                      <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{r.when}</span>
+                      <span style={{ fontWeight: 600 }}>{r.points}</span>
+                    </div>
+                  ))}
+                </div>
+                {block.note && <p style={{ margin: '4px 0 0', fontSize: 10.5, color: '#B7791F' }}>※ {block.note}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {activeRankedFeed.length === 0 ? (
         <div style={cardStyle}>
           <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
@@ -560,7 +586,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                     理由：{item.reason}
                   </p>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F', flexShrink: 0 }}>{item.score}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F' }}>{item.score}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#B7791F', background: '#B7791F14', padding: '1px 5px', borderRadius: 8 }}>手動評価</span>
+                </div>
                 <a href={smoutSearchUrl(item.name)} target="_blank" rel="noopener noreferrer" style={{ ...jumpBtnStyle, textDecoration: 'none', display: 'inline-block' }}>SMOUT ↗</a>
                 <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
               </div>
@@ -653,6 +682,9 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
     { kind: 'suijo', value: en.suijo },
   ];
 
+  const temp = scoreLead(lead);
+  const tempColor = temp.temp === '🔥熱い' ? '#E55039' : temp.temp === '🌤ふつう' ? '#E5A139' : '#8fa3b0';
+
   return (
     <div id={`en-card-${lead.id}`} style={cardStyle}>
       {/* 見出し行 */}
@@ -663,6 +695,10 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
         <span style={{ padding: '2px 9px', borderRadius: 12, fontSize: 10, fontWeight: 700, background: en.stageColor + '18', color: en.stageColor }}>
           {en.stage}
         </span>
+        <span
+          title={temp.reasons.length ? `手がかり：${temp.reasons.join('・')}（計${temp.score}点）` : '証拠パック（メモ）に手がかりがまだありません'}
+          style={{ padding: '2px 9px', borderRadius: 12, fontSize: 10, fontWeight: 700, background: tempColor + '18', color: tempColor }}
+        >{temp.temp}</span>
         <span style={{ fontSize: 11, color: '#999' }}>{en.freshnessLabel}（{en.daysSinceTouch === 999 ? '接点記録なし' : `${en.daysSinceTouch}日前`}）</span>
         {municipalityProfile && (
           <span
