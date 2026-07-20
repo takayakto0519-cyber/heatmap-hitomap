@@ -34,6 +34,34 @@ interface ClientDossier {
 }
 interface MunicipalityProfile {
   id: string; region_name: string; opportunity_level: string; relation_population_initiative: string | null;
+  engagement_stage: string; fit_assessment: string | null; opportunity_notes: string | null; evidence_summary: string | null;
+}
+
+// 自治体プロファイル（106件規模）は縁の台帳（client_leads）とは別の台帳のため、
+// 素点を縁スコア（0-200）と同じ物差しに換算して1本のランキングにまとめる。
+// 「提案余地」の高低＋「関わり方」の進み具合を反映する簡易換算（en scoreの厳密な内訳計算はしない）。
+const OPPORTUNITY_SCORE: Record<string, number> = { 高: 140, 中: 80, 低: 30 };
+const ENGAGEMENT_BONUS: Record<string, number> = { contracted: 40, proposed: 20, lead: 0, observing: -10 };
+function municipalityScore(p: MunicipalityProfile): number {
+  const base = OPPORTUNITY_SCORE[p.opportunity_level] ?? 30;
+  const bonus = ENGAGEMENT_BONUS[p.engagement_stage] ?? 0;
+  return Math.max(0, Math.min(200, base + bonus));
+}
+function municipalityReason(p: MunicipalityProfile): string {
+  return p.fit_assessment?.trim() || p.opportunity_notes?.trim() || p.relation_population_initiative?.trim()
+    || p.evidence_summary?.trim() || '詳細は関係人口・自治体プロファイルで確認してください';
+}
+
+interface RankedFeedItem {
+  key: string;
+  kind: 'lead' | 'municipality';
+  icon: string;
+  name: string;
+  score: number;
+  badge: string;
+  badgeColor: string;
+  reason: string;
+  leadId?: string; // 縁の台帳カードへスクロール用
 }
 
 // 自治体名の表記ゆれ（「佐野市（栃木県・デジタル推進課）」⇄「佐野市（栃木県）」等）を吸収するため、
@@ -246,6 +274,37 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     document.getElementById(`en-card-${leadId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
+  // ---------- 縁ランキング（縁の台帳＋自治体プロファイルを1本の順位にまとめる） ----------
+  // 自治体プロファイル（100件超）は縁の台帳のリード数（数件）とは桁違いに多く、
+  // これまでは「学校・法人」に既にリードがある団体にしかタグとして出てこなかった。
+  // ここで両方を同じスコアの物差しに乗せ、まとめて順位表示することで、台帳に無い
+  // 自治体もすべて営業対象として見えるようにする。
+  const rankedFeed = useMemo<RankedFeedItem[]>(() => {
+    const items: RankedFeedItem[] = [];
+    for (const { lead, en } of activeLedger) {
+      items.push({
+        key: `lead-${lead.id}`, kind: 'lead', icon: lead.client_type === 'school' ? '🏫' : '🏢',
+        name: lead.org_name, score: en.enLive, badge: en.stage, badgeColor: en.stageColor,
+        reason: en.nextMove.why, leadId: lead.id,
+      });
+    }
+    // 既にリードとして台帳にある自治体は、自治体プロファイル側では重複させない
+    const leadCoreNames = new Set(leads.map(l => coreRegionName(l.org_name)));
+    for (const p of municipalityProfiles) {
+      if (leadCoreNames.has(coreRegionName(p.region_name))) continue;
+      items.push({
+        key: `muni-${p.id}`, kind: 'municipality', icon: '🏛',
+        name: p.region_name, score: municipalityScore(p),
+        badge: `提案余地 ${p.opportunity_level}`, badgeColor: OPPORTUNITY_COLORS[p.opportunity_level] ?? '#999',
+        reason: municipalityReason(p),
+      });
+    }
+    return items.sort((a, b) => b.score - a.score);
+  }, [activeLedger, leads, municipalityProfiles]);
+
+  const [showAllRanked, setShowAllRanked] = useState(false);
+  const visibleRanked = showAllRanked ? rankedFeed : rankedFeed.slice(0, 15);
+
   if (loading) return <p style={{ fontSize: 13, color: '#999' }}>縁の台帳を読み込み中…</p>;
 
   return (
@@ -338,6 +397,48 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
               padding: '8px 0', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',
               color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             }}>{showAllMorning ? '折りたたむ' : `残り${morning.length - 6}件も見る`}</button>
+          )}
+        </div>
+      )}
+
+      {/* ---------- 縁ランキング（縁の台帳＋自治体プロファイルを統合） ---------- */}
+      <h2 style={sectionTitleStyle}>🏆 縁ランキング（全{rankedFeed.length}件・順位順）</h2>
+      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
+        「学校・法人」台帳のリードと「関係人口・自治体プロファイル」を、縁スコアの物差しで1本にまとめた順位です。
+        自治体プロファイルは提案余地・関わり方から換算した目安スコアです。理由の欄が、その順位にした根拠です。
+      </p>
+      {rankedFeed.length === 0 ? (
+        <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>まだ順位付けできる相手がいません。</p></div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {visibleRanked.map((item, i) => (
+            <div key={item.key} style={{ ...cardStyle, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#bbb', width: 22, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
+                  {item.name}
+                  <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: item.badgeColor + '18', color: item.badgeColor }}>
+                    {item.badge}
+                  </span>
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  理由：{item.reason}
+                </p>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#B7791F', flexShrink: 0 }}>{item.score}</span>
+              {item.kind === 'lead' ? (
+                <button onClick={() => scrollToLead(item.leadId!)} style={jumpBtnStyle}>台帳へ ↓</button>
+              ) : (
+                <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+              )}
+            </div>
+          ))}
+          {rankedFeed.length > 15 && (
+            <button onClick={() => setShowAllRanked(v => !v)} style={{
+              padding: '8px 0', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',
+              color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}>{showAllRanked ? '折りたたむ' : `残り${rankedFeed.length - 15}件も見る`}</button>
           )}
         </div>
       )}
