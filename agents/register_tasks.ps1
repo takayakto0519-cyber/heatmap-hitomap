@@ -55,6 +55,7 @@ Register-Agent "HitomapNewBizSignalWatch" "new_biz_signal_watch.py" "05:40"
 Register-Agent "HitomapGlobalMarketWatch" "global_market_watch.py" "06:20"
 Register-Agent "HitomapAcademicPartnershipWatch" "academic_partnership_watch.py" "06:30"
 Register-Agent "HitomapMemorialAnniversaryWatch" "memorial_anniversary_watch.py" "07:05"
+Register-RepeatingAgent "HitomapSyncStatusToSupabase" "sync_status_to_supabase.py" "02:15" 1
 
 Write-Host ""
 Write-Host "Manual test example:" -ForegroundColor Cyan

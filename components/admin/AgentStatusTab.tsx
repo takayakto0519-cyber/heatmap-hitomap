@@ -3,17 +3,19 @@
 // 🏢 AIエージェント稼働状況 — ローカルで動いているAIエージェント（agents/*.py、Windowsタスク
 // スケジューラ登録済み）の稼働状況を、外部の「ヒトマップビル」ダッシュボード（agent-dashboard/、
 // localhost:8765）に行かなくても運営ダッシュボードから直接確認できるようにする統合ビュー。
-// エージェントは会長の開発機のローカルファイル（agents/work/*.json）を読むため、
-// hitomap.com（本番）から見た場合はデータが無く「ローカル環境専用」の案内が出る。
-// 会長がこのPCで npm run dev した状態で開いたときだけ実データが表示される。
+// 会長がこのPCで npm run dev したときはローカルファイル（agents/work/*.json）を直接読んで
+// リアルタイム表示する。hitomap.com（本番）から見た場合はローカルファイルが無いため、
+// agents/sync_status_to_supabase.py が1時間おきに書き込むSupabaseのスナップショット
+// （＝会長のPCが最後に同期した時点の状況）を代わりに表示する。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Floor { id: string; name: string; emoji: string; order: number }
 interface AgentStatus {
   id: string; name: string; emoji: string; floor: string; schedule: string;
-  status: 'working' | 'resting';
+  status: 'working' | 'resting' | 'synced';
   result: Record<string, unknown> | null;
   generatedAt: string | null;
+  syncedAt?: string | null;
   level: number; xp: number;
 }
 interface VacantAgent { floor: string; num: number; name: string }
@@ -88,6 +90,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
   const [agents, setAgents] = useState<AgentStatus[]>([]);
   const [vacant, setVacant] = useState<VacantAgent[]>([]);
   const [local, setLocal] = useState<boolean | null>(null);
+  const [synced, setSynced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showVacant, setShowVacant] = useState(false);
@@ -103,6 +106,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
         setAgents(data.agents ?? []);
         setVacant(data.vacant ?? []);
         setLocal(Boolean(data.local));
+        setSynced(Boolean(data.synced));
       } else {
         setError(data.error ?? '取得に失敗しました');
       }
@@ -137,6 +141,11 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
 
   const workingCount = agents.filter(a => a.status === 'working').length;
   const sortedFloors = [...floors].sort((a, b) => a.order - b.order).filter(f => f.id !== 'exec' && f.id !== 'H');
+  const showRoster = local || synced;
+  const latestSync = agents.reduce<string | null>((latest, a) => {
+    const t = a.syncedAt ?? null;
+    return t && (!latest || t > latest) ? t : latest;
+  }, null);
 
   if (loading) return <p style={{ fontSize: 13, color: '#999' }}>エージェント稼働状況を読み込み中…</p>;
 
@@ -148,24 +157,38 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
 
-      {local === false && (
-        <div style={{ ...cardStyle, borderLeft: '4px solid #E5A139', marginBottom: 14 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#B7791F' }}>⚠ ローカル環境でのみ表示できます</p>
+      {local === false && synced && (
+        <div style={{ ...cardStyle, borderLeft: '4px solid #4A69BD', marginBottom: 14 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#4A69BD' }}>🔄 最終同期データを表示しています</p>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: '#777', lineHeight: 1.7 }}>
-            これらのエージェントは会長の開発機で動いているため、hitomap.com（本番）からはファイルが見えません。
-            会長のPCで <code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>npm run dev</code> を実行し、
-            localhostの運営ダッシュボードからこのタブを開くと実データが表示されます。
+            会長の開発機がリアルタイムには繋がっていないため、1時間おきの自動同期（sync_status_to_supabase.py）で
+            会長のPCが最後に送った状況を表示しています。
+            {latestSync && `最終同期：${new Date(latestSync).toLocaleString('ja-JP')}`}
           </p>
         </div>
       )}
 
-      {local && (
+      {local === false && !synced && (
+        <div style={{ ...cardStyle, borderLeft: '4px solid #E5A139', marginBottom: 14 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#B7791F' }}>⚠ まだ同期データがありません</p>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#777', lineHeight: 1.7 }}>
+            会長の開発機で <code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>python agents/sync_status_to_supabase.py</code> を
+            一度実行するか、次回の自動同期（1時間おき）を待つと表示されます。
+            会長のPCで <code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>npm run dev</code> して
+            localhostからこのタブを開くとリアルタイムの状況も見られます。
+          </p>
+        </div>
+      )}
+
+      {showRoster && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 4 }}>
-            <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #27AE60' }}>
-              <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>稼働中</p>
-              <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333' }}>{workingCount}体</p>
-            </div>
+            {local && (
+              <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #27AE60' }}>
+                <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>稼働中</p>
+                <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333' }}>{workingCount}体</p>
+              </div>
+            )}
             <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #4A69BD' }}>
               <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>実装済み番人</p>
               <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333' }}>{agents.length}体</p>
@@ -201,8 +224,8 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
                           {a.name}
-                          <span style={{ marginLeft: 8, ...pillStyle(a.status === 'working', '#27AE60') }}>
-                            {a.status === 'working' ? '実行中' : '待機中'}
+                          <span style={{ marginLeft: 8, ...pillStyle(a.status !== 'resting', a.status === 'working' ? '#27AE60' : '#4A69BD') }}>
+                            {a.status === 'working' ? '実行中' : a.status === 'synced' ? '同期済み' : '待機中'}
                           </span>
                         </p>
                         <p style={{ margin: '2px 0 0', fontSize: 11, color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

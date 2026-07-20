@@ -8,6 +8,7 @@
 // 外部送信は一切ここからは行わない。自動化するのは「判断の迷い」の除去だけ。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { computeEn, EN_KINDS, type EnKind, type EnRecord, type EnBreakdown } from '@/lib/enScore';
+import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 
 // ---------- データ型（各既存APIと同じ形） ----------
 interface ClientLead {
@@ -96,21 +97,19 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [needsMigration, setNeedsMigration] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [demoData, setDemoData] = useState<{ exists: boolean; enabled: boolean; totalCount: number } | null>(null);
-  const [demoToggling, setDemoToggling] = useState(false);
+  const [view, setView] = useState<'ledger' | 'relation'>('ledger');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes, demoRes] = await Promise.all([
+      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/en-records', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/sales-email-targets', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/client-dossiers', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
-        fetch('/api/admin/demo-data', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
       ]);
       if (leadsRes.ok) setLeads(leadsRes.leads ?? []);
       if (recordsRes.ok) {
@@ -121,7 +120,6 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       if (emailsRes.ok) setEmails(emailsRes.targets ?? []);
       if (dossiersRes.ok) setDossiers(dossiersRes.dossiers ?? []);
       if (profilesRes.ok) setMunicipalityProfiles(profilesRes.profiles ?? []);
-      if (demoRes.ok) setDemoData({ exists: demoRes.exists, enabled: demoRes.enabled, totalCount: demoRes.totalCount });
       const failed = [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes].find(r => !r.ok);
       if (failed) setError(failed.error ?? '一部のデータの取得に失敗しました');
     } catch {
@@ -132,23 +130,6 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   }, [authHeaders]);
 
   useEffect(() => { load(); }, [load]);
-
-  async function toggleDemoData(nextEnabled: boolean) {
-    setDemoToggling(true);
-    try {
-      const res = await fetch('/api/admin/demo-data', {
-        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: nextEnabled }),
-      });
-      const data = await res.json();
-      if (data.ok) setDemoData(d => d ? { ...d, enabled: data.enabled } : d);
-      else setError(data.error ?? 'デモデータの切り替えに失敗しました');
-    } catch {
-      setError('通信エラー');
-    } finally {
-      setDemoToggling(false);
-    }
-  }
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -280,31 +261,24 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </p>
       </div>
 
-      {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
+      {/* ---------- 縁の台帳／関係人口 切り替え ---------- */}
+      <div style={{ display: 'flex', gap: 6, margin: '14px 0' }}>
+        <button onClick={() => setView('ledger')} style={{
+          padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+          background: view === 'ledger' ? '#38ADA9' : '#fff', color: view === 'ledger' ? '#fff' : '#666',
+          boxShadow: view === 'ledger' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+        }}>🧭 縁の台帳・営業</button>
+        <button onClick={() => setView('relation')} style={{
+          padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+          background: view === 'relation' ? '#38ADA9' : '#fff', color: view === 'relation' ? '#fff' : '#666',
+          boxShadow: view === 'relation' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+        }}>🔁 関係人口・自治体プロファイル</button>
+      </div>
 
-      {demoData?.exists && (
-        <div style={{ ...cardStyle, marginTop: 10, borderLeft: `4px solid ${demoData.enabled ? '#E5A139' : '#999'}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#333' }}>🎭 営業デモ用の合成データ（{demoData.totalCount}件・デモ架空市）</p>
-            <p style={{ margin: '3px 0 0', fontSize: 11, color: '#999', lineHeight: 1.6 }}>
-              {demoData.enabled
-                ? '現在、公開マップ・自治体向けダッシュボードに表示されています。商談以外の時間は「非表示」にしておくことを推奨。'
-                : '現在は非表示です。商談の直前にオンにすると、公開マップ・ダッシュボードにデモ痕跡が反映されます。'}
-            </p>
-          </div>
-          <button
-            onClick={() => toggleDemoData(!demoData.enabled)}
-            disabled={demoToggling}
-            style={{
-              padding: '6px 16px', borderRadius: 14, fontSize: 12, fontWeight: 700, cursor: demoToggling ? 'default' : 'pointer',
-              border: `1.5px solid ${demoData.enabled ? '#E5A139' : '#999'}`,
-              background: demoData.enabled ? '#E5A13918' : '#fff',
-              color: demoData.enabled ? '#B7791F' : '#999',
-              opacity: demoToggling ? 0.6 : 1,
-            }}
-          >{demoToggling ? '切替中…' : demoData.enabled ? '● 表示中（クリックで非表示）' : '○ 非表示（クリックで表示）'}</button>
-        </div>
-      )}
+      {view === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
+
+      {view === 'ledger' && <>
+      {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
 
       {needsMigration && (
         <div style={{ ...cardStyle, marginTop: 10, borderLeft: '4px solid #E5A139' }}>
@@ -426,6 +400,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>※送信はご自身のメールソフトから。ここは記録だけ。</p>
         </div>
       )}
+      </>}
     </div>
   );
 }

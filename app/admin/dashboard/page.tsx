@@ -10,7 +10,6 @@ import BlocksTab from '@/components/admin/BlocksTab';
 import PostsTab from '@/components/admin/PostsTab';
 import OverviewTab from '@/components/admin/OverviewTab';
 import AttachmentTab from '@/components/admin/AttachmentTab';
-import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import TracePatternTab from '@/components/admin/TracePatternTab';
 import SettingsTab from '@/components/admin/SettingsTab';
 import SnsTab from '@/components/admin/SnsTab';
@@ -25,7 +24,7 @@ const LocationPickerMap = dynamic(() => import('@/components/form/LocationPicker
   loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#aaa', fontSize: 12 }}>地図を読み込み中…</div>,
 });
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'agentstatus' | 'leads' | 'attachment' | 'relation' | 'patterns' | 'aiops' | 'minutes';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'agentstatus' | 'leads' | 'attachment' | 'patterns' | 'aiops' | 'minutes';
 
 // タブをカテゴリ分けして表示するためのメタ情報（アイコン・説明・所属グループ）
 const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: string }> = {
@@ -45,10 +44,9 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   bizmodels: { label: 'ビジネスモデル案', icon: '💡', group: '調査・研究', desc: '新しい事業案を書き溜め、検証状況を追う' },
   funding: { label: 'コンテスト・助成金', icon: '🏆', group: '学校・法人', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
-  sales: { label: '縁の司令室', icon: '🧭', group: '学校・法人', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立て、今日の一手を自動で示す' },
+  sales: { label: '縁の司令室', icon: '🧭', group: '学校・法人', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる縁の台帳と、関係人口・自治体プロファイルを統合' },
   leads: { label: '学校・法人', icon: '🎓', group: '学校・法人', desc: '問い合わせ・契約状況の管理' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
-  relation: { label: '関係人口', icon: '🔁', group: '調査・研究', desc: '複数回関わった人（関係人口の芽）と地域ランキング' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
   aiops: { label: 'AIエージェント運営', icon: '🤖', group: 'AIエージェント', desc: '収益化イニシアチブ・案件パイプライン・顧問先カルテ・LINE縁ミッション・営業メール送り先の管理' },
   agentstatus: { label: '稼働状況', icon: '🏢', group: 'AIエージェント', desc: 'ローカルAIエージェント（番人）の稼働状況・空きオフィスを確認（会長のPCでのみ実データ表示）' },
@@ -396,7 +394,6 @@ export default function AdminDashboardPage() {
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={id => goTab(id as Tab)} />}
           {tab === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
-          {tab === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
           {tab === 'aiops' && <AIOpsTab authHeaders={authHeaders} />}
           {tab === 'agentstatus' && <AgentStatusTab authHeaders={authHeaders} />}

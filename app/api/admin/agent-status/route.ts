@@ -101,7 +101,29 @@ export async function GET(req: NextRequest) {
 
   const workDir = path.join(process.cwd(), 'agents', 'work');
   if (!fs.existsSync(workDir)) {
-    return NextResponse.json({ ok: true, local: false, floors: FLOORS, vacant: VACANT_AGENTS });
+    // hitomap.com（本番）等、ローカルファイルが無い環境から見た場合は、
+    // agents/sync_status_to_supabase.py が定期的に書き込んでいるSupabaseの
+    // スナップショットを代わりに読む（＝会長がローカルPCを最後に同期した時点の状況）。
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      try {
+        const { supabaseServer } = await import('@/lib/supabase/server');
+        const { data, error } = await supabaseServer.from('agent_status_snapshot').select('*');
+        if (!error && data && data.length > 0) {
+          const agents = data.map(row => ({
+            id: row.agent_id, name: row.name, emoji: row.emoji, floor: row.floor, schedule: row.schedule,
+            status: 'synced' as const,
+            result: row.result,
+            generatedAt: row.generated_at,
+            syncedAt: row.synced_at,
+            level: row.level, xp: row.xp,
+          }));
+          return NextResponse.json({ ok: true, local: false, synced: true, floors: FLOORS, agents, vacant: VACANT_AGENTS });
+        }
+      } catch {
+        // Supabase未設定・テーブル未作成でもエラーにはせず、下のlocal:falseにフォールバックする
+      }
+    }
+    return NextResponse.json({ ok: true, local: false, synced: false, floors: FLOORS, vacant: VACANT_AGENTS });
   }
 
   const xp = readJson(path.join(workDir, 'xp.json')) ?? {};
