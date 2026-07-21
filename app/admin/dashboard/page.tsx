@@ -24,10 +24,11 @@ import QuestsTab from '@/components/admin/QuestsTab';
 import UsersTab from '@/components/admin/UsersTab';
 import EventPlansTab from '@/components/admin/EventPlansTab';
 import BizModelIdeasTab from '@/components/admin/BizModelIdeasTab';
+import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 import MinutesTab from '@/components/admin/MinutesTab';
 import { inputStyle } from '@/components/admin/adminShared';
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'funding' | 'sales' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'proposals' | 'funding' | 'sales' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
 
 // 旧タブIDからの後方互換：
 // - ?tab=aiops / ?tab=agentstatus → agents（AIエージェント2タブ統合）
@@ -53,6 +54,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   quests: { label: 'クエスト', icon: '🎯', group: '体験づくり', desc: 'クエストの作成・管理' },
   events: { label: 'イベント計画', icon: '🎪', group: '体験づくり', desc: '企画中イベントのメモ' },
   bizmodels: { label: 'ビジネスモデル案', icon: '💡', group: '調査・研究', desc: '新しい事業案を書き溜め、検証状況を追う' },
+  proposals: { label: '提案ボード', icon: '📮', group: '調査・研究', desc: '新規事業・マーケティング・競合調査などAIスキルが出した提案を一覧・ステータス管理する' },
   funding: { label: 'コンテスト・助成金', icon: '🏆', group: '営業・自治体', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
   sales: { label: '営業', icon: '🧭', group: '営業・自治体', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。学校・法人／関係人口・自治体プロファイルも統合' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
@@ -288,6 +290,7 @@ export default function AdminDashboardPage() {
           {tab === 'quests' && <QuestsTab authHeaders={authHeaders} />}
           {tab === 'events' && <EventPlansTab authHeaders={authHeaders} />}
           {tab === 'bizmodels' && <BizModelIdeasTab authHeaders={authHeaders} />}
+          {tab === 'proposals' && <StrategyProposalsTab authHeaders={authHeaders} />}
           {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} />}
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={id => goTab(id as Tab)} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
