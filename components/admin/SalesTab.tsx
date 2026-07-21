@@ -311,7 +311,24 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [ledgerFilter, setLedgerFilter] = useState<'active' | 'all'>('active');
 
   function scrollToLead(leadId: string) {
-    document.getElementById(`en-card-${leadId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 営業リストは上位15件のみ表示（折りたたみ）のため、スコアが低くまだ折りたたみの外にいる
+    // リード（追加直後で記録が無いものなど）はDOMに存在せず、そのままではスクロールが反応しない。
+    // 先に「すべて表示」を開き、83件規模の再描画が終わるまでポーリングしてからスクロールする
+    // （rAFを1〜2回挟むだけでは大きなリストの再描画に間に合わないことがある）。
+    setShowAllRanked(true);
+    setLedgerFilter('all');
+    const targetId = `en-card-${leadId}`;
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      attempts += 1;
+      if (attempts < 20) setTimeout(tryScroll, 50);
+    };
+    setTimeout(tryScroll, 50);
   }
 
   const ledgerById = useMemo(() => {
