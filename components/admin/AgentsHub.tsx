@@ -6,10 +6,12 @@
 import { useState } from 'react';
 import AgentStatusTab from '@/components/admin/AgentStatusTab';
 import AIOpsTab from '@/components/admin/AIOpsTab';
+import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 
 const VIEWS = [
   { key: 'status', label: '🏢 稼働状況・名簿' },
   { key: 'ops', label: '📇 運営データ' },
+  { key: 'proposals', label: '💡 提案ボード' },
 ] as const;
 type View = typeof VIEWS[number]['key'];
 
@@ -30,6 +32,7 @@ export default function AgentsHub({ authHeaders, initialView }: { authHeaders: (
       </div>
       {view === 'status' && <AgentStatusTab authHeaders={authHeaders} />}
       {view === 'ops' && <AIOpsTab authHeaders={authHeaders} />}
+      {view === 'proposals' && <StrategyProposalsTab authHeaders={authHeaders} />}
     </div>
   );
 }

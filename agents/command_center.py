@@ -47,6 +47,7 @@ AGENT_META: dict[str, tuple[str, str, str | None]] = {
     "global_market_watch": ("J", "海外展開リサーチ", None),
     "academic_partnership_watch": ("J", "産学連携リサーチ", None),
     "memorial_anniversary_watch": ("J", "周年史アーカイブ", "upcoming_count"),
+    "action_items_digest": ("A", "作業状況デイリー報告", "manual_required_count"),
 }
 
 
