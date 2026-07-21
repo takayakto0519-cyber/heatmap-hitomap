@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
+import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 
 // 案件ごとに折りたたみ、開いた案件だけ詳細（メモ・ロードマップ）を表示することで
 // 縦スクロール量を大きく減らす。ヘッダー行はタイトル・ステータス・件数目安のみ。
@@ -143,6 +144,13 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {migrationFile && <MigrationNotice title="ビジネスモデル案のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
+
+      <AgentDigestPanel
+        authHeaders={authHeaders}
+        agentIds={['new_biz_signal_watch', 'academic_partnership_watch']}
+        title="🤖 番人が自動で集めてきた新規事業の種"
+        hint="新規事業の種探し・産学連携リサーチの番人が拾ってきた材料です。ここは読むだけで保存はされません。事業案にしたいものは、下の「＋ 新しいビジネスモデル案を追加」か、チャットで「これ登録して」と言ってください。"
+      />
 
       {showCreate ? (
         <Card style={{ marginBottom: 14 }}>

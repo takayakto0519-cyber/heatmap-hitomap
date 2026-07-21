@@ -6,6 +6,11 @@
 // 登録・更新はAI APIの自動呼び出しではなく、会長がチャットで「登録して」と指示した時にClaude Codeが書き込む運用。
 import { useCallback, useEffect, useState } from 'react';
 import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
+import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
+
+// ニュース番人は9分野を集めてくるので、マーケ関連の分野だけに絞る。
+// この分野名は agents/marketing_digest.py の NEWS_DIGEST_CATEGORY と揃えること。
+const MARKETING_NEWS_CATEGORIES = ['観光・関係人口・採用DX'];
 
 interface StrategyProposal {
   id: string;
@@ -75,6 +80,18 @@ export default function MarketingProposalsTab({ authHeaders }: { authHeaders: ()
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {migrationFile && <MigrationNotice title="提案ボードのテーブルがまだ作成されていません" migrationFile={migrationFile} />}
 
+      <AgentDigestPanel
+        authHeaders={authHeaders}
+        agentIds={['news_digest', 'marketing_digest']}
+        categoryFilter={MARKETING_NEWS_CATEGORIES}
+        title="🤖 番人が自動で集めてきた最新のニュース"
+        hint="ニュース番人が拾った観光・関係人口・採用DXの記事です。ここは読むだけで保存はされません。施策の種になりそうなものは、チャットで「これ登録して」と言ってください。"
+      />
+
+      <p style={{ margin: '18px 0 4px', fontWeight: 800, fontSize: 13.5 }}>📌 会長が残した提案</p>
+      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
+        会長が「登録して」と指示したマーケティング施策だけがここに残ります。
+      </p>
       {proposals.length === 0 && <p style={{ color: '#aaa' }}>まだ提案がありません。</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

@@ -6,6 +6,7 @@
 // 登録・更新はAI APIの自動呼び出しではなく、会長がチャットで「登録して」と指示した時にClaude Codeが書き込む運用。
 import { useCallback, useEffect, useState } from 'react';
 import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
+import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 
 interface StrategyProposal {
   id: string;
@@ -107,6 +108,13 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {migrationFile && <MigrationNotice title="提案ボードのテーブルがまだ作成されていません" migrationFile={migrationFile} />}
 
+      <AgentDigestPanel
+        authHeaders={authHeaders}
+        agentIds={['competitor_market_research', 'competitor_feature_monitor', 'global_market_watch']}
+        title="🤖 番人が自動で集めてきた最新の調査"
+        hint="毎朝スケジュール実行される番人が拾ってきた記事です。ここは読むだけで保存はされません。残しておきたいものだけ、チャットで「これ登録して」と言ってください。"
+      />
+
       <Card style={{ marginBottom: 14 }}>
         <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 13 }}>🔍 競合・市場調査 系統マップ</p>
         <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
@@ -129,6 +137,10 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
         </div>
       </Card>
 
+      <p style={{ margin: '18px 0 4px', fontWeight: 800, fontSize: 13.5 }}>📌 会長が残した提案</p>
+      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
+        上の番人の調査から会長が「登録して」と指示したものだけがここに残ります。
+      </p>
       {proposals.length === 0 && <p style={{ color: '#aaa' }}>まだ提案がありません。</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

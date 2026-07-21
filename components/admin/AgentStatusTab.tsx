@@ -66,6 +66,19 @@ function summarize(agentId: string, result: Record<string, unknown> | null): str
       const kw = (result.top_keywords as { word: string }[]) ?? [];
       return (kw[0] ? `頻出フレーズ最多:「${kw[0].word.slice(0, 20)}」` : '目立つ頻出フレーズなし') + ` ／停滞事業案${result.stale_idea_count ?? 0}件`;
     }
+    // 調査系の番人（digest形の結果を持つもの）は「total=24件」ではなく分野の内訳を出す。
+    // 中身そのものは各タブの AgentDigestPanel で読める。
+    case 'competitor_market_research':
+    case 'competitor_feature_monitor':
+    case 'global_market_watch':
+    case 'academic_partnership_watch': {
+      const digest = result.digest as Record<string, unknown[]> | undefined;
+      const total = Number(result.total ?? 0);
+      if (!digest) return total > 0 ? `${total}件` : '正常';
+      const cats = Object.entries(digest);
+      const top = cats.slice().sort((a, b) => (b[1]?.length ?? 0) - (a[1]?.length ?? 0))[0];
+      return `${cats.length}分野${total}件${top ? `（${top[0]} ${top[1]?.length ?? 0}件ほか）` : ''}`;
+    }
     default: {
       // 汎用フォールバック：よくあるフィールドを拾って並べる
       const fields: [string, string][] = [
