@@ -62,7 +62,7 @@ def main():
             "target_count": len([t for t in targets if not str(t.get("company", "")).startswith("（例）")]),
             "drafted_now": drafted_now,
             "pending_send": pending_send,
-            "note": "下書きを06番地/営業メール下書き に用意しました。送信は会長が手動で。",
+            "note": "下書きを 06_実行待機_Approval/営業メール下書き に用意しました。送信は会長が手動で。",
         })
 
 

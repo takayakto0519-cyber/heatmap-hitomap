@@ -20,7 +20,7 @@ def main():
         ap = _read("approval_watch")
         if ap:
             n = ap.get("stale_count", 0)
-            lines.append(f"・06番地の番人：承認待ちの滞留は{n}件。" + ("急いで見てあげてください。" if n else "きれいに片付いています。"))
+            lines.append(f"・送信待ちドラフトの見張り番：そのままの下書きは{n}件。" + ("急いで見てあげてください。" if n else "きれいに片付いています。"))
 
         cp = _read("case_pipeline_watch")
         if cp:

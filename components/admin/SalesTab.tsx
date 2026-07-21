@@ -463,7 +463,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         {[
           { label: '営業対象', value: `${activeLedger.length}件`, sub: `記録 ${records.length}本`, color: '#4A69BD' },
           { label: '火が消えかけ', value: `${coldCount}件`, sub: '45日以上で❄', color: '#E55039' },
-          { label: '承認待ち', value: `${pendingApproval.length}件`, sub: '06番地の確認', color: '#E5A139' },
+          { label: '送信待ち', value: `${pendingApproval.length}件`, sub: '会長の確認待ち', color: '#E5A139' },
           { label: '便り（未送信）', value: `${emails.filter(e => !e.sent).length}件`, sub: `下書き済 ${draftedUnsent.length}件`, color: '#8E44AD' },
           { label: '結ばれた縁', value: `${Math.max(contracted.length, dossiers.length)}社`, sub: `月額計 ${monthlyRecurring.toLocaleString()}円`, color: '#27AE60' },
         ].map(kpi => (

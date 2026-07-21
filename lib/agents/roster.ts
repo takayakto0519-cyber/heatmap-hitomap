@@ -41,7 +41,7 @@ export const FLOORS: Floor[] = [
 
 // 番人（Pythonで自動実行・稼働状況に表示）
 export const SCRIPTS: AgentDef[] = [
-  { id: 'approval_watch', name: '3. 06番地滞留監視', emoji: '🐹', floor: 'A', kind: 'script', schedule: '毎日 08:00' },
+  { id: 'approval_watch', name: '3. 送信待ちドラフトの監視', emoji: '🐹', floor: 'A', kind: 'script', schedule: '毎日 08:00' },
   { id: 'report_screen', name: '19. 通報一次スクリーニングAI', emoji: '🦫', floor: 'D', kind: 'script', schedule: '毎日 07:30' },
   { id: 'trace_qa', name: '22. データ整合性夜間QA番人', emoji: '🦔', floor: 'D', kind: 'script', schedule: '毎日 02:00' },
   { id: 'deadline_watch', name: '54. 課題締切トラッキングAI', emoji: '🐰', floor: 'K', kind: 'script', schedule: '毎日 07:00' },

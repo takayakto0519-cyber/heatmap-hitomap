@@ -83,7 +83,7 @@
   "scripts": [
     {
       "id": "approval_watch",
-      "name": "3. 06番地滞留監視",
+      "name": "3. 送信待ちドラフトの監視",
       "emoji": "🐹",
       "floor": "A",
       "kind": "script",

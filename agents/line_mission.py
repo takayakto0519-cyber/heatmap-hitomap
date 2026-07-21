@@ -97,12 +97,12 @@ def main():
         text = _mission_text(pair[0], pair[1])
         today = datetime.now().strftime("%Y%m%d")
 
-        # 常に下書きを06番地に保存（記録と、auto_pushでない時の会長送信用）
+        # 常に下書きを 06_実行待機_Approval に保存（記録と、auto_pushでない時の会長送信用）
         APPROVAL_DIR.mkdir(parents=True, exist_ok=True)
         draft_path = APPROVAL_DIR / f"LINE縁ミッション_{today}.md"
         draft_path.write_text(f"# LINE縁ミッション下書き（{today}）\n\n以下をLINEグループに投稿:\n\n---\n{text}\n---\n", encoding="utf-8")
 
-        pushed = "下書きのみ（auto_push=false）。06番地に保存しました。会長が送ってください。"
+        pushed = "下書きのみ（auto_push=false）。06_実行待機_Approval に保存しました。会長が送ってください。"
         if config.get("auto_push"):
             env = common.load_env_local()
             token = env.get("LINE_CHANNEL_TOKEN")
@@ -111,7 +111,7 @@ def main():
                 try:
                     pushed = _push_to_line(token, gid, text)
                 except Exception as e:
-                    pushed = f"push失敗: {e}（下書きは06番地に残しています）"
+                    pushed = f"push失敗: {e}（下書きは 06_実行待機_Approval に残しています）"
             else:
                 pushed = "auto_pushはtrueですが、LINE_CHANNEL_TOKEN か group_id が未設定です。下書きのみ。"
 

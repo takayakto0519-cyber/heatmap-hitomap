@@ -19,7 +19,7 @@ FLOOR_NAMES = {
 # agent_id -> (フロア, 表示名, 注意判定に使うフィールド名 or None)
 # urgent_fieldの値が0より大きければ「注意」とみなす。Noneは常時「正常」扱い（個別ロジックは_is_urgentで例外対応）。
 AGENT_META: dict[str, tuple[str, str, str | None]] = {
-    "approval_watch": ("A", "06番地滞留監視", "stale_count"),
+    "approval_watch": ("A", "送信待ちドラフトの監視", "stale_count"),
     "report_screen": ("D", "通報一次スクリーニング", "pending_count"),
     "trace_qa": ("D", "データ整合性QA", "issue_count"),
     "deadline_watch": ("K", "課題締切トラッキング", "urgent_count"),
@@ -54,7 +54,9 @@ AGENT_META: dict[str, tuple[str, str, str | None]] = {
 # 会長が一目で「何が起きているか」を読めるようにするための文言。ここに無いagent_idは
 # _headline() のフォールバックで name を使った汎用文になる（生のフィールド名は出さない）。
 HEADLINE_TEMPLATES: dict[str, str] = {
-    "approval_watch": "承認待ちの資料が{n}件、3日以上放置されています",
+    # 「承認待ち」は投稿モデレーションのタブ名と紛らわしいので使わない。
+    # どのフォルダを見ればよいかが分かるように、実際のフォルダ名まで出す。
+    "approval_watch": "送信待ちの下書きが{n}件、3日以上そのままです（書類フォルダ「06_実行待機_Approval」）",
     "trace_qa": "投稿データに直すべき箇所が{n}件あります（タイトル空欄・画像未設定など）",
     "deadline_watch": "締切が3日以内に迫っている課題が{n}件あります",
     "spam_detect": "同じタイトルの投稿が3回以上重複しているものが{n}件あります",
