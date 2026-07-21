@@ -316,6 +316,9 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     // 先に「すべて表示」を開いたうえで、対象の要素が実際にDOMへ挿入されるまで
     // MutationObserverで監視してからスクロールする（83件規模の再描画は固定時間のポーリングでは
     // 環境によって間に合わないことがあるため、時間ではなく「挿入イベント」を待つ）。
+    // behaviorは'smooth'ではなく'auto'（瞬時）にする：挿入直後は残りのリスト（68件超）の
+    // 再描画がまだ主スレッドで続いており、smoothのアニメーションがその途中で
+    // ブラウザにキャンセルされ、何も起きなかったように見える不具合を実測で確認したため。
     setShowAllRanked(true);
     setLedgerFilter('all');
     const targetId = `en-card-${leadId}`;
@@ -323,7 +326,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     const scrollIfFound = (): boolean => {
       const el = document.getElementById(targetId);
       if (!el) return false;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'auto', block: 'center' });
       return true;
     };
 
