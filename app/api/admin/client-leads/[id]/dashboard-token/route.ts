@@ -20,6 +20,7 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
   const body = await req.json().catch(() => ({})) as {
     region?: string; label?: string;
     bbox_min_lat?: number; bbox_max_lat?: number; bbox_min_lng?: number; bbox_max_lng?: number;
+    boundary_geojson?: { type?: string; coordinates?: unknown } | null;
   };
   if (!body.region) {
     return NextResponse.json<IssueDashboardTokenResponse>({ ok: false, error: 'region は必須です' }, { status: 400 });
@@ -41,6 +42,18 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
     );
   }
 
+  // 境界ポリゴンは簡易チェックのみ（過剰なGeoJSON検証ライブラリは導入しない）
+  const boundary = body.boundary_geojson;
+  const hasBoundary = Boolean(
+    boundary && (boundary.type === 'Polygon' || boundary.type === 'MultiPolygon') && Array.isArray(boundary.coordinates)
+  );
+  if (boundary && !hasBoundary) {
+    return NextResponse.json<IssueDashboardTokenResponse>(
+      { ok: false, error: '境界データの形式が不正です' },
+      { status: 400 }
+    );
+  }
+
   const { supabaseServer } = await import('@/lib/supabase/server');
 
   // 同じ地域向けに既に有効なトークンがあれば使い回す（発行しすぎて管理が煩雑になるのを防ぐ）
@@ -54,9 +67,11 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
 
   let access = existing as DashboardAccess | null;
 
-  // 既存トークンの範囲指定が今回の指定と食い違う場合は使い回さず、新規発行に進む
+  // 既存トークンの範囲指定・境界データが今回の指定と食い違う場合は使い回さず、新規発行に進む
   // （範囲を変えたい＝実質的に別のダッシュボードとして扱う）
-  if (access && hasBbox !== (access.bbox_min_lat !== null)) access = null;
+  if (access && (hasBbox !== (access.bbox_min_lat !== null) || hasBoundary !== (access.boundary_geojson !== null))) {
+    access = null;
+  }
 
   if (!access) {
     const { data, error } = await supabaseServer
@@ -70,6 +85,7 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
         bbox_max_lat: hasBbox ? body.bbox_max_lat : null,
         bbox_min_lng: hasBbox ? body.bbox_min_lng : null,
         bbox_max_lng: hasBbox ? body.bbox_max_lng : null,
+        boundary_geojson: hasBoundary ? boundary : null,
       })
       .select()
       .single();

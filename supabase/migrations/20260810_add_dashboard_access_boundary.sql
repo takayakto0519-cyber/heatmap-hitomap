@@ -1,0 +1,15 @@
+-- 自治体向けダッシュボードの表示を「その自治体だけの地図」に見せるための境界ポリゴン（GeoJSON）。
+-- 既存の bbox_min/max_lat/lng（矩形）はデータ絞り込み用にそのまま残す（point-in-polygon判定は重いため）。
+-- boundary_geojson は地図表示側のマスク描画・パン制限にのみ使う。
+--
+-- データ出典：国土数値情報 行政区域データ（N03）、smartnews-smri/japan-topography 経由。
+-- scripts/fetch-municipality-boundaries.mjs で取得した data/municipality-boundaries/*.json から、
+-- 運営ダッシュボードの発行フロー（/api/admin/client-leads/[id]/dashboard-token）が
+-- 該当自治体のgeometryをそのままこのカラムに保存する想定。
+--
+-- 注意：ensure_schema() の全文再定義は、このファイル単体では行わない。
+-- 20260806_add_dashboard_access_bbox.sql と同じ理由（古いスナップショットをベースに
+-- 再定義すると、その間に追加されたテーブル定義が抜け落ちて事故る前例が複数回あったため、
+-- 20260807_add_site_settings.sql参照）。ensure_schema()の全文再定義は
+-- 「その時点で最新の全定義を確実に把握できている時」のみ行う。
+ALTER TABLE dashboard_access ADD COLUMN IF NOT EXISTS boundary_geojson jsonb;
