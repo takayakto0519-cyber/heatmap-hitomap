@@ -103,7 +103,10 @@ async function gmailFetch(path: string, params: Record<string, string>): Promise
   const accessToken = await getAccessToken();
   const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+  // Next.jsはRoute Handler内のfetchを既定でキャッシュすることがあるため、
+  // 実行のたびに必ずGmailを再確認するようcache:'no-store'を明示する
+  // （このcacheバグでcronの2回目以降が前回と同じ結果を返し続けていたことが判明したため）
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' });
   const data = await res.json();
   if (!res.ok) throw new Error(`Gmail API呼び出しに失敗しました(${path}): ${data.error?.message ?? res.status}`);
   return data;

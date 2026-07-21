@@ -17,6 +17,7 @@ import { listUpcomingEventsGrouped } from '@/lib/googleCalendarServer';
 import { notifyDiscord, notifyDiscordError } from '@/lib/discord';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const maxDuration = 60;
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
