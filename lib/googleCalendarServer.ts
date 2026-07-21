@@ -14,8 +14,8 @@ const TIME_ZONE = 'Asia/Tokyo';
 const JST_OFFSET = '+09:00';
 
 // 予約を受け付ける営業時間（JST・平日のみ）。必要に応じて調整する。
-const BUSINESS_START_HOUR = 10;
-const BUSINESS_END_HOUR = 18;
+const BUSINESS_START_HOUR = 9;
+const BUSINESS_END_HOUR = 23;
 
 export interface AvailabilitySlot {
   start: string; // ISO8601
@@ -117,28 +117,32 @@ export async function isSlotFree(startTime: string, endTime: string): Promise<bo
 }
 
 /**
- * 直近days営業日ぶんの空き枠を計算する（真のfreeBusy APIを使用）。
- * 平日・営業時間内（既定10:00-18:00 JST）を、durationMinutes刻みでスロット化し、
+ * 指定した日付範囲（JST・両端含む）の空き枠を計算する（真のfreeBusy APIを使用）。
+ * 平日・営業時間内（既定9:00-23:00 JST）を、durationMinutes刻みでスロット化し、
  * 既存の予定（busy区間）と重ならないものだけを返す。
+ *
+ * 月間カレンダーグリッド表示のため、土日・空き無し日・過去日も含めて範囲内の
+ * 全カレンダー日ぶん `{date, slots}` を返す（該当日はslots: []）。呼び出し側
+ * （app/api/schedule/availability/route.ts）が表示中の月の範囲を渡す。
  */
-export async function getAvailability(days: number, durationMinutes: number): Promise<AvailabilityDay[]> {
+export async function getAvailability(fromDate: string, toDate: string, durationMinutes: number): Promise<AvailabilityDay[]> {
   const accessToken = await getAccessToken();
   const now = new Date();
-  const todayParts = jstPartsFromDate(now);
-  const windowStart = jstIso(todayParts.y, todayParts.m, todayParts.d, 0, 0);
-  const endParts = addDays(todayParts, days + 3); // 週末を挟んでも十分な平日数を確保するため少し多めに取る
-  const windowEnd = jstIso(endParts.y, endParts.m, endParts.d, 23, 59);
+  const [fy, fm, fd] = fromDate.split('-').map(Number);
+  const [ty, tm, td] = toDate.split('-').map(Number);
+  const windowStart = jstIso(fy, fm, fd, 0, 0);
+  const windowEnd = jstIso(ty, tm, td, 23, 59);
 
   const busy = await fetchBusyIntervals(accessToken, windowStart, windowEnd);
 
   const result: AvailabilityDay[] = [];
-  let cursor = todayParts;
-  let businessDaysCollected = 0;
+  let cursor = addDays({ y: fy, m: fm, d: fd, weekday: 0 }, 0); // weekdayを正しく計算させるためaddDays(+0日)を通す
   let safety = 0;
-  while (businessDaysCollected < days && safety < days + 14) {
+  const maxIterations = 400; // 月表示の想定範囲（前後端込みで最大42日程度）を大きく上回る安全弁
+  while (safety < maxIterations) {
     safety++;
+    const slots: AvailabilitySlot[] = [];
     if (cursor.weekday !== 0 && cursor.weekday !== 6) {
-      const slots: AvailabilitySlot[] = [];
       for (let hh = BUSINESS_START_HOUR; hh * 60 + durationMinutes <= BUSINESS_END_HOUR * 60; ) {
         const startIso = jstIso(cursor.y, cursor.m, cursor.d, Math.floor(hh), Math.round((hh % 1) * 60));
         const startMs = new Date(startIso).getTime();
@@ -150,19 +154,18 @@ export async function getAvailability(days: number, durationMinutes: number): Pr
         }
         hh += durationMinutes / 60;
       }
-      if (slots.length > 0) {
-        result.push({ date: `${cursor.y}-${String(cursor.m).padStart(2, '0')}-${String(cursor.d).padStart(2, '0')}`, slots });
-      }
-      businessDaysCollected++;
     }
+    result.push({ date: `${cursor.y}-${String(cursor.m).padStart(2, '0')}-${String(cursor.d).padStart(2, '0')}`, slots });
+    if (cursor.y === ty && cursor.m === tm && cursor.d === td) break;
     cursor = addDays(cursor, 1);
   }
   return result;
 }
 
-// 日程調整サイト（/schedule）経由の打ち合わせで使う固定のGoogle MeetURL。
-// 会長の指示で全件このURLに統一する（Google Calendar側の自動発行conferenceDataは使わない）。
-export const SCHEDULING_MEET_URL = 'https://meet.google.com/kbk-hhwi-pzc';
+// lib/scheduleConstants.ts に切り出し済み（クライアント側の確認画面からも参照するため）。
+// 既存の呼び出し元（app/api/admin/booking-requests/[id]/route.ts）が引き続き
+// このファイルから import できるよう re-export しておく。
+export { SCHEDULING_MEET_URL } from '@/lib/scheduleConstants';
 
 export interface CreateEventInput {
   summary: string;
