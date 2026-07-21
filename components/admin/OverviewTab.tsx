@@ -5,7 +5,7 @@
 // 「どの分野が動いていて、どこが滞っているか」を見る画面に再設計した。
 // 数値は /api/admin/stats（既存・ログイン確認兼用）と /api/admin/biz-stats（分野別）の2本から取る。
 import { useEffect, useState } from 'react';
-import { ErrorBanner, LoadingLine } from '@/components/admin/adminShared';
+import { ErrorBanner, LoadingLine, type TabBadgeCounts } from '@/components/admin/adminShared';
 
 interface RegionValence { region: string; valence: { positive: number; negative: number; neutral: number; total: number } }
 
@@ -99,7 +99,7 @@ const ATTENTION_JUMP: Record<string, { tab: string; label: string }> = {
 export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, tabGroups, siteLinks }: {
   authHeaders: () => HeadersInit;
   goTab: (id: string) => void;
-  badgeCounts: { pendingReview: number; pendingReports: number } | null;
+  badgeCounts: TabBadgeCounts | null;
   tabMeta: Record<string, OverviewTabMetaEntry>;
   tabGroups: string[];
   siteLinks: OverviewSiteLink[];
@@ -161,8 +161,8 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
   // 数字が取れなかったことは下のErrorBannerで伝えつつ、導線は描画し続ける。
   if (!stats) return <LoadingLine />;
 
-  const pendingReview = badgeCounts?.pendingReview ?? stats.pendingReview;
-  const pendingReports = badgeCounts?.pendingReports ?? stats.pendingReports;
+  const pendingReview = badgeCounts?.review ?? stats.pendingReview;
+  const pendingReports = badgeCounts?.reports ?? stats.pendingReports;
 
   return (
     <div>
@@ -314,7 +314,9 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
             <p style={{ margin: '0 0 6px', fontSize: 12, color: '#999', fontWeight: 700 }}>{group}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
               {Object.keys(tabMeta).filter(id => tabMeta[id].group === group).map(id => {
-                const count = id === 'review' ? pendingReview : id === 'reports' ? pendingReports : 0;
+                // page.tsx の badgeFor と同じマップを引くだけ（以前はここに同じ三項演算子が
+                // 二重に書かれていて、バッジを増やすたび2箇所直す必要があった）
+                const count = badgeCounts?.[id] ?? 0;
                 return (
                   <button key={id} onClick={() => goTab(id)} style={{
                     textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',

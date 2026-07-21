@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 import { summarizeValence } from '@/lib/emotions';
 import { DEMO_SESSION_CODE, DEMO_TITLE_PREFIX } from '@/lib/demoData';
+import { safeCount, safeRows } from '@/lib/adminApi';
+import { computeFollowUp } from '@/lib/followUp';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -53,6 +55,51 @@ export async function GET(req: NextRequest) {
     .from('traces').select('emotion_key').eq('is_deleted', false).eq('visibility', 'public');
   const valence = summarizeValence((publicEmotions ?? []).map((t) => t.emotion_key));
 
+  // ---------- サイドバーの未処理バッジ ----------
+  // このAPIは app/admin/dashboard/page.tsx の tryUnlock() がログイン判定にも使っている。
+  // 未作成テーブルへのクエリが1本でも例外を投げると ok:false になり会長が入れなくなるため、
+  // 以下は必ず safeCount / safeRows（失敗しても0・空配列）で包むこと。
+  const in14Days = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const [
+    actionItemsPending,
+    bookingPending,
+    proposalsUnread,
+    marketingUnread,
+    fundingSoon,
+    emailTargets,
+    municipalityTargets,
+  ] = await Promise.all([
+    safeCount(() => supabaseServer.from('action_items').select('id', { count: 'exact', head: true }).neq('status', 'done')),
+    safeCount(() => supabaseServer.from('booking_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+    safeCount(() => supabaseServer.from('strategy_proposals').select('id', { count: 'exact', head: true }).eq('status', 'unread').in('category', ['competitor_insight', 'pricing'])),
+    safeCount(() => supabaseServer.from('strategy_proposals').select('id', { count: 'exact', head: true }).eq('status', 'unread').eq('category', 'marketing')),
+    safeCount(() => supabaseServer.from('funding_opportunities').select('id', { count: 'exact', head: true }).in('status', ['watching', 'preparing']).not('deadline', 'is', null).lte('deadline', in14Days)),
+    // 「要フォロー」はSQLのcountでは表現できない（経過日数の判定が必要）ため、
+    // 必要な列だけ取って lib/followUp.ts の純粋関数をサーバー側で回す。
+    safeRows<{ email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null }>(
+      () => supabaseServer.from('sales_email_targets').select('email_sent_at, email_reply, followed_up_at').not('email_sent_at', 'is', null),
+    ),
+    safeRows<{ email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null }>(
+      () => supabaseServer.from('municipality_profiles').select('email_sent_at, email_reply, followed_up_at').not('email_sent_at', 'is', null),
+    ),
+  ]);
+
+  const overdueCount = [...emailTargets, ...municipalityTargets]
+    .filter(r => computeFollowUp(r)?.status === 'overdue').length;
+
+  // タブIDをキーにしたマップで返す。バッジを増やしたいときはここにキーを足すだけでよく、
+  // 画面側（page.tsx の badgeFor / OverviewTab のクイックアクセス）は変更不要。
+  const badges: Record<string, number> = {
+    review: pendingReview ?? 0,
+    reports: pendingReports ?? 0,
+    secretary: actionItemsPending + bookingPending,
+    proposals: proposalsUnread,
+    marketing: marketingUnread,
+    funding: fundingSoon,
+    sales: overdueCount,
+  };
+
   return NextResponse.json({
     ok: true,
     stats: {
@@ -64,6 +111,7 @@ export async function GET(req: NextRequest) {
       activeSponsors: activeSponsors ?? 0,
       pendingReports: pendingReports ?? 0,
       valence,
+      badges,
     },
     demoHiddenCount: includeDemo ? 0 : (demoTraceCount ?? 0),
   });

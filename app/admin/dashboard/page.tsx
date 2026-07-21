@@ -27,7 +27,7 @@ import BizModelIdeasTab from '@/components/admin/BizModelIdeasTab';
 import MarketingProposalsTab from '@/components/admin/MarketingProposalsTab';
 import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 import MinutesTab from '@/components/admin/MinutesTab';
-import { inputStyle } from '@/components/admin/adminShared';
+import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
 
 type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
 
@@ -85,7 +85,7 @@ export default function AdminDashboardPage() {
   const [unlockError, setUnlockError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
-  const [badgeCounts, setBadgeCounts] = useState<{ pendingReview: number; pendingReports: number } | null>(null);
+  const [badgeCounts, setBadgeCounts] = useState<TabBadgeCounts | null>(null);
   const [siteMenuOpen, setSiteMenuOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
     if (!unlocked) return;
     fetch('/api/admin/stats', { headers: authHeaders() })
       .then(r => r.json())
-      .then(d => { if (d.ok) setBadgeCounts({ pendingReview: d.stats.pendingReview, pendingReports: d.stats.pendingReports }); })
+      .then(d => { if (d.ok) setBadgeCounts(d.stats.badges ?? {}); })
       .catch(() => {});
   }, [unlocked, tab, authHeaders]);
 
@@ -158,8 +158,9 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const badgeFor = (id: Tab): number =>
-    id === 'review' ? (badgeCounts?.pendingReview ?? 0) : id === 'reports' ? (badgeCounts?.pendingReports ?? 0) : 0;
+  // バッジはタブIDをキーにしたマップ（/api/admin/stats の stats.badges）。
+  // 種類を増やしたいときはAPI側にキーを足すだけでよく、この画面は変更不要。
+  const badgeFor = (id: Tab): number => badgeCounts?.[id] ?? 0;
 
   // 引数を string で受けるのは、子コンポーネントが実際には任意の文字列を渡してくるため
   // （以前 'relation' というタブに存在しないIDが渡り、画面が真っ白になる事故があった）。
