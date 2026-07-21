@@ -5,6 +5,39 @@ import { useCallback, useEffect, useState } from 'react';
 import { Card, inputStyle } from '@/components/admin/adminShared';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 
+// 案件ごとに折りたたみ、開いた案件だけ詳細（メモ・ロードマップ）を表示することで
+// 縦スクロール量を大きく減らす。ヘッダー行はタイトル・ステータス・件数目安のみ。
+function CollapsibleIdeaCard({
+  idea, open, onToggle, children, accentBorder,
+}: {
+  idea: { title: string; status: string; report_md: string | null };
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  accentBorder?: string;
+}) {
+  const statusInfo = BIZMODEL_STATUS_LABELS[idea.status] ?? BIZMODEL_STATUS_LABELS.idea;
+  const hasRoadmap = !!(idea.report_md && idea.report_md.trim());
+  return (
+    <div style={{ background: '#fff', border: `1.5px solid ${accentBorder ?? '#eee'}`, borderRadius: 14, overflow: 'hidden' }}>
+      <button onClick={onToggle} style={{
+        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+        padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 13, color: '#bbb', flexShrink: 0 }}>{open ? '▼' : '▶'}</span>
+          <span style={{ fontWeight: 800, fontSize: 14.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{idea.title}</span>
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {hasRoadmap && <span style={{ fontSize: 10, color: '#38ADA9', fontWeight: 700 }}>🗺 ロードマップあり</span>}
+          <span style={{ fontSize: 11, fontWeight: 700, color: statusInfo.color, whiteSpace: 'nowrap' }}>{statusInfo.label}</span>
+        </span>
+      </button>
+      {open && <div style={{ padding: '0 16px 16px' }}>{children}</div>}
+    </div>
+  );
+}
+
 interface BizModelIdea {
   id: string;
   title: string;
@@ -39,6 +72,11 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
   const [saving, setSaving] = useState(false);
   const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
   const [editingReport, setEditingReport] = useState<Record<string, string>>({});
+  const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
+
+  function toggleOpen(id: string) {
+    setOpenIds(prev => ({ ...prev, [id]: !prev[id] }));
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -141,15 +179,15 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
             <p style={{ fontWeight: 800, fontSize: 14, margin: '0 0 10px' }}>
               {CONTEST_LABELS[contest] ?? `📌 ${contest}`}
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {list.map(i => (
-                <div key={i.id} style={{ background: '#fff', border: '1.5px solid #FDEBD0', borderRadius: 14, padding: 16 }}>
+                <CollapsibleIdeaCard key={i.id} idea={i} open={!!openIds[i.id]} onToggle={() => toggleOpen(i.id)} accentBorder="#FDEBD0">
                   <IdeaReportEditor
                     idea={i}
                     saving={saving}
                     onSave={fields => updateIdea(i.id, fields)}
                   />
-                </div>
+                </CollapsibleIdeaCard>
               ))}
             </div>
           </div>
@@ -159,45 +197,47 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
       <p style={{ fontWeight: 800, fontSize: 14, margin: '4px 0 8px' }}>💡 その他の事業案</p>
       {ideas.filter(i => !i.contest).length === 0 && <p style={{ color: '#aaa' }}>まだ事業案がありません。</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {ideas.filter(i => !i.contest).map(i => {
-          const statusInfo = BIZMODEL_STATUS_LABELS[i.status] ?? BIZMODEL_STATUS_LABELS.idea;
-          return (
-            <Card key={i.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <p style={{ margin: 0, fontWeight: 800, fontSize: 15 }}>
-                  {i.title}
-                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
-                </p>
-                <button onClick={() => deleteIdea(i.id)} style={{
-                  padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
-                }}>削除</button>
-              </div>
-
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
-                {Object.entries(BIZMODEL_STATUS_LABELS).map(([key, info]) => (
-                  <button key={key} onClick={() => updateIdea(i.id, { status: key })} style={{
-                    padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
-                    border: `1.5px solid ${i.status === key ? info.color : '#ddd'}`,
-                    background: i.status === key ? info.color + '18' : '#fff',
-                    color: i.status === key ? info.color : '#999', fontWeight: i.status === key ? 700 : 400,
-                  }}>{info.label}</button>
-                ))}
-              </div>
-
-              <textarea
-                value={editingMemo[i.id] ?? ''}
-                onChange={e => setEditingMemo(prev => ({ ...prev, [i.id]: e.target.value }))}
-                onBlur={() => { if ((editingMemo[i.id] ?? '') !== (i.memo ?? '')) updateIdea(i.id, { memo: editingMemo[i.id] || null }); }}
-                placeholder="事業案のメモ（誰向け・収益モデル・必要なもの・検証方法など自由に）"
-                rows={4}
-                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+        {ideas.filter(i => !i.contest).map(i => (
+          <CollapsibleIdeaCard key={i.id} idea={i} open={!!openIds[i.id]} onToggle={() => toggleOpen(i.id)}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+              <button onClick={() => deleteIdea(i.id)} style={{
+                padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+              }}>削除</button>
+            </div>
+            {i.report_md && i.report_md.trim() ? (
+              <IdeaReportEditor
+                idea={i}
+                saving={saving}
+                onSave={fields => updateIdea(i.id, fields)}
               />
-              <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
-                最終更新: {new Date(i.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
-              </p>
-            </Card>
-          );
-        })}
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px' }}>
+                  {Object.entries(BIZMODEL_STATUS_LABELS).map(([key, info]) => (
+                    <button key={key} onClick={() => updateIdea(i.id, { status: key })} style={{
+                      padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+                      border: `1.5px solid ${i.status === key ? info.color : '#ddd'}`,
+                      background: i.status === key ? info.color + '18' : '#fff',
+                      color: i.status === key ? info.color : '#999', fontWeight: i.status === key ? 700 : 400,
+                    }}>{info.label}</button>
+                  ))}
+                </div>
+
+                <textarea
+                  value={editingMemo[i.id] ?? ''}
+                  onChange={e => setEditingMemo(prev => ({ ...prev, [i.id]: e.target.value }))}
+                  onBlur={() => { if ((editingMemo[i.id] ?? '') !== (i.memo ?? '')) updateIdea(i.id, { memo: editingMemo[i.id] || null }); }}
+                  placeholder="事業案のメモ（誰向け・収益モデル・必要なもの・検証方法など自由に）"
+                  rows={4}
+                  style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </>
+            )}
+            <p style={{ margin: '8px 0 0', fontSize: 10, color: '#ccc' }}>
+              最終更新: {new Date(i.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+            </p>
+          </CollapsibleIdeaCard>
+        ))}
       </div>
     </div>
   );
