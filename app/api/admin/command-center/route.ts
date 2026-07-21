@@ -36,8 +36,9 @@ export async function GET(req: NextRequest) {
   // 本番：スナップショットの command_center 行を読む
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
     try {
-      const { supabaseServer } = await import('@/lib/supabase/server');
-      const { data, error } = await supabaseServer
+      // データキャッシュに載ると古い要注意項目が返り続けるため、必ず最新を読むクライアントを使う
+      const { supabaseServerFresh } = await import('@/lib/supabase/server');
+      const { data, error } = await supabaseServerFresh
         .from('agent_status_snapshot')
         .select('result, synced_at')
         .eq('agent_id', 'command_center')

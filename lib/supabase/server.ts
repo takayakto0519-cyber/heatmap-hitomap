@@ -11,3 +11,15 @@ const key =
 export const supabaseServer = createClient(url, key, {
   auth: { persistSession: false },
 });
+
+// 常に最新を読むクライアント。
+// supabase-js は内部で fetch を使うため、Next.js のデータキャッシュに載ってしまい、
+// ルートに dynamic='force-dynamic' を付けていても古いレスポンスが返り続けることがある
+// （実際に本番で、統合司令室の要注意項目が20時間以上前の内容のまま表示される事象が起きた）。
+// 運営ダッシュボードのように「今の状態」を見る画面では必ずこちらを使う。
+export const supabaseServerFresh = createClient(url, key, {
+  auth: { persistSession: false },
+  global: {
+    fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
+  },
+});

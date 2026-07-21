@@ -64,8 +64,9 @@ export async function GET(req: NextRequest) {
   // 本番（Vercel等）：会長のPCが最後に同期した時点のスナップショットを読む
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
     try {
-      const { supabaseServer } = await import('@/lib/supabase/server');
-      const { data, error } = await supabaseServer
+      // データキャッシュに載ると古い調査結果が返り続けるため、必ず最新を読むクライアントを使う
+      const { supabaseServerFresh } = await import('@/lib/supabase/server');
+      const { data, error } = await supabaseServerFresh
         .from('agent_status_snapshot')
         .select('agent_id, result, generated_at, synced_at')
         .in('agent_id', metas.map(m => m.id));

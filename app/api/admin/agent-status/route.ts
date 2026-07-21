@@ -43,8 +43,9 @@ export async function GET(req: NextRequest) {
     // スナップショットを代わりに読む（＝会長がローカルPCを最後に同期した時点の状況）。
     if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
       try {
-        const { supabaseServer } = await import('@/lib/supabase/server');
-        const { data, error } = await supabaseServer.from('agent_status_snapshot').select('*');
+        // データキャッシュに載ると古い稼働状況が返り続けるため、必ず最新を読むクライアントを使う
+        const { supabaseServerFresh } = await import('@/lib/supabase/server');
+        const { data, error } = await supabaseServerFresh.from('agent_status_snapshot').select('*');
         if (!error && data && data.length > 0) {
           const agents = data.map(row => ({
             id: row.agent_id, name: row.name, emoji: row.emoji, floor: row.floor, schedule: row.schedule,
