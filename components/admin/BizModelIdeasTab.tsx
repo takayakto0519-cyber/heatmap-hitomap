@@ -185,6 +185,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
                   <IdeaReportEditor
                     idea={i}
                     saving={saving}
+                    hideTitle
                     onSave={fields => updateIdea(i.id, fields)}
                   />
                 </CollapsibleIdeaCard>
@@ -208,6 +209,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
               <IdeaReportEditor
                 idea={i}
                 saving={saving}
+                hideTitle
                 onSave={fields => updateIdea(i.id, fields)}
               />
             ) : (
