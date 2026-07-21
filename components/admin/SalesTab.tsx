@@ -313,22 +313,26 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   function scrollToLead(leadId: string) {
     // 営業リストは上位15件のみ表示（折りたたみ）のため、スコアが低くまだ折りたたみの外にいる
     // リード（追加直後で記録が無いものなど）はDOMに存在せず、そのままではスクロールが反応しない。
-    // 先に「すべて表示」を開き、83件規模の再描画が終わるまでポーリングしてからスクロールする
-    // （rAFを1〜2回挟むだけでは大きなリストの再描画に間に合わないことがある）。
+    // 先に「すべて表示」を開いたうえで、対象の要素が実際にDOMへ挿入されるまで
+    // MutationObserverで監視してからスクロールする（83件規模の再描画は固定時間のポーリングでは
+    // 環境によって間に合わないことがあるため、時間ではなく「挿入イベント」を待つ）。
     setShowAllRanked(true);
     setLedgerFilter('all');
     const targetId = `en-card-${leadId}`;
-    let attempts = 0;
-    const tryScroll = () => {
+
+    const scrollIfFound = (): boolean => {
       const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
-      attempts += 1;
-      if (attempts < 20) setTimeout(tryScroll, 50);
+      if (!el) return false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
     };
-    setTimeout(tryScroll, 50);
+
+    if (scrollIfFound()) return;
+    const observer = new MutationObserver(() => {
+      if (scrollIfFound()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => observer.disconnect(), 8000); // 保険：8秒で監視終了
   }
 
   const ledgerById = useMemo(() => {
