@@ -1,7 +1,8 @@
 'use client';
 
-// 💡 経営提案ボード：new-biz-hypothesis / competitor-market-research / market-price-scan 等の
-// スキルが出した提案を、01_経営幹部_Executive/配下のMarkdownに埋もれさせず一覧・ステータス管理する受信トレイ。
+// 🔍 競合・価格インサイトボード：competitor-market-research / competitor-feature-monitor /
+// market-price-scan / global-market-research 等のスキルが出した提案を一覧・ステータス管理する受信トレイ。
+// 新規事業は「💡ビジネスモデル案」、マーケティングは「📣マーケティング」タブへそれぞれ一本化済み（このタブは競合・価格専用）。
 // 登録・更新はAI APIの自動呼び出しではなく、会長がチャットで「登録して」と指示した時にClaude Codeが書き込む運用。
 import { useCallback, useEffect, useState } from 'react';
 import { Card, inputStyle } from '@/components/admin/adminShared';
@@ -19,8 +20,6 @@ interface StrategyProposal {
 }
 
 const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
-  new_biz: { label: '🌱 新規事業', color: '#8E44AD' },
-  marketing: { label: '📣 マーケティング', color: '#E67E22' },
   competitor_insight: { label: '🔍 競合・市場', color: '#4A69BD' },
   pricing: { label: '💴 価格', color: '#38ADA9' },
 };
@@ -47,13 +46,15 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [adopting, setAdopting] = useState<Record<string, boolean>>({});
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const load = useCallback(() => {
     setLoading(true);
     fetch('/api/admin/strategy-proposals', { headers: authHeaders() })
       .then(r => r.json())
-      .then(d => { if (d.ok) setProposals(d.proposals); else setError(d.error ?? '取得に失敗しました'); })
+      .then(d => {
+        if (d.ok) setProposals((d.proposals as StrategyProposal[]).filter(p => p.category in CATEGORY_LABELS));
+        else setError(d.error ?? '取得に失敗しました');
+      })
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
   }, [authHeaders]);
@@ -95,7 +96,7 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
   return (
     <div>
       <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
-        新規事業・マーケティング・競合調査などのスキルが出した提案を一覧するボードです。
+        競合・市場調査・価格に関する提案を一覧するボードです（新規事業は「💡ビジネスモデル案」、マーケ施策は「📣マーケティング」タブへ）。
         登録は会長がチャットで「登録して」と指示した時のみ行われます（自動送信・自動投稿はありません）。
         採用した提案は「💡ビジネスモデル案」に自動で複製されます。
       </p>
@@ -123,28 +124,11 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
         </div>
       </Card>
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        <button onClick={() => setCategoryFilter('all')} style={{
-          padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
-          border: `1.5px solid ${categoryFilter === 'all' ? '#666' : '#ddd'}`,
-          background: categoryFilter === 'all' ? '#66666618' : '#fff',
-          color: categoryFilter === 'all' ? '#666' : '#999', fontWeight: categoryFilter === 'all' ? 700 : 400,
-        }}>すべて</button>
-        {Object.entries(CATEGORY_LABELS).map(([key, info]) => (
-          <button key={key} onClick={() => setCategoryFilter(key)} style={{
-            padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
-            border: `1.5px solid ${categoryFilter === key ? info.color : '#ddd'}`,
-            background: categoryFilter === key ? info.color + '18' : '#fff',
-            color: categoryFilter === key ? info.color : '#999', fontWeight: categoryFilter === key ? 700 : 400,
-          }}>{info.label}</button>
-        ))}
-      </div>
-
       {proposals.length === 0 && <p style={{ color: '#aaa' }}>まだ提案がありません。</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {proposals.filter(p => categoryFilter === 'all' || p.category === categoryFilter).map(p => {
-          const catInfo = CATEGORY_LABELS[p.category] ?? CATEGORY_LABELS.new_biz;
+        {proposals.map(p => {
+          const catInfo = CATEGORY_LABELS[p.category] ?? CATEGORY_LABELS.competitor_insight;
           const statusInfo = STATUS_LABELS[p.status] ?? STATUS_LABELS.unread;
           const isOpen = !!expanded[p.id];
           return (
