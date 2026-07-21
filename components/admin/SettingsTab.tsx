@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import LivePreview from './LivePreview';
 import LineSettingsSection from './LineSettingsSection';
+import TeamMembersSection from './TeamMembersSection';
 import type { SiteSettings } from '@/lib/siteSettings';
 
 const inputStyle: React.CSSProperties = {
@@ -209,6 +210,16 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
       </div>
 
       <LivePreview path="/" version={previewVersion} />
+
+      {/* 運営メンバー名簿。To-Doの担当・カレンダーの予定担当者として選べる実名リスト。
+          メンバーが増減してもここから追加・編集するだけでよく、コードを直す必要はない。 */}
+      <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid #eee' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>👥 運営メンバー</h2>
+        <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+          To-Doの担当・カレンダーの予定担当者として選べる名簿です。「代表」に指定した1名が各一覧の先頭に表示されます。
+        </p>
+        <TeamMembersSection authHeaders={authHeaders} />
+      </div>
 
       {/* LINE縁ミッションの設定（AIエージェント運営タブから移設）。
           CRUDではなく設定なので、他のサイト設定と同じこの画面にまとめる。 */}

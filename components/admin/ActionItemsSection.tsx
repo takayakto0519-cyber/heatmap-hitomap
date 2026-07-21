@@ -45,10 +45,20 @@ export default function ActionItemsSection({
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [form, setForm] = useState({ title: '', category: 'マキチャレ2026', owner: 'AI', file_ref: '', notes: '' });
+  const [memberNames, setMemberNames] = useState<string[]>([]);
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
   }
+
+  // 運営メンバー名簿から担当の候補を取る（サイト設定タブで管理）。取得できなくても機能自体は動く。
+  useEffect(() => {
+    fetch('/api/admin/team-members', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setMemberNames((d.members as { name: string; is_active: boolean }[]).filter(m => m.is_active).map(m => m.name)); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -111,8 +121,7 @@ export default function ActionItemsSection({
           <label style={labelStyle}>担当</label>
           <select style={inputStyle} value={form.owner} onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}>
             <option value="AI">AI</option>
-            <option value="会長">会長</option>
-            <option value="会長+小田">会長+小田</option>
+            {memberNames.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
           <label style={labelStyle}>関連ファイル（任意）</label>
           <input style={inputStyle} value={form.file_ref} onChange={(e) => setForm((f) => ({ ...f, file_ref: e.target.value }))} placeholder="例：06_実行待機_Approval/提案書_牧之原市_20260719.md" />

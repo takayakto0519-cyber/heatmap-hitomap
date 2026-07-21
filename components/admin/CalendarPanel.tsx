@@ -269,6 +269,7 @@ export default function CalendarPanel({
 }) {
   const [data, setData] = useState<CalendarData>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [memberNames, setMemberNames] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -285,9 +286,18 @@ export default function CalendarPanel({
 
   useEffect(() => { load(); }, [load]);
 
-  // 担当者入力の候補（表記ゆれ防止）。既知の定番名 ＋ 直近2週間で実際に使われている名前を合わせる。
+  // 運営メンバー名簿から候補名を取る（サイト設定タブで管理）。取得できなくても機能自体は動く。
+  useEffect(() => {
+    fetch('/api/admin/team-members', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setMemberNames((d.members as { name: string; is_active: boolean }[]).filter(m => m.is_active).map(m => m.name)); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 担当者入力の候補（表記ゆれ防止）。運営メンバー名簿 ＋ 直近2週間で実際に使われている名前を合わせる。
   const knownAssignees = Array.from(new Set([
-    '会長', '小田',
+    ...memberNames,
     ...data.days.flatMap(d => d.events.map(e => parseAssignee(e.title).assignee).filter((n): n is string => Boolean(n))),
   ]));
   const assigneeDatalist = (

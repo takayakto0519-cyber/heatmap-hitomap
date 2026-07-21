@@ -42,11 +42,18 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   // ホーム(OverviewTab)の「今日の要注意」と同じ統合司令室AIの結果。秘書タブでは読み取り専用で見せる
   // （完了操作は付けない＝会長の判断が必要な生の情報として置いておくだけ）。
   const [attention, setAttention] = useState<AttentionItem[] | null>(null);
+  // To-Doの並び順で先頭に出す「代表」の名前。運営メンバー名簿（サイト設定タブ）で
+  // is_lead=trueにした1名が入る。メンバー未登録でも動くよう既定はnull（誰も先頭固定にしない）。
+  const [leadName, setLeadName] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/command-center', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setAttention(d.result?.attention_items ?? []); })
+      .catch(() => {});
+    fetch('/api/admin/team-members', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setLeadName((d.members as { name: string; is_lead: boolean }[]).find(m => m.is_lead)?.name ?? null); })
       .catch(() => {});
   }, [authHeaders]);
 
@@ -92,9 +99,9 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
 
   const pending = sortByPriority(items.filter(it => it.status !== 'done'));
 
-  // 担当（owner）ごとに振り分け。「会長」を先頭、「AI」を末尾、その他はあいうえお順。
+  // 担当（owner）ごとに振り分け。代表（運営メンバー名簿でis_lead=trueの人）を先頭、「AI」を末尾、その他はあいうえお順。
   function ownerRank(owner: string): number {
-    if (owner === '会長') return 0;
+    if (leadName && owner === leadName) return 0;
     if (owner === 'AI') return 2;
     return 1;
   }
