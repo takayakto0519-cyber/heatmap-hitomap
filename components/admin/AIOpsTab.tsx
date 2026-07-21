@@ -19,6 +19,8 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const SECTIONS = [
+  // 「📋 作業状況」は秘書タブへ移設した（components/admin/ActionItemsSection.tsx）。
+  // 会長が今日やることを見ている画面でそのまま追加・編集できるようにするため。
   { key: 'revenue', label: '🐸 収益化イニシアチブ' },
   { key: 'cases', label: '📇 案件パイプライン' },
   { key: 'dossiers', label: '🤝 顧問先カルテ' },

@@ -2,11 +2,12 @@
 
 // 🗒 秘書 — 会長の負荷最小化のための一枚ビュー。
 // 今日の予定（Googleカレンダー、CalendarPanel共有）＋ To-Do（action_items）を束ねる。
-// To-Doの追加・詳細編集はAIOpsTab（作業状況セクション）で行う。ここは「今日やること」の
-// 見晴らしと、会長作業待ちのものだけワンタップで完了にする軽い操作のみ。
+// 上段は「今日やること」の見晴らしとワンタップ完了。追加・詳細編集は下の折りたたみを開くと
+// この画面のままできる（以前はAIエージェント運営タブへ誘導していたのをここへ移設した）。
 import { useCallback, useEffect, useState } from 'react';
 import CalendarPanel from './CalendarPanel';
 import BookingRequestsPanel from './BookingRequestsPanel';
+import ActionItemsSection from './ActionItemsSection';
 import { MigrationNotice } from '@/components/admin/adminShared';
 
 interface ActionItem {
@@ -37,6 +38,7 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
   // 普段はコンパクト表示、必要な時だけフル（今日・明日の全件）に切り替える。
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [migrationFile, setMigrationFile] = useState<string | null>(null);
+  const [showManage, setShowManage] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,8 +162,18 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
             );
           })}
         </div>
-        <div style={{ fontSize: 11, color: '#bbb', marginTop: 12 }}>To-Doの追加・詳細編集は「AIエージェント運営」タブから行えます。</div>
+        <button onClick={() => setShowManage(v => !v)} style={{
+          marginTop: 12, padding: '5px 12px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
+          color: '#38ADA9', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+        }}>{showManage ? '▴ 追加・編集を閉じる' : '▾ To-Doを追加・編集する'}</button>
       </div>
+
+      {showManage && (
+        <div style={cardStyle}>
+          <div style={sectionTitleStyle}>To-Doの追加・編集</div>
+          <ActionItemsSection authHeaders={authHeaders} onChanged={load} />
+        </div>
+      )}
     </div>
   );
 }
