@@ -52,6 +52,10 @@ interface MunicipalityProfile {
   smout_reply: string | null;
   on_hold: boolean;
   is_priority_pick: boolean;
+  scheduling_request_detected_at?: string | null;
+  municipality_code?: string | null;
+  population_stats?: { dayNightRatio?: number; statsYear?: string; statsDataId?: string; fetchedAt?: string } | null;
+  population_stats_fetched_at?: string | null;
   updated_at: string;
 }
 
@@ -198,6 +202,23 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     await patchProfile(id, { smout_sent_at: null });
   }
 
+  const [popStatsLoading, setPopStatsLoading] = useState<Record<string, boolean>>({});
+  const [popStatsError, setPopStatsError] = useState<Record<string, string>>({});
+  async function fetchPopulationStats(id: string) {
+    setPopStatsLoading(prev => ({ ...prev, [id]: true }));
+    setPopStatsError(prev => ({ ...prev, [id]: '' }));
+    try {
+      const res = await fetch(`/api/admin/municipality-profiles/${id}/population-stats`, { method: 'POST', headers: authHeaders() });
+      const data = await res.json();
+      if (!data.ok) { setPopStatsError(prev => ({ ...prev, [id]: data.error ?? '取得に失敗しました' })); return; }
+      await loadProfiles();
+    } catch {
+      setPopStatsError(prev => ({ ...prev, [id]: '通信エラー' }));
+    } finally {
+      setPopStatsLoading(prev => ({ ...prev, [id]: false }));
+    }
+  }
+
   async function lookupRegion(region: string) {
     if (!region.trim()) return;
     setRegionLoading(true);
@@ -257,6 +278,9 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   };
 
   function ProfileCard({ p, highlight }: { p: MunicipalityProfile; highlight?: boolean }) {
+    // gmail_watch.pyの日程調整検知（直近5日以内なら強調表示）
+    const schedulingDetected = p.scheduling_request_detected_at
+      && (Date.now() - new Date(p.scheduling_request_detected_at).getTime()) < 5 * 86400000;
     return (
       <div style={{
         padding: 14, borderRadius: 10,
@@ -266,6 +290,12 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
           <b style={{ fontSize: 14 }}>
             {highlight && '🌟 '}{p.on_hold && '⏸ '}{p.region_name}
+            {schedulingDetected && (
+              <span title="Gmail番人が日程調整を求める返信を検知しました" style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#4A69BD',
+                background: '#4A69BD18', padding: '1px 8px', borderRadius: 10,
+              }}>📅 日程調整依頼あり</span>
+            )}
           </b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span onClick={() => patchProfile(p.id, { is_priority_pick: !p.is_priority_pick })} style={{
@@ -400,6 +430,34 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
           <textarea defaultValue={p.smout_reply ?? ''} rows={3} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
             placeholder="SMOUT上で届いた返信を貼り付けておくと、ここに残ります"
             onBlur={e => { if (e.target.value !== (p.smout_reply ?? '')) patchProfile(p.id, { smout_reply: e.target.value || null }); }} />
+        </div>
+
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#F2F6FB', border: '1px solid #DDE8F5' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#2E5FA3' }}>
+            📊 人口統計（e-Stat）
+            <span style={{ fontWeight: 400, color: '#aaa', marginLeft: 6, fontSize: 10.5 }}>感情ヒートマップと比べるための自治体単位の公的統計</span>
+          </p>
+          <label style={labelStyle}>全国地方公共団体コード（5桁）</label>
+          <input defaultValue={p.municipality_code ?? ''} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+            placeholder="例：092010（e-Statの地域コード検索で調べる）"
+            onBlur={e => { if (e.target.value !== (p.municipality_code ?? '')) patchProfile(p.id, { municipality_code: e.target.value || null }); }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0 4px', flexWrap: 'wrap' }}>
+            {p.population_stats?.dayNightRatio != null ? (
+              <span style={{ fontSize: 11.5, color: '#2E5FA3', fontWeight: 700 }}>
+                昼夜間人口比率 {p.population_stats.dayNightRatio}%（{p.population_stats.statsYear ?? '年不明'}・国勢調査）
+              </span>
+            ) : (
+              <span style={{ fontSize: 11.5, color: '#aaa' }}>まだ取得されていません</span>
+            )}
+            <button onClick={() => fetchPopulationStats(p.id)} disabled={!p.municipality_code || popStatsLoading[p.id]} style={{
+              fontSize: 11, fontWeight: 700, background: '#2E5FA3', color: '#fff', border: 'none', borderRadius: 999,
+              padding: '4px 12px', cursor: p.municipality_code ? 'pointer' : 'not-allowed', opacity: p.municipality_code ? 1 : 0.5,
+            }}>{popStatsLoading[p.id] ? '取得中…' : '人口統計を取得'}</button>
+          </div>
+          {p.population_stats_fetched_at && (
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#aaa' }}>最終取得：{new Date(p.population_stats_fetched_at).toLocaleString('ja-JP')}</p>
+          )}
+          {popStatsError[p.id] && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#E74C3C' }}>{popStatsError[p.id]}</p>}
         </div>
       </div>
     );

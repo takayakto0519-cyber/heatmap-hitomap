@@ -40,19 +40,22 @@ async function loadDashboard(token: string) {
   // 感情の内訳（従来）に加えて、愛着ファネル（地・理・心）も併せて取得する。
   // どちらも件数・割合のみで個人を特定できる値は含まない。
   const bbox = bboxOf(typedAccess);
-  const [aggregate, funnel, trend] = await Promise.all([
+  const [aggregate, funnel, trend, { data: municipalityProfile }] = await Promise.all([
     computeRegionAggregate(supabaseServer, typedAccess.region, undefined, undefined, bbox),
     computeAttachmentFunnel(supabaseServer, typedAccess.region, bbox),
     computeRegionTrend(supabaseServer, typedAccess.region, undefined, bbox),
+    // 人口統計は運営ダッシュボードで事前に取得・キャッシュ済みの値を読むだけ（ここではe-Statを叩かない）
+    supabaseServer.from('municipality_profiles').select('population_stats').eq('region_name', typedAccess.region).maybeSingle(),
   ]);
-  return { access: typedAccess, aggregate, funnel, trend, bbox };
+  const populationStats = (municipalityProfile as { population_stats?: { dayNightRatio?: number; statsYear?: string } | null } | null)?.population_stats ?? null;
+  return { access: typedAccess, aggregate, funnel, trend, bbox, populationStats };
 }
 
 export default async function CustomerDashboardPage({ params }: { params: { token: string } }) {
   const data = await loadDashboard(params.token);
   if (!data) notFound();
 
-  const { access, aggregate, funnel, trend, bbox } = data;
+  const { access, aggregate, funnel, trend, bbox, populationStats } = data;
   const totalShown = aggregate.cells.reduce((sum, c) => sum + c.count, 0);
   const valence = aggregate.cells.reduce(
     (acc, c) => ({
@@ -216,6 +219,26 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
             </div>
           </section>
         )}
+
+        {/* 自治体の人口統計と比べる——国勢調査等の公的統計を、上記の感情記録と並べて見せる（自治体単位・e-Stat経由・事前キャッシュ済み） */}
+        <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px', marginBottom: 24 }}>
+          <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>自治体の人口統計と比べる</p>
+          <p style={{ margin: '0 0 20px', fontSize: 12, color: corpColor.inkSoft, lineHeight: 1.8 }}>
+            国勢調査など公的統計と、上記の感情の記録を並べています。
+          </p>
+          {populationStats?.dayNightRatio != null ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 24, fontWeight: 700, color: corpColor.ink }}>{populationStats.dayNightRatio}%</span>
+              <span style={{ fontSize: 12, color: corpColor.inkSoft }}>
+                昼夜間人口比率{populationStats.statsYear ? `（${populationStats.statsYear}・国勢調査）` : '（国勢調査）'}
+              </span>
+            </div>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13, color: corpColor.inkSoft, lineHeight: 1.9 }}>
+              まだ取得されていません。
+            </p>
+          )}
+        </section>
 
         <section style={{ background: corpColor.white, border: `1px solid ${corpColor.line}`, padding: '28px 26px' }}>
           <p style={{ margin: '0 0 20px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>エリア別の記録密度</p>

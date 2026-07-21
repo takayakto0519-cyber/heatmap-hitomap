@@ -31,3 +31,35 @@ export async function fetchEstatStatsData(params: EstatStatsDataParams) {
   if (!res.ok) throw new Error(`e-Stat APIエラー: ${res.status}`);
   return res.json();
 }
+
+// 感情ヒートマップと組み合わせる「自治体単位の人口統計」用の統計表ID（国勢調査・昼夜間人口比率、市区町村単位）。
+// e-Stat統計表検索( https://www.e-stat.go.jp/stat-search )で会長が事前に1つ確定させ、
+// 環境変数 ESTAT_CENSUS_STATS_DATA_ID に設定する（自治体ごとに変わるものではなく、
+// cdAreaで自治体を絞り込む共通の統計表IDのはず）。
+export function requireCensusStatsDataId(): string {
+  const id = process.env.ESTAT_CENSUS_STATS_DATA_ID;
+  if (!id) {
+    throw new Error('ESTAT_CENSUS_STATS_DATA_ID が未設定です。e-Stat統計表検索で昼夜間人口比率（市区町村単位）の統計表IDを調べて設定してください');
+  }
+  return id;
+}
+
+// e-Statの getStatsData レスポンスから、最初に見つかった数値を「昼夜間人口比率」として取り出す簡易パーサー。
+// e-Statのレスポンス構造は統計表ごとに細部が異なるため、実際のstatsDataIdが決まって
+// レスポンス例を確認した際にはこの関数の調整が必要になる可能性がある。
+export function extractDayNightRatio(estatResponse: unknown): { value: number; time?: string } | null {
+  try {
+    const dataInf = (estatResponse as Record<string, any>)?.GET_STATS_DATA?.STATISTICAL_DATA?.DATA_INF;
+    const values = dataInf?.VALUE;
+    const list = Array.isArray(values) ? values : values ? [values] : [];
+    if (list.length === 0) return null;
+    const first = list[0] as Record<string, unknown>;
+    const raw = first['$'] ?? first['@value'];
+    const value = typeof raw === 'string' ? parseFloat(raw) : typeof raw === 'number' ? raw : NaN;
+    if (!Number.isFinite(value)) return null;
+    const time = typeof first['@time'] === 'string' ? (first['@time'] as string) : undefined;
+    return { value, time };
+  } catch {
+    return null;
+  }
+}
