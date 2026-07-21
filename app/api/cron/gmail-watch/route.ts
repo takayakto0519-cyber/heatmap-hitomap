@@ -6,13 +6,15 @@
 //  ① municipality_profiles（contact_emailが入っている行）ごとに、
 //     送信済みか・実際に送った本文・相手からの返信本文を確認し、email_sent_at/email_sent_content/email_reply を更新。
 //     新しく返信が付いた自治体があればDiscordに通知（自動返信かどうかは判定しない＝どんな返信でも反映・通知する）。
-//  ② 受信箱全体（直近2日・学校/法人宛も含む）から日程調整を求めていそうなメールを検知し、
-//     client_leads / sales_email_targets / municipality_profiles のいずれかに登録済みならscheduling_request_detected_atを更新。
+//  ② 受信箱全体（直近2日・学校/法人宛も含む）に届いた「自分が送った以外」の全メールを検知し
+//     （日程調整キーワードを含むかどうかに関わらず＝自動返信・不在通知なども対象）、
+//     client_leads / sales_email_targets / municipality_profiles のいずれかに登録済みなら
+//     Discordに通知する。日程調整キーワードを含む場合はscheduling_request_detected_atも更新する。
 //     二重通知を防ぐため、通知済みメッセージIDをsite_settingsに保存する。
 //
 // 読み取り専用スコープ(gmail.readonly)。メールの送信・削除・変更は一切しない。
 import { NextRequest, NextResponse } from 'next/server';
-import { checkThreadForContact, scanInboxForSchedulingRequests, OWN_ADDRESS } from '@/lib/gmailServer';
+import { checkThreadForContact, scanInboxMessages, OWN_ADDRESS } from '@/lib/gmailServer';
 import { listUpcomingEventsGrouped } from '@/lib/googleCalendarServer';
 import { notifyDiscord, notifyDiscordError } from '@/lib/discord';
 
@@ -22,6 +24,7 @@ export const maxDuration = 60;
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const SCAN_WINDOW_DAYS = 2;
+// キー名はscheduling時代の名残だが、値の実体は「受信箱スキャンで既に通知済みのメッセージID」全般に拡張して使う
 const SEEN_SCHEDULING_IDS_KEY = 'gmail_watch_scheduling_seen';
 const SEEN_SCHEDULING_IDS_MAX = 500;
 
@@ -135,21 +138,22 @@ export async function GET(req: NextRequest) {
     sendDiscordMessage(lines.join('\n'));
   }
 
-  // ② 受信箱全体からの日程調整検知
-  let schedulingHits: Awaited<ReturnType<typeof scanInboxForSchedulingRequests>> = [];
-  let schedulingError: string | null = null;
+  // ② 受信箱全体のスキャン（日程調整キーワードの有無に関わらず全メールが対象。自動返信もここで拾う）
+  let inboxHits: Awaited<ReturnType<typeof scanInboxMessages>> = [];
+  let inboxScanError: string | null = null;
   try {
-    schedulingHits = await scanInboxForSchedulingRequests(SCAN_WINDOW_DAYS);
+    inboxHits = await scanInboxMessages(SCAN_WINDOW_DAYS);
   } catch (e) {
-    schedulingError = e instanceof Error ? e.message : String(e);
+    inboxScanError = e instanceof Error ? e.message : String(e);
   }
 
+  let newInboxCount = 0;
   let newSchedulingCount = 0;
-  if (schedulingHits.length > 0) {
+  if (inboxHits.length > 0) {
     const { data: seenRow } = await supabaseServer
       .from('site_settings').select('value').eq('key', SEEN_SCHEDULING_IDS_KEY).maybeSingle();
     const seenIds = new Set<string>(Array.isArray(seenRow?.value) ? seenRow.value as string[] : []);
-    const newHits = schedulingHits.filter(h => !seenIds.has(h.messageId));
+    const newHits = inboxHits.filter(h => !seenIds.has(h.messageId));
 
     if (newHits.length > 0) {
       const matchedHits: (typeof newHits[number] & { matchedName?: string })[] = [];
@@ -161,26 +165,50 @@ export async function GET(req: NextRequest) {
           const row = rows?.[0] as Record<string, unknown> | undefined;
           if (row) {
             matchedName = (row[nameCol] as string) ?? hit.fromEmail;
-            await supabaseServer.from(table).update({ scheduling_request_detected_at: new Date().toISOString() }).eq('id', row.id);
+            // scheduling_request_detected_atは元々「日程調整を求められている」ことを示す列のため、
+            // 日程調整キーワードを含む場合だけ更新する（それ以外の一般的な返信では更新しない）
+            if (hit.isScheduling) {
+              await supabaseServer.from(table).update({ scheduling_request_detected_at: new Date().toISOString() }).eq('id', row.id);
+            }
             break;
           }
         }
         matchedHits.push({ ...hit, matchedName });
       }
 
-      const openDays = await computeOpenDays();
-      const daysLine = openDays.length > 0 ? openDays.join('・') : '（カレンダー未連携のため空き日を計算できません）';
-      const lines = [`**📅 日程調整を求める返信が届いています（${matchedHits.length}件）**`];
-      for (const h of matchedHits) {
-        const who = h.fromName !== h.fromEmail ? `${h.fromName}（${h.fromEmail}）` : h.fromEmail;
-        const matched = h.matchedName ? ` ・${h.matchedName}として登録済み` : '';
-        lines.push(`・${who}${matched} — 「${h.subject || h.preview}」`);
-      }
-      lines.push(`空いてそうな日: ${daysLine}`);
-      lines.push('※簡易判定です。実際に返信する前にカレンダーで最終確認してください。');
-      sendDiscordMessage(lines.join('\n'));
+      // 日程調整っぽいメールは未登録の相手（見込み客の初コンタクト等）でも見逃したくないため通知する。
+      // 一方、日程調整キーワードを含まない一般メールは、登録済みの相手（自治体・学校法人・営業先）
+      // からのものだけに絞る（無関係な通知・広告メールでDiscordが埋まらないようにするため）。
+      const schedulingMatched = matchedHits.filter(h => h.isScheduling);
+      const otherMatched = matchedHits.filter(h => !h.isScheduling && h.matchedName);
 
-      newSchedulingCount = newHits.length;
+      if (schedulingMatched.length > 0) {
+        const openDays = await computeOpenDays();
+        const daysLine = openDays.length > 0 ? openDays.join('・') : '（カレンダー未連携のため空き日を計算できません）';
+        const lines = [`**📅 日程調整を求める返信が届いています（${schedulingMatched.length}件）**`];
+        for (const h of schedulingMatched) {
+          const who = h.fromName !== h.fromEmail ? `${h.fromName}（${h.fromEmail}）` : h.fromEmail;
+          const matched = h.matchedName ? ` ・${h.matchedName}として登録済み` : '';
+          lines.push(`・${who}${matched} — 「${h.subject || h.preview}」`);
+        }
+        lines.push(`空いてそうな日: ${daysLine}`);
+        lines.push('※簡易判定です。実際に返信する前にカレンダーで最終確認してください。');
+        sendDiscordMessage(lines.join('\n'));
+      }
+
+      if (otherMatched.length > 0) {
+        const lines = [`**📬 新着メール（返信・自動返信の可能性を含む、${otherMatched.length}件）**`];
+        for (const h of otherMatched) {
+          const who = h.fromName !== h.fromEmail ? `${h.fromName}（${h.fromEmail}）` : h.fromEmail;
+          const matched = h.matchedName ? ` ・${h.matchedName}として登録済み` : '';
+          lines.push(`・${who}${matched} — 「${h.subject || h.preview}」`);
+        }
+        lines.push('※日程調整キーワードは含まれていません。自動返信・受付確認等の可能性があります。');
+        sendDiscordMessage(lines.join('\n'));
+      }
+
+      newInboxCount = newHits.length;
+      newSchedulingCount = schedulingMatched.length;
       const trimmed = [...seenIds, ...newHits.map(h => h.messageId)].slice(-SEEN_SCHEDULING_IDS_MAX);
       await supabaseServer.from('site_settings').upsert(
         { key: SEEN_SCHEDULING_IDS_KEY, value: trimmed, updated_at: new Date().toISOString() },
@@ -196,8 +224,9 @@ export async function GET(req: NextRequest) {
     updated,
     newReplies: newReplies.length,
     errors,
-    schedulingChecked: schedulingHits.length,
+    inboxChecked: inboxHits.length,
+    inboxNew: newInboxCount,
     schedulingNew: newSchedulingCount,
-    schedulingError,
+    inboxScanError,
   });
 }

@@ -168,13 +168,23 @@ function containsSchedulingKeyword(text: string): boolean {
   return SCHEDULING_KEYWORDS.some(kw => text.includes(kw));
 }
 
-/** 受信箱全体（直近windowDays日・自分が送ったものは除く）から日程調整を求めていそうなメールを拾う（gmail_watch.py:_scan_inbox_for_scheduling_requests 相当） */
-export async function scanInboxForSchedulingRequests(windowDays: number): Promise<SchedulingHit[]> {
+export interface InboxHit extends SchedulingHit {
+  isScheduling: boolean; // 日程調整キーワードを含むか（含まなくても自動返信等は拾う）
+}
+
+/**
+ * 受信箱全体（直近windowDays日・自分が送ったものは除く）から届いたメールを全て拾う。
+ * 以前は日程調整キーワードに一致したものだけを対象にしていたが、キーワードを含まない
+ * 自動返信（不在通知・受付確認メール等）が拾えていなかったため、キーワードの有無に関わらず
+ * 全件を返すようにした（isSchedulingで日程調整っぽいかどうかだけ区別する）。
+ * 呼び出し元でclient_leads/sales_email_targets/municipality_profiles登録済みの相手かを判定する。
+ */
+export async function scanInboxMessages(windowDays: number): Promise<InboxHit[]> {
   const query = `newer_than:${windowDays}d -in:sent -in:chats`;
   const listRes = await gmailFetch('messages', { q: query, maxResults: '50' });
   const messageIds = ((listRes.messages as { id: string }[] | undefined) ?? []).map(m => m.id);
 
-  const hits: SchedulingHit[] = [];
+  const hits: InboxHit[] = [];
   for (const mid of messageIds) {
     const msg = await gmailFetch(`messages/${mid}`, { format: 'full' }) as unknown as GmailMessage;
     const headers = msg.payload?.headers;
@@ -184,13 +194,13 @@ export async function scanInboxForSchedulingRequests(windowDays: number): Promis
     const subject = header(headers, 'Subject');
     const body = extractPlainText(msg.payload) || msg.snippet || '';
     const haystack = `${subject}\n${body}`;
-    if (!containsSchedulingKeyword(haystack)) continue;
     hits.push({
       messageId: mid,
       fromEmail,
       fromName: fromName || fromEmail,
       subject,
       preview: body.trim().slice(0, 150).replace(/\n/g, ' '),
+      isScheduling: containsSchedulingKeyword(haystack),
     });
   }
   return hits;
