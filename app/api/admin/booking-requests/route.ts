@@ -11,8 +11,10 @@ export async function GET(req: NextRequest) {
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
+  // requested_startは確定するまでNULL（候補は複数あるため単一の日時では並べられない）なので、
+  // 送信順（created_at）で並べる
   const { data, error } = await supabaseServer
-    .from('booking_requests').select('*').order('requested_start', { ascending: true });
+    .from('booking_requests').select('*').order('created_at', { ascending: true });
 
   if (error) {
     // テーブル未作成（SQL未適用）のときは画面を壊さず、どのSQLを流せばよいかを伝える

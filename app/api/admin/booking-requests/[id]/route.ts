@@ -1,10 +1,16 @@
 // PATCH /api/admin/booking-requests/[id] — 予約リクエストの確定/却下/キャンセル（admin-gated）
 // confirm時だけ実際にGoogleカレンダーへイベントを作成する（会長が押した瞬間だけ書き込む）。
 // decline/cancelでは申込者へメールで通知する（gmail.sendスコープ、lib/gmailServer.ts）。
+//
+// 訪問者は候補を複数（3件以上）提出しており、confirm時は body.chosen_start で
+// candidate_slots のどれを確定するかを指定してもらう（急な予定変更があっても、
+// 確定前ならどの候補にするか会長が選び直せる）。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+interface CandidateSlot { start: string; end: string }
 
 // メール本文用の日時整形（JST固定。/scheduleページの表示と揃える）
 function formatJst(iso: string): string {
@@ -14,11 +20,17 @@ function formatJst(iso: string): string {
   return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}(${weekday}) ${String(jst.getUTCHours()).padStart(2, '0')}:${String(jst.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+// 却下メール用：候補が複数あるので、確定前は候補一覧を列挙する（確定済みなら1件だけになる）
+function formatCandidatesJst(candidateSlots: CandidateSlot[]): string {
+  if (!candidateSlots || candidateSlots.length === 0) return '（候補日時なし）';
+  return candidateSlots.map((c) => formatJst(c.start)).join(' / ');
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { action?: 'confirm' | 'decline' | 'cancel' };
+  const body = await req.json().catch(() => ({})) as { action?: 'confirm' | 'decline' | 'cancel'; chosen_start?: string };
   if (body.action !== 'confirm' && body.action !== 'decline' && body.action !== 'cancel') {
     return NextResponse.json({ ok: false, error: 'action は confirm・decline・cancel のいずれかを指定してください' }, { status: 400 });
   }
@@ -87,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         body: [
           `${reqRow.name} 様`,
           '',
-          `${formatJst(reqRow.requested_start)}〜のご予約リクエストをいただきありがとうございます。`,
+          `${formatCandidatesJst(reqRow.candidate_slots)} でいただいたご予約リクエストについて、ありがとうございます。`,
           '大変恐縮ですが、今回はご希望に沿うことができませんでした。',
           '別の日時で改めてお申し込みいただけますと幸いです。',
           '',
@@ -102,17 +114,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: true });
   }
 
-  // confirm：ここで初めてGoogleカレンダーへ書き込む
+  // confirm：候補の中から会長が選んだ1件（chosen_start）を確定し、ここで初めてGoogleカレンダーへ書き込む
+  const candidateSlots: CandidateSlot[] = Array.isArray(reqRow.candidate_slots) ? reqRow.candidate_slots : [];
+  const chosen = candidateSlots.find((c) => c.start === body.chosen_start);
+  if (!chosen) {
+    return NextResponse.json({ ok: false, error: '確定する候補を指定してください（候補一覧から選んでください）' }, { status: 400 });
+  }
+
   try {
     const { createCalendarEvent, SCHEDULING_MEET_URL, isSlotFree } = await import('@/lib/googleCalendarServer');
 
     // 二重予約防止：会長が確定を押した「今」の時点でもう一度空きを確認する
     // （申込〜確定の間に別リクエストが先に確定され、枠が埋まっている可能性があるため）
-    const free = await isSlotFree(reqRow.requested_start, reqRow.requested_end);
+    const free = await isSlotFree(chosen.start, chosen.end);
     if (!free) {
       return NextResponse.json({
         ok: false,
-        error: 'この時間帯は既に別の予定で埋まっています。却下するか、別の対応をご検討ください。',
+        error: 'この時間帯は既に別の予定で埋まっています。他の候補を選ぶか、却下をご検討ください。',
         conflict: true,
       }, { status: 409 });
     }
@@ -120,13 +138,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const event = await createCalendarEvent({
       summary: `${reqRow.name}様${reqRow.company ? `（${reqRow.company}）` : ''}`,
       description: reqRow.purpose ? `用件：${reqRow.purpose}\n\nヒトマップ日程調整ページからの予約` : 'ヒトマップ日程調整ページからの予約',
-      startTime: reqRow.requested_start,
-      endTime: reqRow.requested_end,
+      startTime: chosen.start,
+      endTime: chosen.end,
       attendeeEmail: reqRow.email,
       location: SCHEDULING_MEET_URL,
     });
     const { error } = await supabaseServer.from('booking_requests')
-      .update({ status: 'confirmed', calendar_event_id: event.id, responded_at: new Date().toISOString() })
+      .update({
+        status: 'confirmed', calendar_event_id: event.id, responded_at: new Date().toISOString(),
+        requested_start: chosen.start, requested_end: chosen.end,
+      })
       .eq('id', params.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, calendarEventLink: event.htmlLink });

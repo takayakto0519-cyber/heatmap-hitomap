@@ -1,13 +1,18 @@
 'use client';
 
 // 日程調整ページ（/schedule、公開・汎用）から届いた予約リクエストの確定/却下/キャンセル。
-// 確定した瞬間だけ実際にGoogleカレンダーへ書き込まれる（会長のワンクリック確定方式）。
+// 訪問者は候補を3件以上出しており、会長はその中から1つを選んで「確定する」を押す
+// （急な予定変更があっても、確定前なら別の候補に切り替えられる）。
+// 確定した瞬間だけ実際にGoogleカレンダーへ書き込まれる。
 // 却下・キャンセル時は申込者へメールで通知する（gmail.sendスコープ、app/api経由）。
 import { useCallback, useEffect, useState } from 'react';
 
+interface CandidateSlot { start: string; end: string }
 interface BookingRequest {
   id: string; name: string; email: string; company: string | null; purpose: string | null;
-  duration_minutes: number; requested_start: string; requested_end: string;
+  duration_minutes: number;
+  requested_start: string | null; requested_end: string | null; // 確定するまではNULL
+  candidate_slots: CandidateSlot[];
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled'; calendar_event_id: string | null;
   created_at: string; responded_at: string | null;
 }
@@ -33,6 +38,8 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
   const [showResolved, setShowResolved] = useState(false);
   // 確定した直後だけ、その回のGoogleカレンダーイベントへのリンクを見せる（id→link）
   const [confirmedLinks, setConfirmedLinks] = useState<Record<string, string>>({});
+  // 未対応リクエストごとに、会長が候補の中から選んでいる1件（id→候補のstart）
+  const [chosenByRequest, setChosenByRequest] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,8 +47,22 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
     try {
       const res = await fetch('/api/admin/booking-requests', { headers: authHeaders() });
       const data = await res.json();
-      if (data.ok) setRequests(data.requests ?? []);
-      else setError(data.error ?? '取得に失敗しました');
+      if (data.ok) {
+        const list: BookingRequest[] = data.requests ?? [];
+        setRequests(list);
+        // 未選択の未対応リクエストには、最も早い候補をデフォルトで選んでおく（会長がそのまま確定できるように）
+        setChosenByRequest((prev) => {
+          const next = { ...prev };
+          for (const r of list) {
+            if (r.status === 'pending' && !next[r.id] && r.candidate_slots?.length > 0) {
+              next[r.id] = [...r.candidate_slots].sort((a, b) => a.start.localeCompare(b.start))[0].start;
+            }
+          }
+          return next;
+        });
+      } else {
+        setError(data.error ?? '取得に失敗しました');
+      }
     } catch {
       setError('通信エラー');
     } finally {
@@ -58,10 +79,12 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
     setBusyId(id);
     setError('');
     try {
+      const body: { action: string; chosen_start?: string } = { action };
+      if (action === 'confirm') body.chosen_start = chosenByRequest[id];
       const res = await fetch(`/api/admin/booking-requests/${id}`, {
         method: 'PATCH',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.ok) {
@@ -93,7 +116,7 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
         )}
       </div>
       <p style={{ margin: '0 0 12px', fontSize: 11, color: '#999' }}>
-        <a href="/schedule" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>/schedule ↗</a> から届いた予約希望です。「確定」を押した時だけGoogleカレンダーに書き込まれます（会議室はGoogle Meet固定リンクを自動付与）。却下・キャンセル時は申込者にメールで通知します。
+        <a href="/schedule" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>/schedule ↗</a> から届いた予約希望です。候補（3件以上）の中から1つを選んで「確定する」を押した時だけGoogleカレンダーに書き込まれます（会議室はGoogle Meet固定リンクを自動付与）。却下・キャンセル時は申込者にメールで通知します。
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 12, margin: '0 0 10px' }}>{error}</p>}
 
@@ -101,27 +124,44 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
         <p style={{ fontSize: 12, color: '#999', margin: 0 }}>未対応のリクエストはありません。</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {pending.map((r) => (
-            <div key={r.id} style={{ padding: '10px 12px', borderRadius: 10, background: '#F4F6F5' }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#222' }}>
-                {formatDateTime(r.requested_start)}〜（{r.duration_minutes}分）
-              </p>
-              <p style={{ margin: '2px 0 0', fontSize: 12, color: '#555' }}>
-                {r.name}様（{r.email}）{r.company ? ` ・ ${r.company}` : ''}
-              </p>
-              {r.purpose && <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888' }}>{r.purpose}</p>}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => respond(r.id, 'confirm')} disabled={busyId === r.id} style={{
-                  padding: '6px 14px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff',
-                  fontWeight: 700, fontSize: 12, cursor: busyId === r.id ? 'wait' : 'pointer',
-                }}>{busyId === r.id ? '処理中…' : '確定する'}</button>
-                <button onClick={() => respond(r.id, 'decline')} disabled={busyId === r.id} style={{
-                  padding: '6px 14px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#888',
-                  fontWeight: 700, fontSize: 12, cursor: busyId === r.id ? 'wait' : 'pointer',
-                }}>却下</button>
+          {pending.map((r) => {
+            const sortedCandidates = [...(r.candidate_slots ?? [])].sort((a, b) => a.start.localeCompare(b.start));
+            const chosen = chosenByRequest[r.id];
+            return (
+              <div key={r.id} style={{ padding: '10px 12px', borderRadius: 10, background: '#F4F6F5' }}>
+                <p style={{ margin: '0 0 6px', fontSize: 12, color: '#555' }}>
+                  {r.name}様（{r.email}）{r.company ? ` ・ ${r.company}` : ''} ・ {r.duration_minutes}分
+                </p>
+                {r.purpose && <p style={{ margin: '0 0 6px', fontSize: 12, color: '#888' }}>{r.purpose}</p>}
+                <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#999' }}>候補（{sortedCandidates.length}件）から確定する日時を選ぶ：</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                  {sortedCandidates.map((c) => {
+                    const isChosen = chosen === c.start;
+                    return (
+                      <label key={c.start} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+                        background: isChosen ? '#DFF3F1' : '#fff', border: isChosen ? '1.5px solid #38ADA9' : '1px solid #e5e5e5',
+                      }}>
+                        <input type="radio" name={`chosen-${r.id}`} checked={isChosen}
+                          onChange={() => setChosenByRequest((prev) => ({ ...prev, [r.id]: c.start }))} />
+                        <span style={{ fontSize: 13, fontWeight: isChosen ? 700 : 500, color: '#222' }}>{formatDateTime(c.start)}〜</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => respond(r.id, 'confirm')} disabled={busyId === r.id || !chosen} style={{
+                    padding: '6px 14px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff',
+                    fontWeight: 700, fontSize: 12, cursor: busyId === r.id ? 'wait' : 'pointer', opacity: chosen ? 1 : 0.5,
+                  }}>{busyId === r.id ? '処理中…' : 'この日時で確定する'}</button>
+                  <button onClick={() => respond(r.id, 'decline')} disabled={busyId === r.id} style={{
+                    padding: '6px 14px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#888',
+                    fontWeight: 700, fontSize: 12, cursor: busyId === r.id ? 'wait' : 'pointer',
+                  }}>却下</button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -135,7 +175,7 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
               {resolved.map((r) => (
                 <div key={r.id} style={{ padding: '8px 12px', borderRadius: 8, background: '#fafafa', opacity: r.status === 'confirmed' ? 1 : 0.75 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#666' }}>{formatDateTime(r.requested_start)} ・ {r.name}様</span>
+                    <span style={{ fontSize: 12, color: '#666' }}>{r.requested_start ? formatDateTime(r.requested_start) : '（候補未確定）'} ・ {r.name}様</span>
                     <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[r.status] ?? '#999' }}>
                       {STATUS_LABEL[r.status] ?? r.status}
                     </span>

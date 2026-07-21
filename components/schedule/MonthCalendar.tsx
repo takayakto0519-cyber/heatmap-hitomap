@@ -9,7 +9,7 @@ import { formatMonthLabel, todayJstDateStr, weekdayOfDateStr, WEEKDAY_LABELS } f
 import type { AvailabilityDay } from './types';
 
 export default function MonthCalendar({
-  monthKey, days, selectedDate, onSelectDate, onChangeMonth, minMonth, maxMonth,
+  monthKey, days, selectedDate, onSelectDate, onChangeMonth, minMonth, maxMonth, pickedCounts,
 }: {
   monthKey: string;
   days: AvailabilityDay[];
@@ -18,6 +18,9 @@ export default function MonthCalendar({
   onChangeMonth: (diff: 1 | -1) => void;
   minMonth: string;
   maxMonth: string;
+  // 日付ごとに、その日から候補として選択中の枠数（複数日にまたがって候補を選べるため、
+  // 「今見ている日」＝selectedDateとは別に、どの日に候補があるかを視覚的に示す）
+  pickedCounts: Record<string, number>;
 }) {
   const today = todayJstDateStr();
   const firstDate = days[0]?.date;
@@ -52,20 +55,28 @@ export default function MonthCalendar({
         {days.map((day) => {
           const hasSlots = day.slots.length > 0;
           const isToday = day.date === today;
-          const isSelected = day.date === selectedDate;
+          const isViewing = day.date === selectedDate;
+          const pickedCount = pickedCounts[day.date] ?? 0;
           const dayNum = Number(day.date.slice(8, 10));
           return (
             <button key={day.date} type="button" disabled={!hasSlots} onClick={() => onSelectDate(day.date)} style={{
-              aspectRatio: '1 / 1', minHeight: 40, borderRadius: radii.sm, cursor: hasSlots ? 'pointer' : 'default',
-              fontSize: 13, fontWeight: isSelected ? 800 : 600, fontFamily: 'inherit',
+              position: 'relative', aspectRatio: '1 / 1', minHeight: 40, borderRadius: radii.sm, cursor: hasSlots ? 'pointer' : 'default',
+              fontSize: 13, fontWeight: isViewing ? 800 : 600, fontFamily: 'inherit',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-              border: isSelected ? `1.5px solid ${colors.primary}` : isToday ? `1.5px solid ${colors.textFaint}` : '1.5px solid transparent',
-              background: isSelected ? colors.primary : hasSlots ? colors.surface : colors.surfaceMuted,
-              color: isSelected ? '#fff' : hasSlots ? colors.textPrimary : colors.textFaint,
+              border: isViewing ? `1.5px solid ${colors.primary}` : isToday ? `1.5px solid ${colors.textFaint}` : '1.5px solid transparent',
+              background: isViewing ? colors.primary : pickedCount > 0 ? colors.purpleBg : hasSlots ? colors.surface : colors.surfaceMuted,
+              color: isViewing ? '#fff' : hasSlots ? colors.textPrimary : colors.textFaint,
             }}>
               <span>{dayNum}</span>
-              {hasSlots && !isSelected && (
+              {hasSlots && pickedCount === 0 && (
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: colors.accent }} />
+              )}
+              {pickedCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, borderRadius: 7,
+                  background: isViewing ? '#fff' : colors.purple, color: isViewing ? colors.primary : '#fff',
+                  fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                }}>{pickedCount}</span>
               )}
             </button>
           );
