@@ -18,6 +18,7 @@ import QuickAddSheet from '@/components/QuickAddSheet';
 import StatsPanel from '@/components/list/StatsPanel';
 import Onboarding from '@/components/Onboarding';
 import BottomNav from '@/components/BottomNav';
+import { computeCharacter } from '@/lib/character';
 import { PinIcon, FlameIcon, SearchIcon, WalkIcon, CompassIcon, TrailIcon, ClockIcon } from '@/components/icons';
 import { ARCHIVE_TYPE_ICONS } from '@/components/report/tagIcons';
 import type { Quest } from '@/lib/quests';
@@ -304,7 +305,9 @@ function MapApp() {
   const submitDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const postedPosRef = useRef<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
   const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
-  const [currentProfile, setCurrentProfile] = useState<{ username: string; display_name: string | null; avatar_url: string | null } | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<{ username: string; display_name: string | null; avatar_url: string | null; character_name: string | null } | null>(null);
+  // マップ右下の小型キャラ表示用。プロフィールと同じ「自分の記録一覧」を軽く取得するだけで、新規APIは足さない。
+  const [myCharacterTraces, setMyCharacterTraces] = useState<Trace[]>([]);
   const [postVisibility, setPostVisibility] = useState<'private' | 'followers' | 'pending_review'>('private');
 
   // ログイン済みだがプロフィール未作成の場合に、その場でユーザー名を設定してもらう
@@ -327,6 +330,10 @@ function MapApp() {
       setCurrentProfile(d.profile ?? null);
       if (d.profile && !d.profile.display_name?.trim()) {
         setDisplayNameGateOpen(true);
+      }
+      if (d.user) {
+        fetch(`/api/traces?user_id=${d.user.id}&limit=500`).then(r => r.json())
+          .then(tr => { if (tr.ok) setMyCharacterTraces(tr.traces ?? []); }).catch(() => {});
       }
     }).catch(() => {});
   }, []);
@@ -2597,6 +2604,21 @@ function MapApp() {
           </button>
         </div>
       )}
+
+      {/* 右下の小型キャラ：記録が育てているキャラをマップからも一目で見られるように。プロフィールへの導線 */}
+      {currentUser && currentProfile && (() => {
+        const myCharacter = computeCharacter(myCharacterTraces);
+        return (
+          <a href={`/profile/${currentProfile.username}`} style={{
+            position: 'fixed', right: 12, bottom: 84, zIndex: 40, textDecoration: 'none',
+            display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(35,35,31,0.72)',
+            borderRadius: 999, padding: '6px 12px 6px 8px', boxShadow: shadows.floating,
+          }}>
+            <span style={{ fontSize: 22 }}>{myCharacter.emoji}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>LV.{myCharacter.level}</span>
+          </a>
+        );
+      })()}
 
       {/* ── ボトムナビ ── */}
       <BottomNav active={tab} onTabChange={setTab} />

@@ -9,6 +9,9 @@ import EmotionTimeline from '@/components/profile/EmotionTimeline';
 import EnList from '@/components/profile/EnList';
 import type { Trace } from '@/lib/types';
 import { computeBadges } from '@/lib/badges';
+import { computeCharacter } from '@/lib/character';
+import CharacterScene from '@/components/profile/CharacterScene';
+import RegionCounterCard from '@/components/profile/RegionCounterCard';
 
 const TraceMap = dynamic(() => import('@/components/map/TraceMap'), { ssr: false });
 
@@ -45,6 +48,7 @@ interface Profile {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  character_name: string | null;
 }
 
 interface AppointmentRequest {
@@ -305,7 +309,22 @@ export default function ProfilePage() {
   return (
     <div style={{ padding: 20, maxWidth: 480, margin: '0 auto' }}>
       <a href="/map" style={{ fontSize: 12, color: '#999', textDecoration: 'none' }}>← マップへ戻る</a>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginTop: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: '#fff', borderRadius: 16, marginTop: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        {isMe && (
+          <CharacterScene
+            character={computeCharacter(myTraces)}
+            characterName={profile.character_name}
+            onRename={async (name) => {
+              const res = await fetch('/api/profile', {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ character_name: name }),
+              });
+              const data = await res.json();
+              if (data.ok) setProfile(data.profile as Profile);
+            }}
+          />
+        )}
+        <div style={{ padding: 20 }}>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 14 }}>
           <div style={{ position: 'relative' }}>
             <Avatar url={profile.avatar_url} />
@@ -502,6 +521,7 @@ export default function ProfilePage() {
             background: '#fff', color: '#38ADA9', fontWeight: 700, cursor: 'pointer',
           }}>✏️ プロフィールを編集</button>
         )}
+        </div>
       </div>
 
       {myTraces.length > 0 && (
@@ -512,6 +532,8 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {isMe && <RegionCounterCard traces={myTraces} />}
 
       {myTraces.length > 1 && (
         <div style={{ marginTop: 20, background: '#fff', borderRadius: 14, padding: 16, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>

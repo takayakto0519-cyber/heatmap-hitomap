@@ -10,6 +10,8 @@ import type { CreateTraceResponse } from '@/lib/types';
 import type { Quest } from '@/lib/quests';
 import { getEmotion } from '@/lib/emotions';
 import { computeBadges, type Badge } from '@/lib/badges';
+import { computeCharacter, type CharacterState } from '@/lib/character';
+import CharacterScene from '@/components/profile/CharacterScene';
 
 const LocationPickerMap = dynamic(
   () => import('@/components/form/LocationPickerMap'),
@@ -112,7 +114,10 @@ export default function PostPage() {
 
   // 投稿完了直後にバッジ・連続記録をその場で見せる演出（続けて記録するハードルを下げる施策）。
   // ログインユーザーのみ対象。取得できなければ静かにスキップして通常どおり遷移する。
-  const [celebration, setCelebration] = useState<{ badges: Badge[]; totalPosts: number } | null>(null);
+  const [celebration, setCelebration] = useState<{
+    badges: Badge[]; totalPosts: number;
+    before: CharacterState; after: CharacterState; gainedExp: number; leveledUp: boolean;
+  } | null>(null);
 
   useEffect(() => {
     fetch('/api/quests/active')
@@ -341,8 +346,20 @@ export default function PostPage() {
               fetch(`/api/routes/completions?user_id=${user.id}`).then((r) => r.json()).catch(() => null),
             ]);
             if (tracesRes?.ok) {
-              const badges = computeBadges(tracesRes.traces ?? [], routeRes?.ok ? routeRes.count ?? 0 : 0);
-              setCelebration({ badges, totalPosts: (tracesRes.traces ?? []).length });
+              const allTraces = tracesRes.traces ?? [];
+              const badges = computeBadges(allTraces, routeRes?.ok ? routeRes.count ?? 0 : 0);
+              // 今回投稿した分だけを除いた状態と比べて、キャラの成長分を演出する
+              const sorted = [...allTraces].sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+              const before = computeCharacter(sorted.slice(0, -1));
+              const after = computeCharacter(sorted);
+              setCelebration({
+                badges, totalPosts: allTraces.length,
+                before, after,
+                gainedExp: after.totalExp - before.totalExp,
+                leveledUp: after.level > before.level,
+              });
               return; // 遷移はcelebrationの「続ける」ボタンで行う
             }
           }
@@ -370,7 +387,22 @@ export default function PostPage() {
       <main style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px', textAlign: 'center' }}>
         <p style={{ fontSize: 48, margin: '0 0 8px' }}>✨</p>
         <h1 style={{ fontSize: 20, margin: '0 0 4px' }}>記録しました</h1>
-        <p style={{ color: '#888', fontSize: 13, margin: '0 0 24px' }}>これで{celebration.totalPosts}件目の痕跡です</p>
+        <p style={{ color: '#888', fontSize: 13, margin: '0 0 20px' }}>これで{celebration.totalPosts}件目の痕跡です</p>
+
+        <div style={{ marginBottom: 12 }}>
+          <CharacterScene character={celebration.after} compact />
+        </div>
+        <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#F6B93B' }}>+{celebration.gainedExp} EXP!</p>
+        {celebration.leveledUp && (
+          <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#8E44AD' }}>
+            🎉 レベルアップ！ Lv.{celebration.after.level}
+          </p>
+        )}
+        {celebration.after.mood === 'justWoke' && (
+          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#38ADA9' }}>😊 キャラクターが目を覚ました！</p>
+        )}
+        <div style={{ height: 16 }} />
+
         {celebration.badges.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
             {celebration.badges.map((b) => (
