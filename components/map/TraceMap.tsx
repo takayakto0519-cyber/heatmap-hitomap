@@ -350,9 +350,12 @@ interface Props {
   // 自治体向けダッシュボード専用：個別tracesの代わりに、集計済みグリッドセル（5件未満は既に抑制済み）から
   // heat円を描く。指定時はheatモードの描画元をtraces由来から切り替える（k-匿名の原則を守るため）
   aggregateCells?: { gridLat: number; gridLng: number; count: number }[];
+  // 人口統計の比較レイヤー（有料顧客ダッシュボード専用）：boundaryGeoJsonの内側を
+  // 昼夜間人口比率に応じた色で塗る。感情ヒート/ピンの下に敷く背景レイヤーとして使う。
+  populationFill?: { color: string; opacity: number } | null;
 }
 
-export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins, waypoints, boundaryGeoJson, maxBounds, maxBoundsViscosity, aggregateCells }: Props) {
+export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyTo, flyToZoom, fitBounds, routeLine, highlightIds, onLocate, onTraceClick, onMapClick, pinDropPos, reactionCounts, currentUserId, teamColors, avatarUrls, allowWideZoom, pins, waypoints, boundaryGeoJson, maxBounds, maxBoundsViscosity, aggregateCells, populationFill }: Props) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const fallback: [number, number] = [35.681236, 139.767125];
   const computedCenter: [number, number] =
@@ -375,6 +378,13 @@ export default function TraceMap({ traces, mode = 'pin', center, zoom = 15, flyT
       maxBoundsViscosity={maxBounds ? (maxBoundsViscosity ?? 1) : undefined}
     >
       <TileLayer attribution={GSI_ATTRIBUTION} url={GSI_TILE_URL} maxZoom={GSI_MAX_ZOOM} />
+      {boundaryGeoJson && populationFill && (
+        <Polygon
+          positions={ringsFromGeometry(boundaryGeoJson)}
+          pathOptions={{ stroke: false, fillColor: populationFill.color, fillOpacity: populationFill.opacity }}
+          interactive={false}
+        />
+      )}
       {boundaryGeoJson && (
         <Polygon
           positions={[WORLD_RING, ...ringsFromGeometry(boundaryGeoJson)]}

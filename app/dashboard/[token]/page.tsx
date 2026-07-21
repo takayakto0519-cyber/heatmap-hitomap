@@ -213,10 +213,23 @@ export default async function CustomerDashboardPage({ params }: { params: { toke
             <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: corpColor.ink }}>地図で見る</p>
             <p style={{ margin: '0 0 16px', fontSize: 12, color: corpColor.inkSoft, lineHeight: 1.8 }}>
               {access.region}の外側はマスクしています。個別の投稿の位置・写真・本文は表示されません（上記と同じ集計データのみ）。
+              {populationStats?.dayNightRatio != null && '　地図全体の色は昼夜間人口比率（人口の流出入）を示しています。'}
             </p>
             <div style={{ height: 420 }}>
-              <DashboardTraceMap aggregateCells={aggregate.cells} boundaryGeoJson={access.boundary_geojson} bbox={bbox} />
+              <DashboardTraceMap aggregateCells={aggregate.cells} boundaryGeoJson={access.boundary_geojson} bbox={bbox} dayNightRatio={populationStats?.dayNightRatio ?? null} />
             </div>
+            {populationStats?.dayNightRatio != null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10, fontSize: 11, color: corpColor.inkSoft }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: '#38ADA9', display: 'inline-block' }} />
+                  昼間に人が流入する街
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: '#E5A139', display: 'inline-block' }} />
+                  夜間人口の方が多い（流出）
+                </span>
+              </div>
+            )}
           </section>
         )}
 

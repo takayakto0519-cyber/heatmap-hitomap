@@ -127,7 +127,7 @@ function LinkList({ text }: { text: string }) {
   );
 }
 
-type SortKey = 'rank_desc' | 'rank_asc' | 'name';
+type SortKey = 'rank_desc' | 'rank_asc' | 'name' | 'population_asc';
 
 export default function RelationPopulationTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [overall, setOverall] = useState<OverallResult | null>(null);
@@ -264,6 +264,17 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     const sorted = [...list];
     if (sortKey === 'name') {
       sorted.sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja'));
+    } else if (sortKey === 'population_asc') {
+      // 昼夜間人口比率が低い（流出が深刻な）自治体ほど上に来るようにする。
+      // 未取得は判断材料がないので末尾に回す（0扱いで上位に来ると誤解を招くため）。
+      sorted.sort((a, b) => {
+        const ra = a.population_stats?.dayNightRatio;
+        const rb = b.population_stats?.dayNightRatio;
+        if (ra == null && rb == null) return 0;
+        if (ra == null) return 1;
+        if (rb == null) return -1;
+        return ra - rb;
+      });
     } else {
       const dir = sortKey === 'rank_desc' ? 1 : -1;
       sorted.sort((a, b) => dir * ((OPPORTUNITY_RANK[a.opportunity_level] ?? 9) - (OPPORTUNITY_RANK[b.opportunity_level] ?? 9)));
@@ -295,6 +306,14 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
                 marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#4A69BD',
                 background: '#4A69BD18', padding: '1px 8px', borderRadius: 10,
               }}>📅 日程調整依頼あり</span>
+            )}
+            {p.population_stats?.dayNightRatio != null && (
+              <span title="昼夜間人口比率（国勢調査）。100%未満＝夜間人口の方が多い＝人口流出傾向" style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 700,
+                color: p.population_stats.dayNightRatio < 100 ? '#B7791F' : '#2E5FA3',
+                background: (p.population_stats.dayNightRatio < 100 ? '#E5A139' : '#2E5FA3') + '18',
+                padding: '1px 8px', borderRadius: 10,
+              }}>🏙 昼夜{p.population_stats.dayNightRatio}%</span>
             )}
           </b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -613,6 +632,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
                 <span onClick={() => setSortKey('rank_desc')} style={pillStyle(sortKey === 'rank_desc')}>提案余地 高→低</span>
                 <span onClick={() => setSortKey('rank_asc')} style={pillStyle(sortKey === 'rank_asc')}>提案余地 低→高</span>
                 <span onClick={() => setSortKey('name')} style={pillStyle(sortKey === 'name')}>自治体名</span>
+                <span onClick={() => setSortKey('population_asc')} style={pillStyle(sortKey === 'population_asc', '#2E5FA3')} title="昼夜間人口比率が低い（人口流出が深刻な）自治体を上位に">人口流出 大→小</span>
               </div>
             </div>
 

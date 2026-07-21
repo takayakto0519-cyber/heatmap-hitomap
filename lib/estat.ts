@@ -65,3 +65,22 @@ export function extractDayNightRatio(estatResponse: unknown): { value: number; t
     return null;
   }
 }
+
+// ──────────────────────────────────────────────
+// 昼夜間人口比率 → 地図の自治体境界を塗る色。感情ヒートマップの上に重ねる
+// 「人口滞留の比較レイヤー」用（有料顧客ダッシュボード専用機能）。
+// 100%＝夜間人口と昼間人口が同数（流出入なし）。100%超＝昼間に人が流入する街
+// （商業・観光地寄り、corpColor.mossに近いteal）、100%未満＝夜間人口の方が多い
+// （住宅地寄り・人口流出、amber）で塗り分ける。
+// ──────────────────────────────────────────────
+const INFLOW_COLOR = '#38ADA9';  // teal（昼間人口が多い＝流入超過）
+const OUTFLOW_COLOR = '#E5A139'; // amber（夜間人口が多い＝流出超過）
+
+export function getDayNightRatioColor(ratio: number): string {
+  return ratio >= 100 ? INFLOW_COLOR : OUTFLOW_COLOR;
+}
+
+export function getDayNightRatioOpacity(ratio: number): number {
+  const diff = Math.abs(ratio - 100);
+  return Math.min(0.10 + diff * 0.008, 0.4);
+}

@@ -25,6 +25,9 @@ export default function RegionPage() {
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
+  // 有料ダッシュボード機能（人口統計との比較）が用意できる自治体かどうかだけを取得する。
+  // 実際の数値（昼夜間人口比率）はここでは絶対に見せない（無料公開ページと有料機能の境界）。
+  const [hasPopulationStats, setHasPopulationStats] = useState(false);
 
   useEffect(() => {
     fetch(`/api/traces?region=${encodeURIComponent(regionName)}`)
@@ -32,6 +35,10 @@ export default function RegionPage() {
       .then(d => { if (d.ok) setTraces(d.traces); else setError(d.error ?? '取得に失敗しました'); })
       .catch(e => setError(e instanceof Error ? e.message : '通信エラー'))
       .finally(() => setLoading(false));
+    fetch(`/api/municipality-teaser?region=${encodeURIComponent(regionName)}`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setHasPopulationStats(d.hasPopulationStats); })
+      .catch(() => {});
     fetch(`/api/sponsors?placement=region&region=${encodeURIComponent(regionName)}`)
       .then(r => r.json() as Promise<ListSponsorsResponse>)
       .then(d => { if (d.ok && d.sponsors.length > 0) setSponsor(d.sponsors[0]); })
@@ -105,6 +112,20 @@ export default function RegionPage() {
             <AfterStories traces={traces} onTraceClick={setSelectedTrace} />
             <Storytellers traces={traces} />
           </>
+        )}
+
+        {hasPopulationStats && (
+          <a href="/business" style={{
+            display: 'block', margin: '0 0 16px', padding: '12px 14px', borderRadius: 10,
+            background: '#F2F6FB', border: '1px solid #DDE8F5', textDecoration: 'none',
+          }}>
+            <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: '#2E5FA3' }}>
+              📊 {regionName}は人口統計との比較分析をご用意できます
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#666', lineHeight: 1.6 }}>
+              国勢調査などの公的統計と、この地域の感情の記録を並べて見るレポートを自治体・法人向けにご案内しています →
+            </p>
+          </a>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
