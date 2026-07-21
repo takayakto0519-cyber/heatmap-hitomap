@@ -10,7 +10,8 @@ import AttachmentTab from '@/components/admin/AttachmentTab';
 import TracePatternTab from '@/components/admin/TracePatternTab';
 import SettingsTab from '@/components/admin/SettingsTab';
 import SnsTab from '@/components/admin/SnsTab';
-import AgentsHub from '@/components/admin/AgentsHub';
+import AgentStatusTab from '@/components/admin/AgentStatusTab';
+import MoneyTab from '@/components/admin/MoneyTab';
 import SalesTab from '@/components/admin/SalesTab';
 import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
 import SecretaryTab from '@/components/admin/SecretaryTab';
@@ -29,7 +30,7 @@ import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 import MinutesTab from '@/components/admin/MinutesTab';
 import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
 
 // 旧タブIDからの後方互換：
 // - ?tab=aiops / ?tab=agentstatus → agents（AIエージェント2タブ統合）
@@ -58,10 +59,11 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   marketing: { label: 'マーケティング', icon: '📈', group: '調査・研究', desc: 'マーケティング施策のAI提案を一覧・ステータス管理する' },
   proposals: { label: '競合・価格インサイト', icon: '🔍', group: '調査・研究', desc: '競合・市場調査・価格に関するAI提案を一覧・ステータス管理する' },
   funding: { label: 'コンテスト・助成金', icon: '🏆', group: '営業・自治体', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
-  sales: { label: '営業', icon: '🧭', group: '営業・自治体', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。学校・法人／関係人口・自治体プロファイルも統合' },
+  sales: { label: '営業', icon: '🧭', group: '営業・自治体', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。学校・法人／関係人口／案件／顧問先の台帳も統合' },
+  money: { label: '収益・損益', icon: '💰', group: '営業・自治体', desc: '収益化イニシアチブの進み具合と、事業別の月次損益(P&L)' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
-  agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: '番人の稼働状況・スキル名簿(全戦力)と、収益化・案件・顧問先などの運営データを1箇所で' },
+  agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: '番人の稼働状況とスキル名簿（全戦力）' },
   minutes: { label: '議事録', icon: '🗒', group: '秘書', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
@@ -304,7 +306,8 @@ export default function AdminDashboardPage() {
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={goTab} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
-          {tab === 'agents' && <AgentsHub authHeaders={authHeaders} />}
+          {tab === 'agents' && <AgentStatusTab authHeaders={authHeaders} />}
+          {tab === 'money' && <MoneyTab authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
           {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} />}
         </div>

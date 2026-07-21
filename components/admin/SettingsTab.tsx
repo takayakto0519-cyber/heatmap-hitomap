@@ -5,6 +5,7 @@
 // 保存すると実サイトプレビューが自動で更新される（LivePreviewはページ編集タブと共通）。
 import { useEffect, useState } from 'react';
 import LivePreview from './LivePreview';
+import LineSettingsSection from './LineSettingsSection';
 import type { SiteSettings } from '@/lib/siteSettings';
 
 const inputStyle: React.CSSProperties = {
@@ -31,6 +32,8 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [previewVersion, setPreviewVersion] = useState(0);
+  const [demoData, setDemoData] = useState<{ exists: boolean; enabled: boolean; totalCount: number } | null>(null);
+  const [demoToggling, setDemoToggling] = useState(false);
 
   useEffect(() => {
     fetch('/api/admin/settings', { headers: authHeaders() })
@@ -45,8 +48,26 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
       })
       .catch(() => setMessage('通信エラー'))
       .finally(() => setLoading(false));
+    fetch('/api/admin/demo-data', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setDemoData({ exists: d.exists, enabled: d.enabled, totalCount: d.totalCount }); })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function toggleDemoData(nextEnabled: boolean) {
+    setDemoToggling(true);
+    try {
+      const res = await fetch('/api/admin/demo-data', {
+        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const data = await res.json();
+      if (data.ok) setDemoData(d => d ? { ...d, enabled: data.enabled } : d);
+    } finally {
+      setDemoToggling(false);
+    }
+  }
 
   async function save() {
     if (!settings) return;
@@ -152,6 +173,23 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
         <input value={hero.biz_link_href} onChange={e => setHero({ biz_link_href: e.target.value })} style={inputStyle} />
       </Card>
 
+      {demoData?.exists && (
+        <Card title="🎭 営業デモ用データ" desc="商談用に投入した架空の投稿です。普段はオフのままにしてください。">
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: '4px 0 0' }}>
+            <input
+              type="checkbox"
+              checked={demoData.enabled}
+              disabled={demoToggling}
+              onChange={e => toggleDemoData(e.target.checked)}
+            />
+            公開マップ・自治体向けダッシュボードに反映する（{demoData.totalCount}件）
+          </label>
+          <p style={hintStyle}>
+            商談の直前だけオンにし、終わったらすぐオフに戻してください。オフの間は運営（このダッシュボード）以外の誰にも見えません。
+          </p>
+        </Card>
+      )}
+
       {message && <p style={{ fontSize: 13, color: '#566246', fontWeight: 700 }}>{message}</p>}
 
       <div style={{ display: 'flex', gap: 10, margin: '4px 0 20px' }}>
@@ -171,6 +209,16 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
       </div>
 
       <LivePreview path="/" version={previewVersion} />
+
+      {/* LINE縁ミッションの設定（AIエージェント運営タブから移設）。
+          CRUDではなく設定なので、他のサイト設定と同じこの画面にまとめる。 */}
+      <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid #eee' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>🐇 LINE縁ミッション</h2>
+        <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+          グループID・ミッションの間隔・自動投稿のON/OFFと名簿の設定です。ここでは投稿は行いません。
+        </p>
+        <LineSettingsSection authHeaders={authHeaders} />
+      </div>
     </div>
   );
 }

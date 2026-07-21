@@ -92,7 +92,7 @@ const ATTENTION_JUMP: Record<string, { tab: string; label: string }> = {
   trace_qa: { tab: 'traces', label: '投稿管理へ' },
   deadline_watch: { tab: 'funding', label: 'コンテスト・助成金へ' },
   case_pipeline_watch: { tab: 'sales', label: '営業へ' },
-  payment_watch: { tab: 'aiops', label: '案件へ' },
+  payment_watch: { tab: 'sales', label: '営業（案件）へ' },
   burnout_watch: { tab: 'secretary', label: '秘書へ' },
 };
 

@@ -15,6 +15,9 @@ import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
 import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
+import CasesSection from '@/components/admin/sales/CasesSection';
+import DossiersSection from '@/components/admin/sales/DossiersSection';
+import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
 
 // ---------- データ型（各既存APIと同じ形） ----------
 interface ClientLead {
@@ -120,8 +123,22 @@ interface MorningItem {
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
 // 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
-const SALES_VIEWS = ['ledger', 'relation', 'leads'] as const;
+const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers'] as const;
 type SalesView = typeof SALES_VIEWS[number];
+
+// サブビューを「見る画面」と「書く画面（台帳）」に分けて並べる。
+// 案件・顧問先は AIOpsTab（AIエージェント運営）から移設したもの。
+const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }[] = [
+  { label: '見る', views: [
+    { key: 'ledger', label: '🧭 営業' },
+    { key: 'relation', label: '🔁 関係人口・自治体' },
+  ] },
+  { label: '台帳', views: [
+    { key: 'leads', label: '🎓 学校・法人' },
+    { key: 'cases', label: '📇 案件' },
+    { key: 'dossiers', label: '🤝 顧問先' },
+  ] },
+];
 
 export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => HeadersInit; goTab: (tab: string) => void }) {
   const [leads, setLeads] = useState<ClientLead[]>([]);
@@ -136,6 +153,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [error, setError] = useState('');
   // ナビ整理で独立タブ「学校・法人」を廃止し、営業ハブのサブビューに吸収（サイドバー整理2026-07-20）
   const [view, setView] = useState<SalesView>('ledger');
+  const [showEmailEditor, setShowEmailEditor] = useState(false);
   // EnCard内の「学校・法人へ」「関係人口へ」ボタン用：これらは独立タブではなくこのタブのサブビューなので、
   // ページ遷移ではなくローカルのview切替に差し替える（他の宛先はそのままpage.tsxのgoTabへ）。
   // 'relation' を横取りし損ねると page.tsx 側に該当タブが無く画面が真っ白になるため、配列で一括判定する。
@@ -241,7 +259,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         title: '承認待ちの案件があります',
         why: '止まっているボールは相手ではなく自分側にある',
         how: '06_実行待機_Approvalを確認し、送るか差し戻すか決める',
-        jumpTab: 'aiops', jumpLabel: '案件を開く',
+        switchView: 'cases', jumpLabel: '案件を開く',
       });
     }
     // 下書き済み・未送信の便り
@@ -289,7 +307,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           title: until < 0 ? `打合せ予定が${-until}日過ぎています（${d.next_meeting}）` : until === 0 ? '今日は打合せの日です' : `打合せまであと${until}日（${d.next_meeting}）`,
           why: 'せっかくできた関係を大事にする',
           how: until < 0 ? '日程を組み直し、カルテの次回打合せ日を更新する' : 'カルテを見直し、渡せるもの（お礼になるもの）をひとつ用意して臨む',
-          jumpTab: 'aiops', jumpLabel: 'カルテを開く',
+          switchView: 'dossiers', jumpLabel: 'カルテを開く',
         });
       }
     }
@@ -404,27 +422,28 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </p>
       </div>
 
-      {/* ---------- 縁の台帳／関係人口 切り替え ---------- */}
-      <div style={{ display: 'flex', gap: 6, margin: '14px 0' }}>
-        <button onClick={() => setView('ledger')} style={{
-          padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
-          background: view === 'ledger' ? '#38ADA9' : '#fff', color: view === 'ledger' ? '#fff' : '#666',
-          boxShadow: view === 'ledger' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-        }}>🧭 営業</button>
-        <button onClick={() => setView('relation')} style={{
-          padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
-          background: view === 'relation' ? '#38ADA9' : '#fff', color: view === 'relation' ? '#fff' : '#666',
-          boxShadow: view === 'relation' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-        }}>🔁 関係人口・自治体プロファイル</button>
-        <button onClick={() => setView('leads')} style={{
-          padding: '7px 16px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
-          background: view === 'leads' ? '#38ADA9' : '#fff', color: view === 'leads' ? '#fff' : '#666',
-          boxShadow: view === 'leads' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-        }}>🎓 学校・法人（台帳）</button>
+      {/* ---------- サブビュー切り替え ----------
+          「見る画面」と「書く画面（台帳）」の2群に分ける。ピルが5つ横並びだとスマホで
+          はみ出すため、群ごとに改行し flexWrap も付ける。 */}
+      <div style={{ margin: '14px 0' }}>
+        {VIEW_GROUPS.map(group => (
+          <div key={group.label} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 10.5, color: '#aaa', fontWeight: 700, flexShrink: 0, width: 42 }}>{group.label}</span>
+            {group.views.map(v => (
+              <button key={v.key} onClick={() => setView(v.key)} style={{
+                padding: '7px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+                background: view === v.key ? '#38ADA9' : '#fff', color: view === v.key ? '#fff' : '#666',
+                boxShadow: view === v.key ? 'none' : '0 1px 3px rgba(0,0,0,0.08)', fontFamily: 'inherit',
+              }}>{v.label}</button>
+            ))}
+          </div>
+        ))}
       </div>
 
       {view === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
       {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
+      {view === 'cases' && <CasesSection authHeaders={authHeaders} />}
+      {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
 
       {view === 'ledger' && <>
       {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
@@ -664,6 +683,16 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
       {/* ---------- 便り（営業メール）：送信後まで1つのライフサイクルで管理 ---------- */}
       <h2 style={sectionTitleStyle}>📮 便り（営業メール）の進み具合</h2>
+      {/* 送り先の追加・編集はAIエージェント運営タブにあったが、同じテーブルを2箇所で
+          編集できる状態だったため、表示（下の一覧）と同じ場所へ折りたたみで内包した */}
+      <button onClick={() => setShowEmailEditor(v => !v)} style={{
+        ...jumpBtnStyle, marginBottom: 8,
+      }}>{showEmailEditor ? '▴ 送り先の編集を閉じる' : '▾ 送り先を追加・編集する'}</button>
+      {showEmailEditor && (
+        <div style={{ ...cardStyle, marginBottom: 10 }}>
+          <EmailTargetsEditor authHeaders={authHeaders} onChanged={load} />
+        </div>
+      )}
       {(() => {
         // 送信時刻(email_sent_at)を正とし、旧sent(bool)だけの行はupdated_atで補完する
         const effSentAt = (e: EmailTarget) => e.email_sent_at ?? (e.sent ? (e.updated_at ?? null) : null);
