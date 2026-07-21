@@ -116,9 +116,15 @@ function MapApp() {
   // 全体マップから直接ピンを立てて投稿する導線
   const [pinDropMode, setPinDropMode] = useState(false);
 
-  // クイック記録モード：現地では位置＋1タップだけ記録し、写真・言葉は後から追記する
-  const [quickRecording, setQuickRecording] = useState(false);
+  // クイック記録モード：現地では位置＋その場の感情だけ記録し、写真・言葉は後から追記する。
+  // 「感情の変化を見える化する」という本来の目的のため、感情の記録は省略できない必須ステップにする
+  // （位置解決→感情選択→確定の3段階。感情を選ぶまでは/api/tracesへのPOSTは発生しない）。
+  type QuickRecordStage = 'idle' | 'resolving-position' | 'picking-emotion' | 'submitting';
+  const [quickRecordStage, setQuickRecordStage] = useState<QuickRecordStage>('idle');
   const [quickRecordError, setQuickRecordError] = useState('');
+  const [quickPendingPos, setQuickPendingPos] = useState<{ pos: [number, number]; usedFallback: boolean; usedTap: boolean } | null>(null);
+  const [quickEmotionKeys, setQuickEmotionKeys] = useState<string[]>([]);
+  const [quickIntensity, setQuickIntensity] = useState(3);
   // 地図をタップした場所（未指定ならGPS位置を使う）。タップ後1回のクイック記録で使い切る
   const [quickTapPos, setQuickTapPos] = useState<[number, number] | null>(null);
 
@@ -496,7 +502,7 @@ function MapApp() {
     if (searchParams.get('quick') !== '1' || quickAutoTriggeredRef.current) return;
     quickAutoTriggeredRef.current = true;
     setTab('map');
-    handleQuickRecord();
+    beginQuickRecord();
     router.replace('/map');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -544,6 +550,8 @@ function MapApp() {
   }, [traces]);
 
   // 書きかけの記録：自分のクイック記録で、感情も写真もまだ足せていないもの
+  // 本仕様変更後は新規クイック記録には発生しない想定（感情選択がPOST前の必須ステップになったため）。
+  // ここは仕様変更前に作られた過去分の救済用として残す。
   const unfinishedOwn = traces.filter(t =>
     myTraceIds.includes(t.id) && !t.archive_type && !t.emotion_key && !t.photo_url
   );
@@ -848,10 +856,11 @@ function MapApp() {
     return DEFAULT_CENTER;
   }
 
-  // クイック記録：位置＋1タップだけで即記録する。タイトル・写真・言葉は後からTraceDetailの編集で追記できる
-  async function handleQuickRecord() {
+  // クイック記録 第1段階：位置だけを先に解決する。ここではまだ何も送信しない
+  // （感情を選ぶまで/api/tracesへのPOSTを発生させないことで、「ピンだけ」の記録が生まれないようにする）。
+  async function beginQuickRecord() {
     setQuickRecordError('');
-    setQuickRecording(true);
+    setQuickRecordStage('resolving-position');
     try {
       let usedFallback = false;
       const usedTap = quickTapPos !== null;
@@ -863,6 +872,21 @@ function MapApp() {
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
       });
+      setQuickPendingPos({ pos, usedFallback, usedTap });
+      setQuickRecordStage('picking-emotion');
+    } catch (err) {
+      setQuickRecordError(err instanceof Error ? err.message : '位置の取得に失敗しました');
+      setQuickRecordStage('idle');
+    }
+  }
+
+  // クイック記録 第2段階：感情（複数可）・強さを選んだうえで「この気持ちで記録する」を押した時点で確定送信する
+  async function confirmQuickRecord() {
+    if (!quickPendingPos || quickEmotionKeys.length === 0) return;
+    const { pos, usedFallback, usedTap } = quickPendingPos;
+    setQuickRecordError('');
+    setQuickRecordStage('submitting');
+    try {
       const now = new Date();
       const quickTitle = `クイック記録・${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       const res = await fetch('/api/traces', {
@@ -871,6 +895,9 @@ function MapApp() {
         body: JSON.stringify({
           latitude: pos[0], longitude: pos[1],
           title: quickTitle,
+          emotion_key: quickEmotionKeys[0],
+          emotion_keys: quickEmotionKeys,
+          intensity: quickIntensity,
           session_code: sessionCode.trim() || undefined,
           nickname: nickname.trim() || undefined,
           team: team.trim() || undefined,
@@ -879,7 +906,9 @@ function MapApp() {
       });
       const data: CreateTraceResponse = await res.json();
       if (!data.ok || !data.trace) {
+        // 失敗時は選択済みの感情を失わせず、同じ画面で再送できるようにする
         setQuickRecordError(data.error ?? '記録に失敗しました');
+        setQuickRecordStage('picking-emotion');
         return;
       }
       if (!usedFallback && !usedTap) setUserPos(pos);
@@ -894,11 +923,23 @@ function MapApp() {
       setQuickToastUsedFallback(usedFallback);
       setQuickToast(data.trace);
       quickToastTimerRef.current = setTimeout(() => setQuickToast(null), usedFallback ? 6000 : 4000);
+      setQuickPendingPos(null);
+      setQuickEmotionKeys([]);
+      setQuickIntensity(3);
+      setQuickRecordStage('idle');
     } catch (err) {
       setQuickRecordError(err instanceof Error ? err.message : '記録に失敗しました');
-    } finally {
-      setQuickRecording(false);
+      setQuickRecordStage('picking-emotion');
     }
+  }
+
+  // クイック記録を途中でやめる：まだ何もサーバーに送っていないため、ローカルの状態を戻すだけでよい
+  function cancelQuickRecord() {
+    setQuickPendingPos(null);
+    setQuickEmotionKeys([]);
+    setQuickIntensity(3);
+    setQuickRecordStage('idle');
+    setQuickRecordError('');
   }
 
   function handleTraceUpdate(updated: Trace) {
@@ -2385,7 +2426,7 @@ function MapApp() {
         </div>
       )}
 
-      {/* ── クイック記録（全タブ共通）：町歩き中は立ち止まらず、位置だけその場で1タップ記録する ── */}
+      {/* ── クイック記録（全タブ共通）：町歩き中も立ち止まらず、位置＋その場の感情をその場で記録する ── */}
       {tab !== 'post' && (
         <div style={{
           position: 'fixed', right: 16, bottom: tab === 'map' ? 150 : 78, zIndex: 600,
@@ -2405,7 +2446,7 @@ function MapApp() {
               {quickToastUsedFallback ? (
                 <span style={{ fontSize: 11, opacity: 0.8 }}>位置情報オフのため周辺の地点で記録・タップで場所を調整 →</span>
               ) : (
-                <span style={{ fontSize: 11, opacity: 0.8 }}>タップで感情・写真を追加 →</span>
+                <span style={{ fontSize: 11, opacity: 0.8 }}>タップで写真・ひとことを追加 →</span>
               )}
             </button>
           )}
@@ -2415,7 +2456,7 @@ function MapApp() {
               padding: '5px 10px', borderRadius: 8, maxWidth: 220, textAlign: 'right',
             }}>{quickRecordError}</p>
           )}
-          {tab === 'map' && quickTapPos && !quickRecording && (
+          {tab === 'map' && quickTapPos && quickRecordStage === 'idle' && (
             <button
               type="button"
               onClick={() => setQuickTapPos(null)}
@@ -2429,25 +2470,61 @@ function MapApp() {
               <PinIcon size={12} /> タップした場所に記録 ✕取消
             </button>
           )}
+          {quickRecordStage === 'picking-emotion' && quickPendingPos && (
+            <div style={{
+              background: colors.surface, borderRadius: 16, padding: '14px 14px 12px',
+              boxShadow: shadows.floating, maxWidth: 280, textAlign: 'left',
+            }}>
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: colors.textFaint }}>
+                今どんな気持ち？
+              </p>
+              <EmotionPicker
+                value={quickEmotionKeys}
+                onChange={setQuickEmotionKeys}
+                intensity={quickIntensity}
+                onIntensityChange={setQuickIntensity}
+              />
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={cancelQuickRecord}
+                  style={{ border: 'none', background: 'transparent', color: colors.textFaint, fontSize: 12, cursor: 'pointer', padding: '6px 0' }}
+                >やめる</button>
+                <button
+                  type="button"
+                  onClick={confirmQuickRecord}
+                  disabled={quickEmotionKeys.length === 0}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+                    background: quickEmotionKeys.length === 0 ? '#ccc' : colors.gold, color: colors.surface,
+                    fontWeight: 700, fontSize: 13, cursor: quickEmotionKeys.length === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >この気持ちで記録する →</button>
+              </div>
+            </div>
+          )}
           <button
             type="button"
-            onClick={handleQuickRecord}
-            disabled={quickRecording}
+            onClick={beginQuickRecord}
+            disabled={quickRecordStage !== 'idle'}
             style={{
               height: 52, padding: '0 22px', borderRadius: 26, border: 'none',
               background: colors.gold, color: colors.surface,
-              fontWeight: 700, fontSize: 15, cursor: quickRecording ? 'wait' : 'pointer',
-              boxShadow: shadows.floating, opacity: quickRecording ? 0.7 : 1,
+              fontWeight: 700, fontSize: 15, cursor: quickRecordStage !== 'idle' ? 'wait' : 'pointer',
+              boxShadow: shadows.floating, opacity: quickRecordStage !== 'idle' ? 0.7 : 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               whiteSpace: 'nowrap',
             }}
           >
-            {quickRecording ? '記録中…' : (
-              <>
-                <span style={{ display: 'inline-flex' }}><PinIcon size={18} /></span>
-                <span>痕跡を見つけた</span>
-              </>
-            )}
+            {quickRecordStage === 'resolving-position' ? '位置を確認中…'
+              : quickRecordStage === 'picking-emotion' ? '感情を選んでください ↑'
+              : quickRecordStage === 'submitting' ? '記録中…'
+              : (
+                <>
+                  <span style={{ display: 'inline-flex' }}><PinIcon size={18} /></span>
+                  <span>痕跡を見つけた</span>
+                </>
+              )}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import type { Trace } from '@/lib/types';
 import { colors, radii } from '@/lib/theme';
+import { EMOTIONS } from '@/lib/emotions';
 import EmotionPicker from './form/EmotionPicker';
 import FaceEmotionSuggest from './form/FaceEmotionSuggest';
 
@@ -15,11 +16,13 @@ interface Props {
 const NOTE_PLACEHOLDERS = ['修理された木の柱', '細い路地', '昔の郵便受け', 'すり減った石段', '手書きの貼り紙'];
 
 // クイック記録の直後に出す、最小限の追記シート。
+// 感情はクイック記録の必須ステップで既に選択済みのため、ここではサマリー表示＋「変更する」で編集可能にするだけ。
 // 選ぶ・撮るの1タップごとに即保存する（「保存する」ボタンを挟まない＝迷わせない）。
 export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
   const [emotions, setEmotions] = useState<string[]>(
     trace.emotion_keys ?? (trace.emotion_key ? [trace.emotion_key] : [])
   );
+  const [editingEmotion, setEditingEmotion] = useState(emotions.length === 0);
   const [photoUrl, setPhotoUrl] = useState(trace.photo_url);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -79,17 +82,42 @@ export default function QuickAddSheet({ trace, onClose, onUpdate }: Props) {
         padding: '18px 16px calc(18px + env(safe-area-inset-bottom))',
         boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
       }}>
-        <p style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 16 }}>⚡ 記録しました</p>
+        <p style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 16 }}>
+          {emotions.length > 0
+            ? `⚡ ${emotions.map(k => EMOTIONS.find(e => e.key === k)?.emoji ?? '').join('')}${EMOTIONS.find(e => e.key === emotions[0])?.label ?? ''}として記録しました`
+            : '⚡ 記録しました'}
+        </p>
         <p style={{ margin: '0 0 16px', fontSize: 12, color: '#726C5E' }}>
-          今なら1タップで感情や写真を足せます。あとからでも大丈夫です。
+          写真や言葉もその場で足せます。あとからでも大丈夫です。
         </p>
 
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8C8579', fontWeight: 700 }}>どんな感情？（複数選べます）</p>
-        <EmotionPicker value={emotions} onChange={selectEmotions} />
-        <FaceEmotionSuggest
-          selectedKeys={emotions}
-          onAdd={(key) => selectEmotions(emotions.includes(key) ? emotions : [...emotions, key])}
-        />
+        {editingEmotion ? (
+          <>
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#8C8579', fontWeight: 700 }}>どんな感情？（複数選べます）</p>
+            <EmotionPicker value={emotions} onChange={selectEmotions} />
+            <FaceEmotionSuggest
+              selectedKeys={emotions}
+              onAdd={(key) => selectEmotions(emotions.includes(key) ? emotions : [...emotions, key])}
+            />
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {emotions.map(k => {
+              const meta = EMOTIONS.find(e => e.key === k);
+              if (!meta) return null;
+              return (
+                <span key={k} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '6px 12px', borderRadius: 20, border: `2px solid ${meta.color}`,
+                  background: meta.color, color: '#fff', fontSize: 13, fontWeight: 700,
+                }}>{meta.emoji} {meta.label}</span>
+              );
+            })}
+            <button type="button" onClick={() => setEditingEmotion(true)} style={{
+              border: 'none', background: 'none', color: '#8C8579', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '4px 6px',
+            }}>変更する</button>
+          </div>
+        )}
 
         <div style={{ marginTop: 16 }}>
           {photoUrl && (
