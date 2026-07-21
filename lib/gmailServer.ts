@@ -112,6 +112,45 @@ async function gmailFetch(path: string, params: Record<string, string>): Promise
   return data;
 }
 
+function base64UrlEncode(input: string): string {
+  return Buffer.from(input, 'utf-8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// MIMEヘッダーの日本語Subjectをエンコードする（RFC 2047, Base64/UTF-8）
+function encodeSubject(subject: string): string {
+  return `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`;
+}
+
+export interface SendEmailInput {
+  to: string;
+  subject: string;
+  body: string; // プレーンテキスト
+}
+
+/**
+ * gmail.sendスコープでのメール送信（日程調整サイトの却下・キャンセル通知専用）。
+ * 予定の作成・削除・返信の閲覧とは別の権限。送信専用の用途にだけ使うこと。
+ */
+export async function sendEmail(input: SendEmailInput): Promise<void> {
+  const accessToken = await getAccessToken();
+  const raw = [
+    `To: ${input.to}`,
+    `From: ${OWN_ADDRESS}`,
+    `Subject: ${encodeSubject(input.subject)}`,
+    'Content-Type: text/plain; charset=UTF-8',
+    '',
+    input.body,
+  ].join('\r\n');
+
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: base64UrlEncode(raw) }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`メール送信に失敗しました: ${data.error?.message ?? res.status}`);
+}
+
 export interface ContactThreadStatus {
   sent: boolean;
   sentContent: string | null;

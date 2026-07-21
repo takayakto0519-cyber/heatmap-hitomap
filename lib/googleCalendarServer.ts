@@ -104,6 +104,19 @@ async function fetchBusyIntervals(accessToken: string, timeMinIso: string, timeM
 }
 
 /**
+ * 指定した時間帯が今のGoogleカレンダーで本当に空いているかを確認する（真のfreeBusy APIを使用）。
+ * 日程調整サイトの確定処理で、会長が「確定」を押す直前にもう一度これを呼び、
+ * 別のリクエストが先に確定されて枠が埋まっていないかをチェックする（二重予約防止）。
+ */
+export async function isSlotFree(startTime: string, endTime: string): Promise<boolean> {
+  const accessToken = await getAccessToken();
+  const busy = await fetchBusyIntervals(accessToken, startTime, endTime);
+  const startMs = new Date(startTime).getTime();
+  const endMs = new Date(endTime).getTime();
+  return !busy.some(b => startMs < b.end && endMs > b.start);
+}
+
+/**
  * 直近days営業日ぶんの空き枠を計算する（真のfreeBusy APIを使用）。
  * 平日・営業時間内（既定10:00-18:00 JST）を、durationMinutes刻みでスロット化し、
  * 既存の予定（busy区間）と重ならないものだけを返す。
@@ -194,6 +207,23 @@ export async function createCalendarEvent(input: CreateEventInput): Promise<{ id
   const data = await res.json();
   if (!res.ok) throw new Error(`カレンダーへの予定作成に失敗しました: ${data.error?.message ?? res.status}`);
   return { id: data.id, htmlLink: data.htmlLink };
+}
+
+/**
+ * 確定済みの予定をキャンセルする（日程調整サイトの確定後キャンセル用）。
+ * sendUpdates=allで、招待していた参加者にもGoogle側からキャンセル通知メールが届く。
+ */
+export async function deleteCalendarEvent(eventId: string): Promise<void> {
+  const accessToken = await getAccessToken();
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  // 204 No Content が成功。410 Gone（既に削除済み）は冪等に成功扱いにする。
+  if (!res.ok && res.status !== 410) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(`カレンダー予定の削除に失敗しました: ${data.error?.message ?? res.status}`);
+  }
 }
 
 export interface CalendarEventItem {
