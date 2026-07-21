@@ -44,9 +44,10 @@ export function requireCensusStatsDataId(): string {
   return id;
 }
 
-// e-Statの getStatsData レスポンスから、最初に見つかった数値を「昼夜間人口比率」として取り出す簡易パーサー。
-// e-Statのレスポンス構造は統計表ごとに細部が異なるため、実際のstatsDataIdが決まって
-// レスポンス例を確認した際にはこの関数の調整が必要になる可能性がある。
+// e-Statの getStatsData レスポンスから、最初に見つかった数値を「昼夜間人口比率」として取り出すパーサー。
+// statsDataId=0003454499（令和2年国勢調査・市区町村単位の昼夜間人口比率）の実レスポンスで動作確認済み：
+// GET_STATS_DATA.STATISTICAL_DATA.DATA_INF.VALUE[0] が cat01=0(総数)/cat02=00(総数) の全体比率、
+// @time は "2020000000" 形式（先頭4桁が調査年）。他の統計表を使う場合は要調整。
 export function extractDayNightRatio(estatResponse: unknown): { value: number; time?: string } | null {
   try {
     const dataInf = (estatResponse as Record<string, any>)?.GET_STATS_DATA?.STATISTICAL_DATA?.DATA_INF;
@@ -57,7 +58,8 @@ export function extractDayNightRatio(estatResponse: unknown): { value: number; t
     const raw = first['$'] ?? first['@value'];
     const value = typeof raw === 'string' ? parseFloat(raw) : typeof raw === 'number' ? raw : NaN;
     if (!Number.isFinite(value)) return null;
-    const time = typeof first['@time'] === 'string' ? (first['@time'] as string) : undefined;
+    const timeRaw = typeof first['@time'] === 'string' ? (first['@time'] as string) : undefined;
+    const time = timeRaw && /^\d{4}/.test(timeRaw) ? `${timeRaw.slice(0, 4)}年` : timeRaw;
     return { value, time };
   } catch {
     return null;
