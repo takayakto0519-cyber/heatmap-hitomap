@@ -72,7 +72,11 @@ export function AuthorLine({ trace, authorMap }: { trace: Trace; authorMap: Reco
       </span>
     );
   }
-  return <span>🕶 {trace.nickname ?? '匿名'}</span>;
+  // 未登録（非会員）投稿：ニックネームがあればそれを、無くてもsession_code（実験回の識別）が
+  // あれば表示し、運営が同一人物の複数投稿をたどれるようにする。両方無ければ本当に匿名として表示。
+  if (trace.nickname?.trim()) return <span>🕶 {trace.nickname}</span>;
+  if (trace.session_code?.trim()) return <span title="ニックネーム未入力。実験回の識別コードで表示">🕶 匿名（{trace.session_code}）</span>;
+  return <span>🕶 匿名</span>;
 }
 export function ContentTags({ trace }: { trace: Trace }) {
   const emotion = getEmotion(trace.emotion_key);

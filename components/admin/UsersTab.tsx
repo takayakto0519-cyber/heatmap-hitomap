@@ -14,6 +14,8 @@ export default function UsersTab({ authHeaders }: { authHeaders: () => HeadersIn
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'traces' | 'recent' | 'new'>('traces');
   const [q, setQ] = useState('');
+  const [noNameOnly, setNoNameOnly] = useState(false);
+  const [showDormant, setShowDormant] = useState(false);
   const [fullTraces, setFullTraces] = useState<Record<string, Trace[]>>({});
   const [loadingFull, setLoadingFull] = useState<Set<string>>(new Set());
 
@@ -59,23 +61,31 @@ export default function UsersTab({ authHeaders }: { authHeaders: () => HeadersIn
 
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
 
+  const noNameCount = users.filter(u => !u.display_name?.trim()).length;
+
   const filtered = users.filter(u => {
+    if (noNameOnly && u.display_name?.trim()) return false;
     if (!q.trim()) return true;
     const needle = q.trim().toLowerCase();
     return u.username.toLowerCase().includes(needle) || (u.display_name ?? '').toLowerCase().includes(needle);
   });
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'traces') return b.traceCount - a.traceCount;
-    if (sortBy === 'new') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    // 'recent'：最終投稿が新しい人を先に（未投稿は最後）
-    if (!a.lastPostedAt) return 1;
-    if (!b.lastPostedAt) return -1;
-    return new Date(b.lastPostedAt).getTime() - new Date(a.lastPostedAt).getTime();
-  });
+  function sortUsers(list: AdminUser[]): AdminUser[] {
+    return [...list].sort((a, b) => {
+      if (sortBy === 'traces') return b.traceCount - a.traceCount;
+      if (sortBy === 'new') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      // 'recent'：最終投稿が新しい人を先に（未投稿は最後）
+      if (!a.lastPostedAt) return 1;
+      if (!b.lastPostedAt) return -1;
+      return new Date(b.lastPostedAt).getTime() - new Date(a.lastPostedAt).getTime();
+    });
+  }
+  // 休眠（投稿0件）アカウントはリスト下段に分離し、実際に使われているアカウントを見やすくする
+  const sorted = sortUsers(filtered.filter(u => u.traceCount > 0));
+  const dormant = sortUsers(filtered.filter(u => u.traceCount === 0));
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
         <p style={{ fontSize: 12, color: '#999', margin: 0 }}>
           登録ユーザー {users.length}人（投稿・フォローと連携した実データ）
         </p>
@@ -88,8 +98,14 @@ export default function UsersTab({ authHeaders }: { authHeaders: () => HeadersIn
           <option value="new">登録が新しい順</option>
         </select>
       </div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#B7791F', cursor: 'pointer' }}>
+          <input type="checkbox" checked={noNameOnly} onChange={e => setNoNameOnly(e.target.checked)} />
+          ⚠ 名前未設定のみ表示（{noNameCount}人）
+        </label>
+      </div>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
-      {sorted.length === 0 && <p style={{ color: '#aaa' }}>該当するユーザーはいません。</p>}
+      {sorted.length === 0 && dormant.length === 0 && <p style={{ color: '#aaa' }}>該当するユーザーはいません。</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {sorted.map(u => {
           const isOpen = expanded.has(u.id);
@@ -111,6 +127,11 @@ export default function UsersTab({ authHeaders }: { authHeaders: () => HeadersIn
                   <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>
                     {u.display_name ?? u.username}
                     <span style={{ marginLeft: 6, fontSize: 11, color: '#999', fontWeight: 400 }}>@{u.username}</span>
+                    {!u.display_name?.trim() && (
+                      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#B7791F', background: '#FFF3DC', padding: '1px 7px', borderRadius: 10 }}>
+                        ⚠ 名前未設定
+                      </span>
+                    )}
                   </p>
                   {u.bio && <p style={{ margin: '2px 0', fontSize: 12, color: '#666' }}>{u.bio}</p>}
                   <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aaa' }}>
@@ -203,6 +224,45 @@ export default function UsersTab({ authHeaders }: { authHeaders: () => HeadersIn
           );
         })}
       </div>
+
+      {dormant.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => setShowDormant(v => !v)} style={{
+            background: 'none', border: 'none', color: '#999', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0,
+          }}>{showDormant ? '▴ 休眠アカウントを隠す' : `▾ 休眠アカウント（投稿0件・${dormant.length}人）を見る`}</button>
+          {showDormant && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {dormant.map(u => (
+                <div key={u.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                  borderRadius: 8, background: '#fafafa', opacity: 0.8,
+                }}>
+                  {u.avatar_url ? (
+                    <img src={u.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%', background: '#eee', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                    }}>👤</div>
+                  )}
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: '#666' }}>
+                    {u.display_name ?? u.username}
+                    <span style={{ marginLeft: 5, fontSize: 10.5, color: '#aaa', fontWeight: 400 }}>@{u.username}</span>
+                  </span>
+                  {!u.display_name?.trim() && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#B7791F', background: '#FFF3DC', padding: '1px 7px', borderRadius: 10 }}>
+                      ⚠ 名前未設定
+                    </span>
+                  )}
+                  <span style={{ marginLeft: 'auto', fontSize: 10.5, color: '#bbb', flexShrink: 0 }}>
+                    登録: {new Date(u.created_at).toLocaleDateString('ja-JP')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

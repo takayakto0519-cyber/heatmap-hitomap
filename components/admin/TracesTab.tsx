@@ -13,11 +13,16 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // データ整合性QA・不正投稿検知（ホームの「今日の要注意」と同じ着眼点）をこの一覧側でも
+  // 絞り込めるようにする。品質チェック目的なので通常より広い範囲（500件）を対象にする。
+  const [emptyTitleOnly, setEmptyTitleOnly] = useState(false);
+  const [duplicateOnly, setDuplicateOnly] = useState(false);
   const authorMap = useAuthorMap(authHeaders);
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = new URLSearchParams({ status: 'all', limit: '100' });
+    const qaMode = emptyTitleOnly || duplicateOnly;
+    const params = new URLSearchParams({ status: 'all', limit: qaMode ? '500' : '100' });
     if (q.trim()) params.set('q', q.trim());
     if (showDeleted) params.set('include_deleted', 'true');
     if (includeDemo) params.set('includeDemo', 'true');
@@ -29,7 +34,7 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
       })
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
-  }, [authHeaders, q, showDeleted, includeDemo]);
+  }, [authHeaders, q, showDeleted, includeDemo, emptyTitleOnly, duplicateOnly]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -46,6 +51,21 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
     if (data.ok) load(); else setError(data.error ?? '処理に失敗しました');
   }
 
+  // タイトル空欄件数・重複タイトル（3件以上）は、agents/trace_qa.py・spam_detect.pyと同じ着眼点で
+  // クライアント側に計算する（ホームの「今日の要注意」と同じ考え方の絞り込み）
+  const emptyTitleCount = traces.filter(t => !t.title?.trim()).length;
+  const titleCounts = new Map<string, number>();
+  for (const t of traces) {
+    const title = t.title?.trim();
+    if (title) titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
+  }
+  const duplicateTitles = new Set([...titleCounts.entries()].filter(([, c]) => c >= 3).map(([t]) => t));
+  const visibleTraces = traces.filter(t => {
+    if (emptyTitleOnly && t.title?.trim()) return false;
+    if (duplicateOnly && !duplicateTitles.has(t.title?.trim() ?? '')) return false;
+    return true;
+  });
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -56,6 +76,17 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#666' }}>
           <input type="checkbox" checked={showDeleted} onChange={e => setShowDeleted(e.target.checked)} />
           削除済みも表示
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#B7791F', cursor: 'pointer' }}>
+          <input type="checkbox" checked={emptyTitleOnly} onChange={e => setEmptyTitleOnly(e.target.checked)} />
+          ⚠ タイトル空欄のみ（{emptyTitleCount}件）
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#B7791F', cursor: 'pointer' }}>
+          <input type="checkbox" checked={duplicateOnly} onChange={e => setDuplicateOnly(e.target.checked)} />
+          ⚠ 重複タイトル（3件以上）のみ（{duplicateTitles.size}種類）
         </label>
       </div>
 
@@ -73,8 +104,8 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {loading ? <p style={{ color: '#999' }}>読み込み中…</p> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {traces.length === 0 && <p style={{ color: '#aaa' }}>該当する投稿はありません。</p>}
-          {traces.map(t => (
+          {visibleTraces.length === 0 && <p style={{ color: '#aaa' }}>該当する投稿はありません。</p>}
+          {visibleTraces.map(t => (
             <div key={t.id} style={{
               display: 'flex', alignItems: 'flex-start', gap: 10,
               background: '#fff', borderRadius: 10, padding: '10px 12px',
@@ -83,7 +114,9 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
             }}>
               {t.photo_url && <img src={t.photo_url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.title?.trim() ? undefined : '#B23A2E' }}>
+                  {t.title?.trim() || '（タイトル空欄）'}
+                </p>
                 <ContentTags trace={t} />
                 {t.why && (
                   <p style={{ margin: '2px 0 4px', fontSize: 12, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.why}</p>

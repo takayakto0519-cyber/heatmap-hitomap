@@ -313,10 +313,21 @@ function MapApp() {
   const [usernameSetupError, setUsernameSetupError] = useState('');
   const [usernameSetupBusy, setUsernameSetupBusy] = useState(false);
 
+  // 表示名（display_name）が未設定のログインユーザーに必須で入力してもらうゲート。
+  // Google/マジックリンク/パスワードのどの登録経路でも display_name は集めていないため、
+  // 全経路が最終的にたどり着く/mapのここ1箇所で必須化する（背景クリックでは閉じない＝必須）。
+  const [displayNameGateOpen, setDisplayNameGateOpen] = useState(false);
+  const [displayNameValue, setDisplayNameValue] = useState('');
+  const [displayNameError, setDisplayNameError] = useState('');
+  const [displayNameBusy, setDisplayNameBusy] = useState(false);
+
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => {
       setCurrentUser(d.user ?? null);
       setCurrentProfile(d.profile ?? null);
+      if (d.profile && !d.profile.display_name?.trim()) {
+        setDisplayNameGateOpen(true);
+      }
     }).catch(() => {});
   }, []);
 
@@ -339,6 +350,28 @@ function MapApp() {
       }
     } finally {
       setUsernameSetupBusy(false);
+    }
+  }
+
+  async function submitDisplayName() {
+    if (!displayNameValue.trim()) { setDisplayNameError('お名前を入力してください'); return; }
+    setDisplayNameBusy(true);
+    setDisplayNameError('');
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: displayNameValue.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCurrentProfile(data.profile);
+        setDisplayNameGateOpen(false);
+      } else {
+        setDisplayNameError(data.error ?? 'お名前の設定に失敗しました');
+      }
+    } finally {
+      setDisplayNameBusy(false);
     }
   }
 
@@ -1050,6 +1083,42 @@ function MapApp() {
               fontWeight: 700, fontSize: 15, cursor: usernameSetupBusy ? 'default' : 'pointer',
             }}>
               {usernameSetupBusy ? '設定中…' : '設定する'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {displayNameGateOpen && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100 }} />
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1101,
+            background: '#fff', borderRadius: '20px 20px 0 0',
+            padding: '20px 16px calc(20px + env(safe-area-inset-bottom))',
+            boxShadow: '0 -4px 30px rgba(0,0,0,0.18)',
+          }}>
+            <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 16 }}>👋 お名前を教えてください</p>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#726C5E' }}>
+              投稿や交流の際に表示されるお名前です。本名でもニックネームでも構いません。あとから変更もできます。
+            </p>
+            <input
+              value={displayNameValue}
+              onChange={(e) => { setDisplayNameValue(e.target.value); setDisplayNameError(''); }}
+              placeholder="例：たかや"
+              maxLength={30}
+              autoFocus
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '11px 12px', fontSize: 15,
+                border: `1.5px solid ${displayNameError ? '#B23A2E' : '#D7CFB8'}`, borderRadius: 10, marginBottom: 8,
+              }}
+            />
+            {displayNameError && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#B23A2E' }}>{displayNameError}</p>}
+            <button onClick={submitDisplayName} disabled={displayNameBusy} style={{
+              width: '100%', padding: '13px', borderRadius: 10, border: 'none',
+              background: displayNameBusy ? '#D7CFB8' : '#566246', color: '#fff',
+              fontWeight: 700, fontSize: 15, cursor: displayNameBusy ? 'default' : 'pointer',
+            }}>
+              {displayNameBusy ? '保存中…' : 'はじめる'}
             </button>
           </div>
         </>
