@@ -118,10 +118,10 @@ export async function isSlotFree(startTime: string, endTime: string): Promise<bo
 
 /**
  * 指定した日付範囲（JST・両端含む）の空き枠を計算する（真のfreeBusy APIを使用）。
- * 平日・営業時間内（既定9:00-23:00 JST）を、durationMinutes刻みでスロット化し、
+ * 土日も含め毎日、営業時間内（既定9:00-23:00 JST）を、durationMinutes刻みでスロット化し、
  * 既存の予定（busy区間）と重ならないものだけを返す。
  *
- * 月間カレンダーグリッド表示のため、土日・空き無し日・過去日も含めて範囲内の
+ * 月間カレンダーグリッド表示のため、空き無し日・過去日も含めて範囲内の
  * 全カレンダー日ぶん `{date, slots}` を返す（該当日はslots: []）。呼び出し側
  * （app/api/schedule/availability/route.ts）が表示中の月の範囲を渡す。
  */
@@ -142,18 +142,16 @@ export async function getAvailability(fromDate: string, toDate: string, duration
   while (safety < maxIterations) {
     safety++;
     const slots: AvailabilitySlot[] = [];
-    if (cursor.weekday !== 0 && cursor.weekday !== 6) {
-      for (let hh = BUSINESS_START_HOUR; hh * 60 + durationMinutes <= BUSINESS_END_HOUR * 60; ) {
-        const startIso = jstIso(cursor.y, cursor.m, cursor.d, Math.floor(hh), Math.round((hh % 1) * 60));
-        const startMs = new Date(startIso).getTime();
-        const endMs = startMs + durationMinutes * 60_000;
-        const isPast = startMs < now.getTime() + 60 * 60_000; // 1時間より直前の枠は予約できないようにする
-        const overlapsBusy = busy.some((b) => startMs < b.end && endMs > b.start);
-        if (!isPast && !overlapsBusy) {
-          slots.push({ start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() });
-        }
-        hh += durationMinutes / 60;
+    for (let hh = BUSINESS_START_HOUR; hh * 60 + durationMinutes <= BUSINESS_END_HOUR * 60; ) {
+      const startIso = jstIso(cursor.y, cursor.m, cursor.d, Math.floor(hh), Math.round((hh % 1) * 60));
+      const startMs = new Date(startIso).getTime();
+      const endMs = startMs + durationMinutes * 60_000;
+      const isPast = startMs < now.getTime() + 60 * 60_000; // 1時間より直前の枠は予約できないようにする
+      const overlapsBusy = busy.some((b) => startMs < b.end && endMs > b.start);
+      if (!isPast && !overlapsBusy) {
+        slots.push({ start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() });
       }
+      hh += durationMinutes / 60;
     }
     result.push({ date: `${cursor.y}-${String(cursor.m).padStart(2, '0')}-${String(cursor.d).padStart(2, '0')}`, slots });
     if (cursor.y === ty && cursor.m === tm && cursor.d === td) break;

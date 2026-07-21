@@ -2,8 +2,8 @@
 
 // 月間カレンダーグリッド（Calendly風）。
 // 表示中の月の全カレンダー日を7列グリッドで並べ、空き枠がある日だけ選択可能にする。
-// 空き枠の有無（slots.length）で「過去日・週末・空き無し日」をまとめて非活性にできるのは、
-// サーバー側（lib/googleCalendarServer.ts）がそれらを区別せず全て slots:[] で返すため。
+// 土日も含め毎日が対象（サーバー側 lib/googleCalendarServer.ts は曜日を区別しない）。
+// 空き枠の有無（slots.length）で「過去日・空き無し日」をまとめて非活性にできる。
 import { colors, radii } from '@/lib/theme';
 import { formatMonthLabel, todayJstDateStr, weekdayOfDateStr, WEEKDAY_LABELS } from '@/lib/scheduleFormat';
 import type { AvailabilityDay } from './types';
