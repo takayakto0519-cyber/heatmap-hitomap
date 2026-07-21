@@ -39,10 +39,6 @@ function summarize(agentId: string, result: Record<string, unknown> | null): str
       const lines = (result.lines as string[]) ?? [];
       return lines[1] ?? '日報を書きました';
     }
-    case 'burnout_watch': {
-      const warnings = (result.warnings as string[]) ?? [];
-      return warnings[0] ?? `健全（連続作業${result.current_streak ?? 0}日）`;
-    }
     case 'line_mission':
       if (result.skipped) return String(result.status ?? '次の縁ミッションを待機中');
       return String(result.status ?? '縁ミッションを送りました');

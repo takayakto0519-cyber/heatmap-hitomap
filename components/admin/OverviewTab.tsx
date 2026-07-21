@@ -5,7 +5,7 @@
 // 「どの分野が動いていて、どこが滞っているか」を見る画面に再設計した。
 // 数値は /api/admin/stats（既存・ログイン確認兼用）と /api/admin/biz-stats（分野別）の2本から取る。
 import { useEffect, useState } from 'react';
-import { ErrorBanner, LoadingLine, type TabBadgeCounts } from '@/components/admin/adminShared';
+import { ErrorBanner, LoadingLine, type TabBadgeCounts, type AttentionItem, ATTENTION_JUMP } from '@/components/admin/adminShared';
 
 interface RegionValence { region: string; valence: { positive: number; negative: number; neutral: number; total: number } }
 
@@ -82,19 +82,6 @@ function Kpi({ label, value, urgent, onClick }: { label: string; value: number |
     </button>
   );
 }
-
-// 統合司令室(command_center)が抽出した「今すぐ判断が要ること」1件分
-interface AttentionItem { agent_id: string; floor: string; name: string; headline: string }
-// 要注意項目から運営ダッシュボードのタブへ飛べるものは飛ばす
-const ATTENTION_JUMP: Record<string, { tab: string; label: string }> = {
-  report_screen: { tab: 'reports', label: '通報へ' },
-  spam_detect: { tab: 'traces', label: '投稿管理へ' },
-  trace_qa: { tab: 'traces', label: '投稿管理へ' },
-  deadline_watch: { tab: 'funding', label: 'コンテスト・助成金へ' },
-  case_pipeline_watch: { tab: 'sales', label: '営業へ' },
-  payment_watch: { tab: 'sales', label: '営業（案件）へ' },
-  burnout_watch: { tab: 'secretary', label: '秘書へ' },
-};
 
 export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, tabGroups, siteLinks }: {
   authHeaders: () => HeadersInit;

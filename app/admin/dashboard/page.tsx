@@ -309,7 +309,7 @@ export default function AdminDashboardPage() {
           {tab === 'agents' && <AgentStatusTab authHeaders={authHeaders} />}
           {tab === 'money' && <MoneyTab authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
-          {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} />}
+          {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} goTab={goTab} />}
         </div>
       </main>
     </div>

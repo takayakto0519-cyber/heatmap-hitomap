@@ -104,6 +104,19 @@ export function Card({ children, style }: { children: React.ReactNode; style?: R
   );
 }
 
+// 統合司令室(command_center)が抽出した「今すぐ判断が要ること」1件分。
+// ホーム(OverviewTab)と秘書(SecretaryTab)の両方が /api/admin/command-center から取得して表示する。
+export interface AttentionItem { agent_id: string; floor: string; name: string; headline: string }
+// 要注意項目から運営ダッシュボードのタブへ飛べるものは飛ばす
+export const ATTENTION_JUMP: Record<string, { tab: string; label: string }> = {
+  report_screen: { tab: 'reports', label: '通報へ' },
+  spam_detect: { tab: 'traces', label: '投稿管理へ' },
+  trace_qa: { tab: 'traces', label: '投稿管理へ' },
+  deadline_watch: { tab: 'funding', label: 'コンテスト・助成金へ' },
+  case_pipeline_watch: { tab: 'sales', label: '営業へ' },
+  payment_watch: { tab: 'sales', label: '営業（案件）へ' },
+};
+
 // ---------- ここから下は「同じ見た目を各タブが手書きしていた」ものの共通化 ----------
 
 /** サイドバーのバッジ件数。タブIDをキーにしたマップ（/api/admin/stats が返す badges と同じ形）。 */

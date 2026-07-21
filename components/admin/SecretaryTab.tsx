@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import CalendarPanel from './CalendarPanel';
 import BookingRequestsPanel from './BookingRequestsPanel';
 import ActionItemsSection from './ActionItemsSection';
-import { MigrationNotice } from '@/components/admin/adminShared';
+import { MigrationNotice, type AttentionItem, ATTENTION_JUMP } from '@/components/admin/adminShared';
 
 interface ActionItem {
   id: string; title: string; category: string; status: string; owner: string;
@@ -30,7 +30,7 @@ function isOverdue(due: string | null): boolean {
   return new Date(due + 'T23:59:59').getTime() < Date.now();
 }
 
-export default function SecretaryTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () => HeadersInit; goTab?: (id: string) => void }) {
   const [items, setItems] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,6 +39,16 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [migrationFile, setMigrationFile] = useState<string | null>(null);
   const [showManage, setShowManage] = useState(false);
+  // ホーム(OverviewTab)の「今日の要注意」と同じ統合司令室AIの結果。秘書タブでは読み取り専用で見せる
+  // （完了操作は付けない＝会長の判断が必要な生の情報として置いておくだけ）。
+  const [attention, setAttention] = useState<AttentionItem[] | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/command-center', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setAttention(d.result?.attention_items ?? []); })
+      .catch(() => {});
+  }, [authHeaders]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +104,33 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {migrationFile && <MigrationNotice title="To-Do（作業状況）のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
+
+      {/* 今日の要注意（統合司令室AIが全AIエージェントの結果から抽出、ホームと同じ内容を読み取り専用で表示） */}
+      {attention && attention.length > 0 && (
+        <div style={{ ...cardStyle, borderLeft: '4px solid #E55039', background: '#FFF7F5' }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14, color: '#C0392B' }}>
+            ⚠ 今日の要注意（{attention.length}件）
+            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>統合司令室AIがAIエージェントの報告から拾った、いま判断が要ること（ここでは確認のみ）</span>
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {attention.map((it, i) => {
+              const jump = ATTENTION_JUMP[it.agent_id];
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: '#fff' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#E55039', background: '#E5503914', padding: '1px 7px', borderRadius: 8, flexShrink: 0 }}>{it.name}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: '#444' }}>{it.headline}</span>
+                  {jump && goTab && (
+                    <button onClick={() => goTab(jump.tab)} style={{
+                      flexShrink: 0, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      border: '1px solid #E55039', borderRadius: 12, padding: '2px 10px', background: '#fff', color: '#E55039',
+                    }}>{jump.label} →</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={cardStyle}>
         <CalendarPanel authHeaders={authHeaders} compact={!showFullCalendar} showTomorrow={showFullCalendar} />
