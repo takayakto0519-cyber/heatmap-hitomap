@@ -3,13 +3,11 @@
 // ダッシュボード側が案内を出せるようにする（画面を壊さない）。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isMissingTable, missingTablePayload } from '@/lib/adminApi';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const OPP_TYPES = new Set(['municipal_support', 'subsidy', 'contest', 'funding_event']);
-
-function isMissingTable(message: string): boolean {
-  return message.includes('funding_opportunities') && (message.includes('does not exist') || message.includes('schema cache'));
-}
+const MIGRATION_FILE = 'supabase/migrations/20260720_add_funding_opportunities.sql';
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -22,7 +20,7 @@ export async function GET(req: NextRequest) {
     .order('deadline', { ascending: true, nullsFirst: false });
 
   if (error) {
-    if (isMissingTable(error.message)) return NextResponse.json({ ok: true, opportunities: [], needsMigration: true });
+    if (isMissingTable(error.message, 'funding_opportunities')) return NextResponse.json(missingTablePayload('opportunities', MIGRATION_FILE));
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true, opportunities: data ?? [] });
@@ -63,8 +61,8 @@ export async function POST(req: NextRequest) {
     .select().single();
 
   if (error) {
-    if (isMissingTable(error.message)) {
-      return NextResponse.json({ ok: false, error: '締切台帳のテーブルが未作成です。supabase/migrations/20260720_add_funding_opportunities.sql をSQL Editorで実行してください' }, { status: 503 });
+    if (isMissingTable(error.message, 'funding_opportunities')) {
+      return NextResponse.json({ ok: false, error: `締切台帳のテーブルが未作成です。${MIGRATION_FILE} をSQL Editorで実行してください` }, { status: 503 });
     }
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }

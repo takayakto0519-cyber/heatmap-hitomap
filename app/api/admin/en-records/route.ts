@@ -3,13 +3,11 @@
 // ダッシュボード側が「SQL適用待ち」の案内を出せるようにする（画面を壊さない）。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isMissingTable, missingTablePayload } from '@/lib/adminApi';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const KINDS = new Set(['trace', 'yohaku', 'action', 'suijo']);
-
-function isMissingTable(message: string): boolean {
-  return message.includes('en_records') && (message.includes('does not exist') || message.includes('schema cache'));
-}
+const MIGRATION_FILE = 'supabase/migrations/20260719_add_en_records.sql';
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -22,7 +20,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
 
   if (error) {
-    if (isMissingTable(error.message)) return NextResponse.json({ ok: true, records: [], needsMigration: true });
+    if (isMissingTable(error.message, 'en_records')) return NextResponse.json(missingTablePayload('records', MIGRATION_FILE));
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true, records: data ?? [] });
@@ -51,8 +49,8 @@ export async function POST(req: NextRequest) {
     .select().single();
 
   if (error) {
-    if (isMissingTable(error.message)) {
-      return NextResponse.json({ ok: false, error: '縁の台帳のテーブルが未作成です。supabase/migrations/20260719_add_en_records.sql をSQL Editorで実行してください' }, { status: 503 });
+    if (isMissingTable(error.message, 'en_records')) {
+      return NextResponse.json({ ok: false, error: `縁の台帳のテーブルが未作成です。${MIGRATION_FILE} をSQL Editorで実行してください` }, { status: 503 });
     }
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }

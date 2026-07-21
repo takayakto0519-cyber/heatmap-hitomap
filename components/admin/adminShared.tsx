@@ -103,3 +103,66 @@ export function Card({ children, style }: { children: React.ReactNode; style?: R
     </div>
   );
 }
+
+// ---------- ここから下は「同じ見た目を各タブが手書きしていた」ものの共通化 ----------
+
+/** サイドバーのバッジ件数。タブIDをキーにしたマップ（/api/admin/stats が返す badges と同じ形）。 */
+export type TabBadgeCounts = Record<string, number>;
+
+/**
+ * ステータス切替のピルボタン。ビジネスモデル案・学校法人・イベント計画・提案ボード等で
+ * 同じ見た目を各ファイルが手書きしていたのを1つにまとめたもの。
+ */
+export function StatusPill({ label, color, active, onClick, disabled }: {
+  label: string;
+  color: string;
+  active: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: onClick && !disabled ? 'pointer' : 'default',
+      border: `1.5px solid ${active ? color : '#ddd'}`,
+      background: active ? color + '18' : '#fff',
+      color: active ? color : '#999', fontWeight: active ? 700 : 400,
+      fontFamily: 'inherit',
+    }}>{label}</button>
+  );
+}
+
+/**
+ * テーブル未作成（マイグレーション未適用）の案内。
+ * このプロジェクトはSQLを会長が手で適用する運用なので、生のPostgresエラーを出さずに
+ * 「どのファイルをSQL Editorで流せばよいか」を伝える。
+ */
+export function MigrationNotice({ title, migrationFile }: { title: string; migrationFile: string }) {
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      marginBottom: 12, borderLeft: '4px solid #E5A139',
+    }}>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#B7791F' }}>⚠ {title}</p>
+      <p style={{ margin: '4px 0 0', fontSize: 12, color: '#777', lineHeight: 1.7 }}>
+        <code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>{migrationFile}</code> を
+        SupabaseのSQL Editorで一度実行してください。
+      </p>
+    </div>
+  );
+}
+
+export function LoadingLine({ label = '読み込み中…' }: { label?: string }) {
+  return <p style={{ color: '#999', fontSize: 12, margin: '8px 0' }}>{label}</p>;
+}
+
+/** 画面全体を潰さずにエラーだけ伝える帯。中身は描画したまま上に出す用。 */
+export function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div style={{
+      background: '#FFF7F5', border: '1px solid #FFD9D0', borderRadius: 10,
+      padding: '8px 12px', marginBottom: 12,
+    }}>
+      <p style={{ margin: 0, fontSize: 12.5, color: '#C0392B' }}>{message}</p>
+    </div>
+  );
+}
