@@ -115,8 +115,13 @@ interface MorningItem {
   jumpTab?: string;
   jumpLabel?: string;
   leadId?: string; // 縁の台帳カードへスクロールするため
-  switchView?: 'relation'; // ledger/relationのタブ自体を切り替えるため（jumpTabとは別物）
+  switchView?: SalesView; // ledger/relationのタブ自体を切り替えるため（jumpTabとは別物）
 }
+
+// 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
+// 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
+const SALES_VIEWS = ['ledger', 'relation', 'leads'] as const;
+type SalesView = typeof SALES_VIEWS[number];
 
 export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => HeadersInit; goTab: (tab: string) => void }) {
   const [leads, setLeads] = useState<ClientLead[]>([]);
@@ -130,11 +135,12 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // ナビ整理で独立タブ「学校・法人」を廃止し、営業ハブのサブビューに吸収（サイドバー整理2026-07-20）
-  const [view, setView] = useState<'ledger' | 'relation' | 'leads'>('ledger');
-  // EnCard内の「学校・法人タブへ」ボタン用：'leads'は独立タブではなくこのタブのサブビューなので、
-  // ページ遷移ではなくローカルのview切替に差し替える（他の宛先はそのままpage.tsxのgoTabへ）
+  const [view, setView] = useState<SalesView>('ledger');
+  // EnCard内の「学校・法人へ」「関係人口へ」ボタン用：これらは独立タブではなくこのタブのサブビューなので、
+  // ページ遷移ではなくローカルのview切替に差し替える（他の宛先はそのままpage.tsxのgoTabへ）。
+  // 'relation' を横取りし損ねると page.tsx 側に該当タブが無く画面が真っ白になるため、配列で一括判定する。
   const goTabOrSwitchView = useCallback((target: string) => {
-    if (target === 'leads') { setView('leads'); return; }
+    if ((SALES_VIEWS as readonly string[]).includes(target)) { setView(target as SalesView); return; }
     goTab(target);
   }, [goTab]);
 
@@ -595,7 +601,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {activeRankedFeed.length === 0 ? (
         <div style={cardStyle}>
           <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
-            営業リストが空です。「学校・法人」タブでリードを追加するか、Claude Codeセッションで「リード探して」と頼んでください。
+            営業リストが空です。上の「🎓 学校・法人（台帳）」でリードを追加するか、Claude Codeセッションで「リード探して」と頼んでください。
           </p>
         </div>
       ) : (
@@ -878,7 +884,7 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
                 color: lead.status === s.key ? s.color : '#999', fontWeight: lead.status === s.key ? 700 : 400,
               }}>{s.label}</button>
             ))}
-            <button onClick={() => goTab('leads')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>証拠パック・提案書は学校・法人タブ →</button>
+            <button onClick={() => goTab('leads')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>証拠パック・提案書は「🎓 学校・法人（台帳）」へ →</button>
           </div>
         </div>
       )}

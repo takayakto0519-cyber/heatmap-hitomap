@@ -3,8 +3,10 @@
 // 取り組みの有無・ヒトマップとの親和性・提案余地をまとめて残す。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isMissingTable, missingTablePayload } from '@/lib/adminApi';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const MIGRATION_FILE = 'supabase/migrations/20260719_add_municipality_profiles.sql';
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -14,7 +16,11 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseServer
     .from('municipality_profiles').select('*').order('region_name', { ascending: true });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    // テーブル未作成（SQL未適用）のときは画面を壊さず、どのSQLを流せばよいかを伝える
+    if (isMissingTable(error.message, 'municipality_profiles')) return NextResponse.json(missingTablePayload('profiles', MIGRATION_FILE));
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, profiles: data ?? [] });
 }
 
@@ -52,6 +58,11 @@ export async function POST(req: NextRequest) {
     }, { onConflict: 'region_name' })
     .select().single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    if (isMissingTable(error.message, 'municipality_profiles')) {
+      return NextResponse.json({ ok: false, error: `自治体プロファイルのテーブルが未作成です。${MIGRATION_FILE} をSQL Editorで実行してください` }, { status: 503 });
+    }
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, profile: data });
 }

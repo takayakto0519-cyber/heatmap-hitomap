@@ -3,8 +3,10 @@
 // 同じ事業ライン×月の組で保存すると上書き（upsert）されるため、月を跨いだ再入力がしやすい。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isMissingTable, missingTablePayload } from '@/lib/adminApi';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const MIGRATION_FILE = 'supabase/migrations/20260719_add_pnl_and_revenue_code.sql';
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -14,7 +16,11 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseServer
     .from('business_line_pnl').select('*').order('month', { ascending: false });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    // テーブル未作成（SQL未適用）のときは画面を壊さず、どのSQLを流せばよいかを伝える
+    if (isMissingTable(error.message, 'business_line_pnl')) return NextResponse.json(missingTablePayload('entries', MIGRATION_FILE));
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, entries: data ?? [] });
 }
 
@@ -41,6 +47,11 @@ export async function POST(req: NextRequest) {
     }, { onConflict: 'line_key,month' })
     .select().single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    if (isMissingTable(error.message, 'business_line_pnl')) {
+      return NextResponse.json({ ok: false, error: `事業別損益のテーブルが未作成です。${MIGRATION_FILE} をSQL Editorで実行してください` }, { status: 503 });
+    }
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, entry: data });
 }

@@ -2,7 +2,7 @@
 
 // ビジネスモデル案：新しい事業案を書き溜め、検証状況を追う。page.tsx monolith分割で切り出し。
 import { useCallback, useEffect, useState } from 'react';
-import { Card, inputStyle } from '@/components/admin/adminShared';
+import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 
 // 案件ごとに折りたたみ、開いた案件だけ詳細（メモ・ロードマップ）を表示することで
@@ -73,6 +73,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
   const [editingMemo, setEditingMemo] = useState<Record<string, string>>({});
   const [editingReport, setEditingReport] = useState<Record<string, string>>({});
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
+  const [migrationFile, setMigrationFile] = useState<string | null>(null);
 
   function toggleOpen(id: string) {
     setOpenIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -85,6 +86,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
       .then(d => {
         if (d.ok) {
           setIdeas(d.ideas);
+          setMigrationFile(d.needsMigration ? d.migrationFile : null);
           const memoMap: Record<string, string> = {};
           const reportMap: Record<string, string> = {};
           for (const i of d.ideas as BizModelIdea[]) {
@@ -140,6 +142,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
         次の商品・事業の種になりそうな案をここに書き溜め、検証状況を追っていくための一覧です。
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+      {migrationFile && <MigrationNotice title="ビジネスモデル案のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
 
       {showCreate ? (
         <Card style={{ marginBottom: 14 }}>

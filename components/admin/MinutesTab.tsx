@@ -2,7 +2,7 @@
 
 // 議事録：打ち合わせ・商談の記録を日記のように書き溜める。page.tsx monolith分割で切り出し。
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Card, inputStyle } from '@/components/admin/adminShared';
+import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
 
 interface MeetingMinute {
   id: string;
@@ -94,6 +94,7 @@ export default function MinutesTab({ authHeaders }: { authHeaders: () => Headers
   const [newBody, setNewBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Record<string, { title: string; participants: string; body: string }>>({});
+  const [migrationFile, setMigrationFile] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -102,6 +103,7 @@ export default function MinutesTab({ authHeaders }: { authHeaders: () => Headers
       .then(d => {
         if (d.ok) {
           setEntries(d.minutes);
+          setMigrationFile(d.needsMigration ? d.migrationFile : null);
           const map: Record<string, { title: string; participants: string; body: string }> = {};
           for (const e of d.minutes as MeetingMinute[]) map[e.id] = { title: e.title ?? '', participants: e.participants ?? '', body: e.body ?? '' };
           setEditing(map);
@@ -167,6 +169,7 @@ export default function MinutesTab({ authHeaders }: { authHeaders: () => Headers
       <MinutesSummaryCard authHeaders={authHeaders} />
 
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+      {migrationFile && <MigrationNotice title="議事録のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
 
       {showCreate ? (
         <Card style={{ marginBottom: 14 }}>

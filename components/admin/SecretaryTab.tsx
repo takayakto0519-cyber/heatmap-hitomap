@@ -6,6 +6,8 @@
 // 見晴らしと、会長作業待ちのものだけワンタップで完了にする軽い操作のみ。
 import { useCallback, useEffect, useState } from 'react';
 import CalendarPanel from './CalendarPanel';
+import BookingRequestsPanel from './BookingRequestsPanel';
+import { MigrationNotice } from '@/components/admin/adminShared';
 
 interface ActionItem {
   id: string; title: string; category: string; status: string; owner: string;
@@ -34,6 +36,7 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
   // ナビ整理で独立タブ「カレンダー」を廃止し、ここに内包（サイドバー整理2026-07-20）。
   // 普段はコンパクト表示、必要な時だけフル（今日・明日の全件）に切り替える。
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [migrationFile, setMigrationFile] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,8 +44,10 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
     try {
       const res = await fetch('/api/admin/action-items', { headers: authHeaders() });
       const data = await res.json();
-      if (data.ok) setItems(data.items ?? []);
-      else setError(data.error ?? '取得に失敗しました');
+      if (data.ok) {
+        setItems(data.items ?? []);
+        setMigrationFile(data.needsMigration ? data.migrationFile : null);
+      } else setError(data.error ?? '取得に失敗しました');
     } catch {
       setError('通信エラー');
     } finally {
@@ -86,6 +91,8 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {migrationFile && <MigrationNotice title="To-Do（作業状況）のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
+
       <div style={cardStyle}>
         <CalendarPanel authHeaders={authHeaders} compact={!showFullCalendar} showTomorrow={showFullCalendar} />
         <button onClick={() => setShowFullCalendar(v => !v)} style={{
@@ -93,6 +100,8 @@ export default function SecretaryTab({ authHeaders }: { authHeaders: () => Heade
           color: '#38ADA9', fontSize: 11, fontWeight: 700, cursor: 'pointer',
         }}>{showFullCalendar ? '▴ コンパクト表示に戻す' : '▾ フルカレンダー（今日・明日）を見る'}</button>
       </div>
+
+      <BookingRequestsPanel authHeaders={authHeaders} />
 
       <div style={cardStyle}>
         <div style={sectionTitleStyle}>

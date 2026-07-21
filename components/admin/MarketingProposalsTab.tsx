@@ -5,7 +5,7 @@
 // 新規事業は「💡ビジネスモデル案」、競合・価格は「🔍競合・価格インサイト」タブへそれぞれ一本化済み。
 // 登録・更新はAI APIの自動呼び出しではなく、会長がチャットで「登録して」と指示した時にClaude Codeが書き込む運用。
 import { useCallback, useEffect, useState } from 'react';
-import { Card, inputStyle } from '@/components/admin/adminShared';
+import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
 
 interface StrategyProposal {
   id: string;
@@ -30,13 +30,17 @@ export default function MarketingProposalsTab({ authHeaders }: { authHeaders: ()
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [migrationFile, setMigrationFile] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     fetch('/api/admin/strategy-proposals', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
-        if (d.ok) setProposals((d.proposals as StrategyProposal[]).filter(p => p.category === 'marketing'));
+        if (d.ok) {
+          setProposals((d.proposals as StrategyProposal[]).filter(p => p.category === 'marketing'));
+          setMigrationFile(d.needsMigration ? d.migrationFile : null);
+        }
         else setError(d.error ?? '取得に失敗しました');
       })
       .catch(() => setError('通信エラー'))
@@ -69,6 +73,7 @@ export default function MarketingProposalsTab({ authHeaders }: { authHeaders: ()
         登録は会長がチャットで「登録して」と指示した時のみ行われます（自動送信・自動投稿はありません）。
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
+      {migrationFile && <MigrationNotice title="提案ボードのテーブルがまだ作成されていません" migrationFile={migrationFile} />}
 
       {proposals.length === 0 && <p style={{ color: '#aaa' }}>まだ提案がありません。</p>}
 

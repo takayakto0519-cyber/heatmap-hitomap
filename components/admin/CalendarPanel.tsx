@@ -3,8 +3,8 @@
 // 📅 カレンダー表示の共通パーツ — /api/admin/calendar（優先順でGoogleカレンダーからライブ取得、
 // もしくはagents/calendar_watch.pyが同期した直近2週間分）を叩いて表示する。
 // 予定の追加はPOST /api/admin/calendar-events（lib/googleCalendarServer.tsの書き込みスコープ）経由。
-// CalendarTab（単独タブ・2週間ぶん表示）とSecretaryTab（秘書タブ内埋め込み・今日のみ）
-// の両方から使う共通コンポーネント。
+// 単独の「カレンダー」タブは廃止し、SecretaryTab（秘書タブ）に内包した。compactで今日のみ、
+// showTomorrowで明日ぶんまで、と呼び出し側が表示範囲を選ぶ。
 import { useCallback, useEffect, useState } from 'react';
 
 interface CalendarEvent {

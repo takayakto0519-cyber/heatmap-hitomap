@@ -5,6 +5,7 @@
 // 「どの分野が動いていて、どこが滞っているか」を見る画面に再設計した。
 // 数値は /api/admin/stats（既存・ログイン確認兼用）と /api/admin/biz-stats（分野別）の2本から取る。
 import { useEffect, useState } from 'react';
+import { ErrorBanner, LoadingLine } from '@/components/admin/adminShared';
 
 interface RegionValence { region: string; valence: { positive: number; negative: number; neutral: number; total: number } }
 
@@ -28,6 +29,15 @@ interface BizStats {
 
 export interface OverviewTabMetaEntry { label: string; icon: string; group: string; desc: string }
 export interface OverviewSiteLink { label: string; href: string; icon: string; desc: string }
+
+// /api/admin/stats が落ちてもホームを真っ白にしないための土台。
+// 以前は if (error) return <p>{error}</p> で画面全体が赤文字1行になっていたが、
+// クイックアクセス・本体サイトリンク・今日の要注意は stats に依存しないので描画できる。
+const EMPTY_STATS: Stats = {
+  totalTraces: 0, pendingReview: 0, last7Days: 0, profileCount: 0,
+  routeCount: 0, activeSponsors: 0, pendingReports: 0,
+  valence: { positive: 0, negative: 0, neutral: 0, total: 0 },
+};
 
 // 営業台帳のステータス表示順（client_leads.status の定義に合わせる）
 const LEAD_PIPELINE: { key: string; label: string; color: string }[] = [
@@ -109,9 +119,9 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
       .then(r => r.json())
       .then(d => {
         if (d.ok) { setStats(d.stats); setDemoHiddenCount(d.demoHiddenCount ?? 0); }
-        else setError(d.error ?? '取得に失敗しました');
+        else { setError(d.error ?? '取得に失敗しました'); setStats(EMPTY_STATS); }
       })
-      .catch(() => setError('通信エラー'));
+      .catch(() => { setError('通信エラー'); setStats(EMPTY_STATS); });
     // 自治体別の内訳（regionが入っている投稿のみ。regionが空の投稿は全国集計側にのみ含まれる）
     fetch('/api/admin/stats/by-region', { headers: authHeaders() })
       .then(r => r.json())
@@ -147,14 +157,17 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
     }
   }
 
-  if (error) return <p style={{ color: '#E74C3C' }}>{error}</p>;
-  if (!stats) return <p style={{ color: '#999' }}>読み込み中…</p>;
+  // errorでも早期リターンしない（ホーム全体が赤文字1行になってしまうため）。
+  // 数字が取れなかったことは下のErrorBannerで伝えつつ、導線は描画し続ける。
+  if (!stats) return <LoadingLine />;
 
   const pendingReview = badgeCounts?.pendingReview ?? stats.pendingReview;
   const pendingReports = badgeCounts?.pendingReports ?? stats.pendingReports;
 
   return (
     <div>
+      {error && <ErrorBanner message={`${error}（数字の一部が取れませんでした。下の導線はそのまま使えます）`} />}
+
       {/* 今日の要注意（統合司令室AIが全番人の結果から抽出） */}
       {attention && attention.length > 0 && (
         <Card style={{ marginBottom: 16, borderLeft: '4px solid #E55039', background: '#FFF7F5' }}>
@@ -227,11 +240,12 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
           </div>
         ) : <p style={{ margin: 0, fontSize: 12, color: '#999' }}>読み込み中…</p>}
         <p style={{ margin: '10px 0 0', fontSize: 11, color: '#999' }}>
-          台帳の更新・証拠パック・提案書づくりは「学校・法人」タブへ。
+          台帳の更新・証拠パック・提案書づくりは「🧭 営業」タブ →上の「🎓 学校・法人（台帳）」ボタンから。
         </p>
       </Card>
 
-      {/* 外部コンテスト応募状況（手動更新のメモ） */}
+      {/* 外部コンテスト応募状況（このカードの中身は手動更新。締切は「コンテスト・助成金」タブの
+          締切台帳へ移行できるので、移行したらこのカードごと削除してよい） */}
       <Card style={{ marginTop: 10 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>🏆 牧之原市チャレンジビジネスコンテスト2026</span>
@@ -243,6 +257,16 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
           <li>協賛企業：SBプレイヤーズ株式会社を想定</li>
           <li>10/21 協業ミートアップ（受賞可否に関わらず参加可）</li>
         </ul>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          <a href="/admin/makichalle" style={{
+            fontSize: 12, fontWeight: 700, textDecoration: 'none',
+            border: '1px solid #4A69BD', borderRadius: 12, padding: '4px 12px', color: '#4A69BD',
+          }}>📊 まきチャレ専用ダッシュボードを開く ↗</a>
+          <button onClick={() => goTab('funding')} style={{
+            fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            border: '1px solid #ddd', borderRadius: 12, padding: '4px 12px', background: '#fff', color: '#888',
+          }}>🏆 締切台帳へ →</button>
+        </div>
       </Card>
 
       {/* マネタイズ */}
@@ -333,7 +357,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         <Card style={{ marginTop: 16 }}>
           <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>😊 全国集計サマリー（好悪の内訳・速報値）</p>
           <p style={{ margin: '0 0 10px', fontSize: 12, color: '#999' }}>
-            全国公開済み投稿{stats.valence.total}件を全部まとめた、感情タグから機械的に判定した粗い内訳です。特定の自治体の数字ではありません。自治体ごとの内訳は下の「自治体別の内訳」、または「学校・法人」タブで発行した顧客専用ダッシュボードURLをご覧ください。
+            全国公開済み投稿{stats.valence.total}件を全部まとめた、感情タグから機械的に判定した粗い内訳です。特定の自治体の数字ではありません。自治体ごとの内訳は下の「自治体別の内訳」、または「🧭 営業」タブの「🎓 学校・法人（台帳）」で発行した顧客専用ダッシュボードURLをご覧ください。
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 8, background: '#F3F9EA' }}>
@@ -371,7 +395,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
             ))}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: 11, color: '#999' }}>
-            契約先ごとの正式なダッシュボードURLは「学校・法人」タブから発行・確認できます。
+            契約先ごとの正式なダッシュボードURLは「🧭 営業」タブの「🎓 学校・法人（台帳）」から発行・確認できます。
           </p>
         </Card>
       )}

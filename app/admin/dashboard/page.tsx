@@ -161,9 +161,14 @@ export default function AdminDashboardPage() {
   const badgeFor = (id: Tab): number =>
     id === 'review' ? (badgeCounts?.pendingReview ?? 0) : id === 'reports' ? (badgeCounts?.pendingReports ?? 0) : 0;
 
-  function goTab(id: Tab) {
+  // 引数を string で受けるのは、子コンポーネントが実際には任意の文字列を渡してくるため
+  // （以前 'relation' というタブに存在しないIDが渡り、画面が真っ白になる事故があった）。
+  function goTab(id: string) {
     // 旧タブID（aiops/agentstatus）で呼ばれても新しい agents ハブに寄せる
     const resolved = (LEGACY_TAB_ALIAS[id] ?? id) as Tab;
+    // 存在しないタブIDは黙って無視する。setTabしてしまうと全ての {tab === '...'} が偽になり
+    // コンテンツ領域が空になるため、現在のタブを維持するほうが安全。
+    if (!(resolved in TAB_META)) return;
     setTab(resolved);
     setNavOpen(false);
     // タブをURLにも反映して、リロード・共有で同じタブに戻れるようにする
@@ -271,7 +276,7 @@ export default function AdminDashboardPage() {
           {tab === 'overview' && (
             <OverviewTab
               authHeaders={authHeaders}
-              goTab={id => goTab(id as Tab)}
+              goTab={goTab}
               badgeCounts={badgeCounts}
               tabMeta={TAB_META}
               tabGroups={TAB_GROUPS}
@@ -295,7 +300,7 @@ export default function AdminDashboardPage() {
           {tab === 'marketing' && <MarketingProposalsTab authHeaders={authHeaders} />}
           {tab === 'proposals' && <StrategyProposalsTab authHeaders={authHeaders} />}
           {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} />}
-          {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={id => goTab(id as Tab)} />}
+          {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={goTab} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
           {tab === 'agents' && <AgentsHub authHeaders={authHeaders} />}

@@ -1,8 +1,10 @@
 // GET/POST /api/admin/biz-model-ideas — ビジネスモデル案の一覧（パスワード必須）
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
+import { isMissingTable, missingTablePayload } from '@/lib/adminApi';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const MIGRATION_FILE = 'supabase/migrations/20260719_add_biz_model_ideas.sql';
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -14,7 +16,11 @@ export async function GET(req: NextRequest) {
   query = contest ? query.eq('contest', contest).order('idea_no', { ascending: true }) : query.order('created_at', { ascending: false });
   const { data, error } = await query;
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    // テーブル未作成（SQL未適用）のときは画面を壊さず、どのSQLを流せばよいかを伝える
+    if (isMissingTable(error.message, 'biz_model_ideas')) return NextResponse.json(missingTablePayload('ideas', MIGRATION_FILE));
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, ideas: data ?? [] });
 }
 
@@ -36,6 +42,11 @@ export async function POST(req: NextRequest) {
     })
     .select().single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) {
+    if (isMissingTable(error.message, 'biz_model_ideas')) {
+      return NextResponse.json({ ok: false, error: `ビジネスモデル案のテーブルが未作成です。${MIGRATION_FILE} をSQL Editorで実行してください` }, { status: 503 });
+    }
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, idea: data });
 }
