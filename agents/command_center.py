@@ -33,7 +33,6 @@ AGENT_META: dict[str, tuple[str, str, str | None]] = {
     "payment_watch": ("H", "入金照合", "unpaid_count"),
     "lost_deal_archive": ("B", "失注理由アーカイブ", None),
     "schedule_watch": ("A", "スケジュール", None),
-    "burnout_watch": ("A", "燃え尽き検知", None),  # warningsリストで例外判定
     "line_mission": ("E", "LINE縁ミッション", None),
     "email_queue": ("B", "営業メール下書きキュー", None),
     "trace_pattern": ("I", "痕跡データパターン分析", None),
@@ -51,18 +50,34 @@ AGENT_META: dict[str, tuple[str, str, str | None]] = {
 }
 
 
-def _headline(agent_id: str, result: dict | None, urgent_field: str | None) -> tuple[str, bool]:
+# agent_id -> 件数を埋め込む日本語の見出しテンプレート（{n} が件数に置き換わる）。
+# 会長が一目で「何が起きているか」を読めるようにするための文言。ここに無いagent_idは
+# _headline() のフォールバックで name を使った汎用文になる（生のフィールド名は出さない）。
+HEADLINE_TEMPLATES: dict[str, str] = {
+    "approval_watch": "承認待ちの資料が{n}件、3日以上放置されています",
+    "trace_qa": "投稿データに直すべき箇所が{n}件あります（タイトル空欄・画像未設定など）",
+    "deadline_watch": "締切が3日以内に迫っている課題が{n}件あります",
+    "spam_detect": "同じタイトルの投稿が3回以上重複しているものが{n}件あります",
+    "report_screen": "未対応の通報が{n}件あります",
+    "case_pipeline_watch": "進捗が止まっている案件が{n}件あります",
+    "revenue_initiative_watch": "進捗が止まっている収益化の取り組みが{n}件あります",
+    "payment_watch": "未入金の請求が{n}件あります",
+    "competitor_feature_monitor": "競合の機能更新が{n}件見つかりました",
+    "memorial_anniversary_watch": "近づいている周年イベントが{n}件あります",
+    "action_items_digest": "会長の対応待ちのTo-Doが{n}件あります",
+}
+
+
+def _headline(agent_id: str, name: str, result: dict | None, urgent_field: str | None) -> tuple[str, bool]:
     if result is None:
         return "実行履歴なし", False
     if result.get("error"):
         return f"⚠️ {result['error']}", True
-    if agent_id == "burnout_watch":
-        warnings = result.get("warnings") or []
-        return (warnings[0], True) if warnings else ("健全", False)
     if urgent_field:
         value = result.get(urgent_field)
         if isinstance(value, (int, float)) and value > 0:
-            return f"{urgent_field}={value}", True
+            template = HEADLINE_TEMPLATES.get(agent_id, f"{name}で確認が必要な項目が{{n}}件あります")
+            return template.format(n=int(value)), True
     return "正常", False
 
 
@@ -73,7 +88,7 @@ def main():
 
         for agent_id, (floor, name, urgent_field) in AGENT_META.items():
             result = common.read_result(agent_id)
-            headline, urgent = _headline(agent_id, result, urgent_field)
+            headline, urgent = _headline(agent_id, name, result, urgent_field)
             bucket = floors.setdefault(floor, {"floor_id": floor, "floor_name": FLOOR_NAMES.get(floor, floor), "ok_count": 0, "attention": []})
             if urgent:
                 item = {"agent_id": agent_id, "floor": floor, "name": name, "headline": headline}

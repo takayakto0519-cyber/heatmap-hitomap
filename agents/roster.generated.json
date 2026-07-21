@@ -194,14 +194,6 @@
       "schedule": "毎日 07:15"
     },
     {
-      "id": "burnout_watch",
-      "name": "27. 燃え尽き検知番人",
-      "emoji": "🐨",
-      "floor": "A",
-      "kind": "script",
-      "schedule": "毎日 21:00"
-    },
-    {
       "id": "line_mission",
       "name": "LINE縁ミッション生成",
       "emoji": "🐇",
@@ -364,6 +356,14 @@
       "floor": "C",
       "kind": "skill",
       "invoke": "/achievement-blog"
+    },
+    {
+      "id": "affiliate-pipeline",
+      "name": "アフィリエイト候補提案・生成・note投稿",
+      "emoji": "🧩",
+      "floor": "C",
+      "kind": "skill",
+      "invoke": "/affiliate-pipeline"
     },
     {
       "id": "agent-status",
