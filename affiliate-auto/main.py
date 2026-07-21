@@ -1,7 +1,13 @@
 """
-メインオーケストレーター（完全自動版）
-毎朝7時にタスクスケジューラから実行される
+[非推奨] 旧・毎朝cron自動実行版オーケストレーター。
 
+会長の承認なしにnote.comへ自動投稿する設計だったため廃止し、
+.claude/skills/affiliate-pipeline に「候補提案→会長の明示指示で生成→投稿」の
+チャット起点フローとして統合した（2026-07-21）。このファイル・タスクスケジューラ登録は
+使用しない。個々のモジュール（rss_fetcher / product_finder / article_builder /
+article_generator / note_poster）はaffiliate-pipelineスキルから再利用する。
+
+以下は旧フロー:
 フロー:
   1. RSSフェッチ & トレンドスコアリング
   2. ML（TF-IDF）でキーワード候補TOP5を取得
