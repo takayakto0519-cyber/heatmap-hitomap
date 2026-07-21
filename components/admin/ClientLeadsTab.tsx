@@ -16,6 +16,7 @@ export interface ClientLead {
   memo: string | null;
   created_at: string;
   updated_at: string;
+  scheduling_request_detected_at?: string | null;
 }
 
 export const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -321,6 +322,9 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
           {visibleLeads.map(l => {
             const statusInfo = LEAD_STATUS_LABELS[l.status] ?? LEAD_STATUS_LABELS.lead;
             const temperature = scoreLead(l);
+            // gmail_watch.pyの日程調整検知（直近5日以内なら強調表示。それより古ければ対応済みとみなし目立たせない）
+            const schedulingDetected = l.scheduling_request_detected_at
+              && (Date.now() - new Date(l.scheduling_request_detected_at).getTime()) < 5 * 86400000;
             return (
               <Card key={l.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -331,6 +335,12 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
                       <span title={temperature.reasons.join('・') || '加点要素なし'} style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#B7791F' }}>
                         {temperature.temp}（{temperature.score}点）
                       </span>
+                      {schedulingDetected && (
+                        <span title="Gmail AIエージェントが日程調整を求める返信を検知しました" style={{
+                          marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#4A69BD',
+                          background: '#4A69BD18', padding: '1px 8px', borderRadius: 10,
+                        }}>📅 日程調整依頼あり</span>
+                      )}
                     </p>
                     <p style={{ margin: 0, fontSize: 12, color: '#999' }}>
                       {l.contact_name && `👤 ${l.contact_name}`}

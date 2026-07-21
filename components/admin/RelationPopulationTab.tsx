@@ -1,6 +1,6 @@
 'use client';
 
-// 関係人口ダッシュボード：agents/relation_population.py（番人63）と同じ考え方を
+// 関係人口ダッシュボード：agents/relation_population.py（AIエージェント63）と同じ考え方を
 // サイト本体からライブに見る画面。データは /api/admin/relation-population（lib/relationPopulation.ts）。
 // 複数の実験回に関わった人＝関係人口の芽、また来たいと答えた人＝関係の温度。
 // 個人を特定できる値は一切表示せず、少人数（5人未満）の地域は非表示にする。
@@ -302,7 +302,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
           <b style={{ fontSize: 14 }}>
             {highlight && '🌟 '}{p.on_hold && '⏸ '}{p.region_name}
             {schedulingDetected && (
-              <span title="Gmail番人が日程調整を求める返信を検知しました" style={{
+              <span title="Gmail AIエージェントが日程調整を求める返信を検知しました" style={{
                 marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#4A69BD',
                 background: '#4A69BD18', padding: '1px 8px', borderRadius: 10,
               }}>📅 日程調整依頼あり</span>
@@ -406,7 +406,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
           </div>
           {p.email_sent_content && (
             <>
-              <label style={labelStyle}>Gmailで実際に送信した本文（gmail_watch番人が自動取得・読み取り専用）</label>
+              <label style={labelStyle}>Gmailで実際に送信した本文（gmail_watch AIエージェントが自動取得・読み取り専用）</label>
               <div style={{ padding: '8px 10px', background: '#fafafa', borderRadius: 8, fontSize: 12, color: '#555', whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
                 {p.email_sent_content}
               </div>

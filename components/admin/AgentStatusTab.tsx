@@ -66,7 +66,7 @@ function summarize(agentId: string, result: Record<string, unknown> | null): str
       const kw = (result.top_keywords as { word: string }[]) ?? [];
       return (kw[0] ? `頻出フレーズ最多:「${kw[0].word.slice(0, 20)}」` : '目立つ頻出フレーズなし') + ` ／停滞事業案${result.stale_idea_count ?? 0}件`;
     }
-    // 調査系の番人（digest形の結果を持つもの）は「total=24件」ではなく分野の内訳を出す。
+    // 調査系のAIエージェント（digest形の結果を持つもの）は「total=24件」ではなく分野の内訳を出す。
     // 中身そのものは各タブの AgentDigestPanel で読める。
     case 'competitor_market_research':
     case 'competitor_feature_monitor':
@@ -204,7 +204,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
               </div>
             )}
             <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #4A69BD' }}>
-              <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>実装済み番人</p>
+              <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>実装済みAIエージェント</p>
               <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333' }}>{agents.length}体</p>
             </div>
             <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #999' }}>
@@ -275,9 +275,9 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
   );
 }
 
-// 🧩 スキル名簿 — 番人（Python自動実行）とは別に、会話で呼び出す Claude Code スキル群を
+// 🧩 スキル名簿 — AIエージェント（Python自動実行）とは別に、会話で呼び出す Claude Code スキル群を
 // フロア別に一覧する。これまでダッシュボードに一切出ていなかった〜105スキルを初めて可視化し、
-// 「このビルに番人＋スキルで何体居るか」の全体像を見せる。会話起動のため最終実行時刻は出さない。
+// 「このビルにAIエージェント＋スキルで何体居るか」の全体像を見せる。会話起動のため最終実行時刻は出さない。
 function SkillInventory() {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -308,8 +308,8 @@ function SkillInventory() {
         <span style={{ marginLeft: 'auto', fontSize: 12, color: '#888' }}>{open ? '▲ 閉じる' : '▼ 一覧を見る'}</span>
       </button>
       <p style={{ margin: '6px 0 0', fontSize: 11.5, color: '#999', lineHeight: 1.7 }}>
-        番人（上の稼働状況）は自動で動くAI、こちらは会長がチャットで「◯◯して」と呼ぶAIです。
-        番人とスキルを合わせてビルの全戦力になります。
+        AIエージェント（上の稼働状況）は自動で動くAI、こちらは会長がチャットで「◯◯して」と呼ぶAIです。
+        AIエージェントとスキルを合わせてビルの全戦力になります。
         名前の右の <code style={{ background: '#f4f4f4', padding: '0 4px', borderRadius: 4 }}>/xxx</code> を押すとコマンドをコピーできます。
       </p>
 

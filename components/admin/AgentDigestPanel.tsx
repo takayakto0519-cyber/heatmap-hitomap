@@ -1,13 +1,13 @@
 'use client';
 
-// 🤖 番人が自動で集めてきた調査結果を読むための共通パネル。
+// 🤖 AIエージェントが自動で集めてきた調査結果を読むための共通パネル。
 //
-// これまで番人（agents/*.py）の結果は agent_status_snapshot に丸ごと同期されていたのに、
+// これまでAIエージェント（agents/*.py）の結果は agent_status_snapshot に丸ごと同期されていたのに、
 // 稼働状況タブが1行に潰して表示するだけで中身は捨てられていた
 // （例：競合・市場調査の24件が「total=24件」としか出ていなかった）。
 // このパネルはその中身を実際に読める形にする。
 //
-// 「番人が自動で集めたもの（流れていく）」と「会長が残した提案（strategy_proposals）」は
+// 「AIエージェントが自動で集めたもの（流れていく）」と「会長が残した提案（strategy_proposals）」は
 // 別物なので、見た目と言葉ではっきり分ける。ここは読み取り専用で、保存は一切しない。
 import { useCallback, useEffect, useState } from 'react';
 
@@ -28,7 +28,7 @@ function getDigest(result: Record<string, unknown> | null): Record<string, Diges
   return d as Record<string, DigestItem[]>;
 }
 
-/** digestを持たない番人（marketing_digest等）向けの1行サマリ */
+/** digestを持たないAIエージェント（marketing_digest等）向けの1行サマリ */
 function fallbackLine(result: Record<string, unknown> | null): string {
   if (!result) return '実行履歴なし（次回のスケジュール実行を待っています）';
   if (typeof result.error === 'string') return `⚠️ ${result.error}`;
@@ -53,7 +53,7 @@ export default function AgentDigestPanel({
   agentIds: string[];
   title: string;
   hint: string;
-  /** 指定したカテゴリだけ出す（news_digestのように無関係な分野まで持っている番人向け） */
+  /** 指定したカテゴリだけ出す（news_digestのように無関係な分野まで持っているAIエージェント向け） */
   categoryFilter?: string[];
 }) {
   const [agents, setAgents] = useState<DigestAgent[]>([]);
@@ -84,7 +84,7 @@ export default function AgentDigestPanel({
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <p style={{ color: '#999', fontSize: 12 }}>番人の調査結果を読み込み中…</p>;
+  if (loading) return <p style={{ color: '#999', fontSize: 12 }}>AIエージェントの調査結果を読み込み中…</p>;
 
   return (
     <div style={{
@@ -97,11 +97,11 @@ export default function AgentDigestPanel({
       {/* 鮮度：本番では「会長のPCが最後に同期した時点」のデータになる */}
       <p style={{ margin: '6px 0 10px', fontSize: 10.5, color: '#aaa' }}>
         {source === 'synced' && `🔄 最終同期: ${formatStamp(syncedAt)}（会長のPCが最後に送った時点のデータです）`}
-        {source === 'local' && '💻 このPCの番人の結果を直接読んでいます'}
-        {source === 'none' && 'まだ同期されたデータがありません（会長のPCで番人が動くと表示されます）'}
+        {source === 'local' && '💻 このPCのAIエージェントの結果を直接読んでいます'}
+        {source === 'none' && 'まだ同期されたデータがありません（会長のPCでAIエージェントが動くと表示されます）'}
       </p>
 
-      {agents.length === 0 && <p style={{ margin: 0, fontSize: 12, color: '#bbb' }}>表示できる番人がありません。</p>}
+      {agents.length === 0 && <p style={{ margin: 0, fontSize: 12, color: '#bbb' }}>表示できるAIエージェントがありません。</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {agents.map(a => {

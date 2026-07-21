@@ -63,7 +63,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   money: { label: '収益・損益', icon: '💰', group: '営業・自治体', desc: '収益化イニシアチブの進み具合と、事業別の月次損益(P&L)' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
-  agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: '番人の稼働状況とスキル名簿（全戦力）' },
+  agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: 'AIエージェントの稼働状況とスキル名簿（全戦力）' },
   minutes: { label: '議事録', icon: '🗒', group: '秘書', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 

@@ -132,7 +132,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
       .then(r => r.json())
       .then(d => { if (d.ok) setBiz(d.biz); })
       .catch(() => {});
-    // 統合司令室AIの「今すぐ判断が要ること」（番人が拾った要注意項目）
+    // 統合司令室AIの「今すぐ判断が要ること」（AIエージェントが拾った要注意項目）
     fetch('/api/admin/command-center', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setAttention(d.result?.attention_items ?? []); })
@@ -168,12 +168,12 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
     <div>
       {error && <ErrorBanner message={`${error}（数字の一部が取れませんでした。下の導線はそのまま使えます）`} />}
 
-      {/* 今日の要注意（統合司令室AIが全番人の結果から抽出） */}
+      {/* 今日の要注意（統合司令室AIが全AIエージェントの結果から抽出） */}
       {attention && attention.length > 0 && (
         <Card style={{ marginBottom: 16, borderLeft: '4px solid #E55039', background: '#FFF7F5' }}>
           <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14, color: '#C0392B' }}>
             ⚠ 今日の要注意（{attention.length}件）
-            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>統合司令室AIが番人の報告から拾った、いま判断が要ること</span>
+            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>統合司令室AIがAIエージェントの報告から拾った、いま判断が要ること</span>
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {attention.map((it, i) => {

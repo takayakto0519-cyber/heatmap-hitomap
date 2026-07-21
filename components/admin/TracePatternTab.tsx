@@ -1,6 +1,6 @@
 'use client';
 
-// 痕跡データパターン分析：agents/trace_pattern.py（番人62）と同じ考え方をサイト本体からライブに見る画面。
+// 痕跡データパターン分析：agents/trace_pattern.py（AIエージェント62）と同じ考え方をサイト本体からライブに見る画面。
 // データは /api/admin/trace-pattern（lib/tracePattern.ts）。自治体向けレポート商品の中身（数字）を作る装置。
 import { useEffect, useState } from 'react';
 

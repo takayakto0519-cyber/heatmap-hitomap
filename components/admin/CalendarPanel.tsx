@@ -232,7 +232,7 @@ export default function CalendarPanel({
           padding: compact ? 12 : 16, borderRadius: 12, background: '#FFF8E8',
           fontSize: 12, color: '#8a6d1f', lineHeight: 1.6,
         }}>
-          📅 カレンダー未連携です。会長のPCで番人29（calendar_watch）を設定すると、ここにGoogleカレンダーの予定が表示されます。
+          📅 カレンダー未連携です。会長のPCでAIエージェント29（calendar_watch）を設定すると、ここにGoogleカレンダーの予定が表示されます。
           <div style={{ fontSize: 11, color: '#a68a3f', marginTop: 4 }}>設定手順: agents/secrets/README.md</div>
           {data.error && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 6 }}>{data.error}</div>}
         </div>

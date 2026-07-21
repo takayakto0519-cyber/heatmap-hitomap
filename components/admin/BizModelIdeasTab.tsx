@@ -148,8 +148,8 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
       <AgentDigestPanel
         authHeaders={authHeaders}
         agentIds={['new_biz_signal_watch', 'academic_partnership_watch']}
-        title="🤖 番人が自動で集めてきた新規事業の種"
-        hint="新規事業の種探し・産学連携リサーチの番人が拾ってきた材料です。ここは読むだけで保存はされません。事業案にしたいものは、下の「＋ 新しいビジネスモデル案を追加」か、チャットで「これ登録して」と言ってください。"
+        title="🤖 AIエージェントが自動で集めてきた新規事業の種"
+        hint="新規事業の種探し・産学連携リサーチのAIエージェントが拾ってきた材料です。ここは読むだけで保存はされません。事業案にしたいものは、下の「＋ 新しいビジネスモデル案を追加」か、チャットで「これ登録して」と言ってください。"
       />
 
       {showCreate ? (

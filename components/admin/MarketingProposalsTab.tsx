@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 
-// ニュース番人は9分野を集めてくるので、マーケ関連の分野だけに絞る。
+// ニュースAIエージェントは9分野を集めてくるので、マーケ関連の分野だけに絞る。
 // この分野名は agents/marketing_digest.py の NEWS_DIGEST_CATEGORY と揃えること。
 const MARKETING_NEWS_CATEGORIES = ['観光・関係人口・採用DX'];
 
@@ -84,8 +84,8 @@ export default function MarketingProposalsTab({ authHeaders }: { authHeaders: ()
         authHeaders={authHeaders}
         agentIds={['news_digest', 'marketing_digest']}
         categoryFilter={MARKETING_NEWS_CATEGORIES}
-        title="🤖 番人が自動で集めてきた最新のニュース"
-        hint="ニュース番人が拾った観光・関係人口・採用DXの記事です。ここは読むだけで保存はされません。施策の種になりそうなものは、チャットで「これ登録して」と言ってください。"
+        title="🤖 AIエージェントが自動で集めてきた最新のニュース"
+        hint="ニュース担当のAIエージェントが拾った観光・関係人口・採用DXの記事です。ここは読むだけで保存はされません。施策の種になりそうなものは、チャットで「これ登録して」と言ってください。"
       />
 
       <p style={{ margin: '18px 0 4px', fontWeight: 800, fontSize: 13.5 }}>📌 会長が残した提案</p>
