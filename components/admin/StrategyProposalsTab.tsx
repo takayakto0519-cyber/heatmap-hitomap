@@ -111,8 +111,8 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
       <AgentDigestPanel
         authHeaders={authHeaders}
         agentIds={['competitor_market_research', 'competitor_feature_monitor', 'global_market_watch']}
-        title="🤖 番人が自動で集めてきた最新の調査"
-        hint="毎朝スケジュール実行される番人が拾ってきた記事です。ここは読むだけで保存はされません。残しておきたいものだけ、チャットで「これ登録して」と言ってください。"
+        title="🤖 AIエージェントが自動で集めてきた最新の調査"
+        hint="毎朝スケジュール実行されるAIエージェントが拾ってきた記事です。ここは読むだけで保存はされません。残しておきたいものだけ、チャットで「これ登録して」と言ってください。"
       />
 
       <Card style={{ marginBottom: 14 }}>
@@ -139,7 +139,7 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
 
       <p style={{ margin: '18px 0 4px', fontWeight: 800, fontSize: 13.5 }}>📌 会長が残した提案</p>
       <p style={{ margin: '0 0 10px', fontSize: 11, color: '#999' }}>
-        上の番人の調査から会長が「登録して」と指示したものだけがここに残ります。
+        上のAIエージェントの調査から会長が「登録して」と指示したものだけがここに残ります。
       </p>
       {proposals.length === 0 && <p style={{ color: '#aaa' }}>まだ提案がありません。</p>}
 
