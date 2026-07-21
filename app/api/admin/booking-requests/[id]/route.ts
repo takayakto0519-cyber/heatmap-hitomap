@@ -33,13 +33,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // confirm：ここで初めてGoogleカレンダーへ書き込む
   try {
-    const { createCalendarEvent } = await import('@/lib/googleCalendarServer');
+    const { createCalendarEvent, SCHEDULING_MEET_URL } = await import('@/lib/googleCalendarServer');
     const event = await createCalendarEvent({
       summary: `${reqRow.name}様${reqRow.company ? `（${reqRow.company}）` : ''}`,
       description: reqRow.purpose ? `用件：${reqRow.purpose}\n\nヒトマップ日程調整ページからの予約` : 'ヒトマップ日程調整ページからの予約',
       startTime: reqRow.requested_start,
       endTime: reqRow.requested_end,
       attendeeEmail: reqRow.email,
+      location: SCHEDULING_MEET_URL,
     });
     const { error } = await supabaseServer.from('booking_requests')
       .update({ status: 'confirmed', calendar_event_id: event.id, responded_at: new Date().toISOString() })

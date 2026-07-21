@@ -93,7 +93,8 @@ export default function SchedulePage() {
         <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>リクエストを送りました</h1>
         <p style={{ color: '#777', fontSize: 14, lineHeight: 1.8 }}>
           {selected && `${formatDateLabel(selected.start.slice(0, 10))} ${formatTimeLabel(selected.start)}〜`} のご希望を受け付けました。<br />
-          担当者が確認のうえ、追ってご連絡いたします。
+          担当者が確認のうえ、追ってご連絡いたします。<br />
+          確定後、Google Meet（オンライン会議）の招待メールをお送りします。
         </p>
       </main>
     );

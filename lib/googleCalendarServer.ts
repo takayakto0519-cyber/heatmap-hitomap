@@ -147,6 +147,10 @@ export async function getAvailability(days: number, durationMinutes: number): Pr
   return result;
 }
 
+// 日程調整サイト（/schedule）経由の打ち合わせで使う固定のGoogle MeetURL。
+// 会長の指示で全件このURLに統一する（Google Calendar側の自動発行conferenceDataは使わない）。
+export const SCHEDULING_MEET_URL = 'https://meet.google.com/kbk-hhwi-pzc';
+
 export interface CreateEventInput {
   summary: string;
   description?: string;
@@ -157,6 +161,9 @@ export interface CreateEventInput {
   // この角括弧プレフィックスを担当者バッジとして解釈する。運営ダッシュボード発の予定と、
   // 会長がGoogleカレンダー側で直接同じ書式でタイトルを付けた予定の両方に効く）。
   assignee?: string;
+  // 会議室URL（Google Meet等）。指定するとGoogleカレンダーの「場所」欄と説明欄の両方に入り、
+  // 参加者への招待メールにもそのまま乗る。
+  location?: string;
 }
 
 /**
@@ -166,6 +173,9 @@ export interface CreateEventInput {
 export async function createCalendarEvent(input: CreateEventInput): Promise<{ id: string; htmlLink: string }> {
   const accessToken = await getAccessToken();
   const summary = input.assignee ? `[${input.assignee}] ${input.summary}` : input.summary;
+  const description = input.location
+    ? [input.description, `会議室URL: ${input.location}`].filter(Boolean).join('\n\n')
+    : input.description;
   const res = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events?sendUpdates=all`,
     {
@@ -173,7 +183,8 @@ export async function createCalendarEvent(input: CreateEventInput): Promise<{ id
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         summary,
-        description: input.description,
+        description,
+        location: input.location,
         start: { dateTime: input.startTime, timeZone: TIME_ZONE },
         end: { dateTime: input.endTime, timeZone: TIME_ZONE },
         attendees: input.attendeeEmail ? [{ email: input.attendeeEmail }] : undefined,
