@@ -210,6 +210,30 @@ export async function createCalendarEvent(input: CreateEventInput): Promise<{ id
 }
 
 /**
+ * 既存の予定のタイトルを書き換える（主に「誰の予定か」の担当者バッジを後から付け直す用途）。
+ * cleanTitle は担当者プレフィックスを含まない素のタイトル。assignee を渡すと
+ * "[担当者] " を付け直し、undefinedならプレフィックスなしのタイトルにする。
+ */
+export async function updateCalendarEventAssignee(
+  eventId: string, cleanTitle: string, assignee: string | null,
+): Promise<void> {
+  const accessToken = await getAccessToken();
+  const summary = assignee ? `[${assignee}] ${cleanTitle}` : cleanTitle;
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary }),
+    }
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(`予定の担当者更新に失敗しました: ${data.error?.message ?? res.status}`);
+  }
+}
+
+/**
  * 確定済みの予定をキャンセルする（日程調整サイトの確定後キャンセル用）。
  * sendUpdates=allで、招待していた参加者にもGoogle側からキャンセル通知メールが届く。
  */
@@ -227,6 +251,7 @@ export async function deleteCalendarEvent(eventId: string): Promise<void> {
 }
 
 export interface CalendarEventItem {
+  id: string | null;
   title: string;
   start: string | null;
   end: string | null;
@@ -261,16 +286,20 @@ export async function listUpcomingEventsGrouped(days: number = CALENDAR_READ_RAN
   url.searchParams.set('orderBy', 'startTime');
   url.searchParams.set('maxResults', '250');
 
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+  // cache:'no-store' が必須。Next.jsのデータキャッシュはGETのfetchを既定でキャッシュするため、
+  // これが無いと dynamic='force-dynamic' を付けていても古い予定一覧が返り続ける
+  // （supabaseServerFreshで直した統合司令室の件と同根の問題）。
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' });
   const data = await res.json();
   if (!res.ok) throw new Error(`カレンダー予定の取得に失敗しました: ${data.error?.message ?? res.status}`);
 
   const events: (CalendarEventItem & { dateKey: string })[] = (data.items ?? []).map((e: {
-    summary?: string; location?: string; htmlLink?: string;
+    id?: string; summary?: string; location?: string; htmlLink?: string;
     start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string };
   }) => {
     const start = e.start?.dateTime ?? e.start?.date ?? null;
     return {
+      id: e.id ?? null,
       title: e.summary ?? '(無題の予定)',
       start,
       end: e.end?.dateTime ?? e.end?.date ?? null,

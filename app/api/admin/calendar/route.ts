@@ -16,6 +16,7 @@ import path from 'path';
 export const dynamic = 'force-dynamic';
 
 interface CalendarEvent {
+  id?: string | null;
   title: string;
   start: string | null;
   end: string | null;

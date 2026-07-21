@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 interface CalendarEvent {
+  id?: string | null;
   title: string;
   start: string | null;
   end: string | null;
@@ -67,9 +68,35 @@ function formatDateLabel(dateStr: string, todayStr: string): string {
   return label;
 }
 
-function EventRow({ ev }: { ev: CalendarEvent }) {
+function EventRow({
+  ev, authHeaders, onUpdated,
+}: {
+  ev: CalendarEvent;
+  authHeaders: () => HeadersInit;
+  onUpdated: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
   const time = ev.all_day ? '終日' : `${formatTime(ev.start, ev.all_day)}${ev.end ? ` – ${formatTime(ev.end, ev.all_day)}` : ''}`;
   const { assignee, title } = parseAssignee(ev.title || '(無題の予定)');
+
+  async function saveAssignee() {
+    if (!ev.id) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/calendar-events/${encodeURIComponent(ev.id)}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, assignee: draft.trim() || null }),
+      });
+      const data = await res.json();
+      if (data.ok) { setEditing(false); onUpdated(); }
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const content = (
     <div style={{
       display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 12px',
@@ -87,10 +114,46 @@ function EventRow({ ev }: { ev: CalendarEvent }) {
           {title}
         </div>
         {ev.location && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>📍 {ev.location}</div>}
+
+        {/* 担当者が分からない予定は、その場で誰の予定か設定できるようにする
+            （Googleカレンダー側で直接追加された予定は担当者プレフィックスが付いていないため） */}
+        {ev.id && !editing && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDraft(assignee ?? ''); setEditing(true); }}
+            style={{
+              marginTop: 4, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', padding: 0,
+              border: 'none', background: 'none', color: assignee ? '#bbb' : '#E67E22',
+            }}
+          >{assignee ? '担当者を変更' : '⚠ 担当者未設定（タップして設定）'}</button>
+        )}
+        {editing && (
+          <div
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}
+          >
+            <input
+              list="calendar-assignee-options"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="担当者名"
+              style={{ ...inputStyle, width: 120, padding: '4px 8px', fontSize: 11.5 }}
+              autoFocus
+            />
+            <button onClick={saveAssignee} disabled={saving} style={{
+              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, border: 'none',
+              background: '#38ADA9', color: '#fff', cursor: saving ? 'default' : 'pointer',
+            }}>{saving ? '保存中…' : '保存'}</button>
+            <button onClick={() => setEditing(false)} style={{
+              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, border: '1px solid #ccc',
+              background: '#fff', color: '#666', cursor: 'pointer',
+            }}>キャンセル</button>
+          </div>
+        )}
       </div>
     </div>
   );
-  if (!ev.html_link) return content;
+
+  if (editing || !ev.html_link) return content;
   return (
     <a href={ev.html_link} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
       {content}
@@ -222,6 +285,17 @@ export default function CalendarPanel({
 
   useEffect(() => { load(); }, [load]);
 
+  // 担当者入力の候補（表記ゆれ防止）。既知の定番名 ＋ 直近2週間で実際に使われている名前を合わせる。
+  const knownAssignees = Array.from(new Set([
+    '会長', '小田',
+    ...data.days.flatMap(d => d.events.map(e => parseAssignee(e.title).assignee).filter((n): n is string => Boolean(n))),
+  ]));
+  const assigneeDatalist = (
+    <datalist id="calendar-assignee-options">
+      {knownAssignees.map(n => <option key={n} value={n} />)}
+    </datalist>
+  );
+
   if (loading) return <div style={{ fontSize: 12, color: '#999', padding: compact ? 0 : 16 }}>読み込み中…</div>;
 
   if (!data.connected) {
@@ -251,11 +325,12 @@ export default function CalendarPanel({
           <span style={{ fontSize: 10, fontWeight: 700, color: '#27AE60', background: '#EAF7EE', padding: '2px 8px', borderRadius: 20 }}>● 連携中</span>
         </div>
         <AddEventForm authHeaders={authHeaders} onCreated={load} isLive={Boolean(data.live)} />
+        {assigneeDatalist}
         {data.today.length === 0 ? (
           <div style={{ fontSize: 12, color: '#999', padding: '10px 12px' }}>本日の予定はありません。</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data.today.map((ev, i) => <EventRow key={i} ev={ev} />)}
+            {data.today.map((ev, i) => <EventRow key={i} ev={ev} authHeaders={authHeaders} onUpdated={load} />)}
           </div>
         )}
         {data.asOf && (
@@ -273,6 +348,7 @@ export default function CalendarPanel({
         <span style={{ fontSize: 10, fontWeight: 700, color: '#27AE60', background: '#EAF7EE', padding: '2px 8px', borderRadius: 20 }}>● 連携中</span>
       </div>
       <AddEventForm authHeaders={authHeaders} onCreated={load} isLive={Boolean(data.live)} />
+      {assigneeDatalist}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {data.days.map(day => (
           <div key={day.date}>
@@ -284,7 +360,7 @@ export default function CalendarPanel({
               <div style={{ fontSize: 11, color: '#bbb', padding: '2px 12px' }}>予定なし</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {day.events.map((ev, i) => <EventRow key={i} ev={ev} />)}
+                {day.events.map((ev, i) => <EventRow key={i} ev={ev} authHeaders={authHeaders} onUpdated={load} />)}
               </div>
             )}
           </div>
