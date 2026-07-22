@@ -25,6 +25,14 @@ function Register-RepeatingAgent($taskName, $script, $startTime, $intervalHours)
     Write-Host "Registered: $taskName (every $intervalHours h, starting $startTime)" -ForegroundColor Green
 }
 
+function Register-WeeklyAgent($taskName, $script, $dayOfWeek, $time) {
+    $action   = New-ScheduledTaskAction -Execute $python -Argument "`"$dir\$script`"" -WorkingDirectory $dir
+    $trigger  = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $dayOfWeek -At $time
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -RestartCount 1 -StartWhenAvailable
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+    Write-Host "Registered: $taskName (weekly $dayOfWeek at $time)" -ForegroundColor Green
+}
+
 Register-Agent "HitomapApprovalWatch" "approval_watch.py" "08:00"
 Register-Agent "HitomapReportScreen"  "report_screen.py"  "07:30"
 Register-Agent "HitomapTraceQA"       "trace_qa.py"        "02:00"
@@ -57,6 +65,8 @@ Register-Agent "HitomapGlobalMarketWatch" "global_market_watch.py" "06:20"
 Register-Agent "HitomapAcademicPartnershipWatch" "academic_partnership_watch.py" "06:30"
 Register-Agent "HitomapMemorialAnniversaryWatch" "memorial_anniversary_watch.py" "07:05"
 Register-RepeatingAgent "HitomapSyncStatusToSupabase" "sync_status_to_supabase.py" "02:15" 1
+Register-Agent "HitomapShachoMemoDaily" "shacho_memo_daily.py" "09:40"
+Register-WeeklyAgent "HitomapShachoKeieikaigiWeekly" "shacho_keiei_kaigi_weekly.py" "Monday" "09:45"
 
 Write-Host ""
 Write-Host "Manual test example:" -ForegroundColor Cyan

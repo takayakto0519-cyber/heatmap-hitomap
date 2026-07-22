@@ -150,7 +150,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
   }, [vacant]);
 
   const workingCount = agents.filter(a => a.status === 'working').length;
-  const sortedFloors = [...floors].sort((a, b) => a.order - b.order).filter(f => f.id !== 'exec' && f.id !== 'H');
+  const sortedFloors = [...floors].sort((a, b) => a.order - b.order).filter(f => f.id !== 'FINANCE');
   const showRoster = local || synced;
   const latestSync = agents.reduce<string | null>((latest, a) => {
     const t = a.syncedAt ?? null;
