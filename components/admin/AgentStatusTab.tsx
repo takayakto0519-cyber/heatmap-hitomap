@@ -7,6 +7,9 @@
 // リアルタイム表示する。hitomap.com（本番）から見た場合はローカルファイルが無いため、
 // agents/sync_status_to_supabase.py が1時間おきに書き込むSupabaseのスナップショット
 // （＝会長のPCが最後に同期した時点の状況）を代わりに表示する。
+//
+// 2026-07-22: 組織図（社長→部長→従業員）表示に再編。「動いている」ときはパルスドットで
+// 強調し、「直近3件の実行」パネルで部門をまたいだ最新の動きを1画面で追えるようにした。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SKILLS, FLOORS as ROSTER_FLOORS } from '@/lib/agents/roster';
 
@@ -26,6 +29,16 @@ const pillStyle = (active: boolean, color: string): React.CSSProperties => ({
   padding: '2px 9px', borderRadius: 12, fontSize: 10, fontWeight: 700,
   background: active ? color + '18' : '#f0f0f0', color: active ? color : '#999',
 });
+
+function relTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'たった今';
+  if (min < 60) return `${min}分前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}時間前`;
+  return `${Math.floor(hr / 24)}日前`;
+}
 
 // 各エージェントの結果JSONは形がバラバラなので、よく使うフィールドから汎用的に一言を作る。
 // 個別の言い回しが欲しい場合はここに専用ケースを足す（agent-dashboard/server.pyの
@@ -50,6 +63,10 @@ function summarize(agentId: string, result: Record<string, unknown> | null): str
       const n = Number(result.attention_count ?? 0);
       return n > 0 ? `要注意項目${n}件` : '全フロア異常なし';
     }
+    case 'shacho_memo_daily':
+      return String(result.top_headline ?? (result.memo ? String(result.memo).split('\n')[0] : '全部門、平常運転'));
+    case 'shacho_keiei_kaigi_weekly':
+      return `要注意${result.total_attention ?? 0}件を部門別に集約`;
     case 'ab_test_summary_watch':
       return result.test_count ? `実施中のA/Bテスト${result.test_count}件を集計` : String(result.note ?? 'まだ計測データがありません');
     case 'memorial_anniversary_watch': {
@@ -95,6 +112,66 @@ function summarize(agentId: string, result: Record<string, unknown> | null): str
   }
 }
 
+function StatusBadge({ status }: { status: AgentStatus['status'] }) {
+  if (status === 'working') {
+    return (
+      <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 10px', borderRadius: 12, fontSize: 10, fontWeight: 800, background: '#27AE6018', color: '#1E8449' }}>
+        <span className="pulse-dot" />実行中
+      </span>
+    );
+  }
+  return (
+    <span style={{ marginLeft: 8, ...pillStyle(status === 'synced', '#4A69BD') }}>
+      {status === 'synced' ? '同期済み' : '待機中'}
+    </span>
+  );
+}
+
+function AgentRow({ a }: { a: AgentStatus }) {
+  return (
+    <div style={{ ...cardStyle, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: a.status === 'working' ? '1.5px solid #27AE60' : '1.5px solid transparent' }}>
+      <span style={{ fontSize: 18, flexShrink: 0 }}>{a.emoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
+          {a.name}
+          <StatusBadge status={a.status} />
+        </p>
+        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {summarize(a.id, a.result)}
+        </p>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <p style={{ margin: 0, fontSize: 10, color: '#bbb' }}>{a.schedule}</p>
+        <p style={{ margin: '2px 0 0', fontSize: 10, color: '#ccc' }}>Lv.{a.level}（累計{a.xp}回）</p>
+      </div>
+    </div>
+  );
+}
+
+function DeptCard({ floor, floorAgents, expanded, onToggle }: { floor: Floor; floorAgents: AgentStatus[]; expanded: boolean; onToggle: () => void }) {
+  const workingCount = floorAgents.filter(a => a.status === 'working').length;
+  return (
+    <button onClick={onToggle} style={{
+      ...cardStyle, cursor: 'pointer', minWidth: 148, textAlign: 'left', position: 'relative',
+      border: workingCount > 0 ? '2px solid #27AE60' : '1.5px solid transparent',
+    }}>
+      <span style={{ position: 'absolute', top: 10, right: 12, fontSize: 10, color: '#ccc' }}>{expanded ? '▲' : '▼'}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 18 }}>{floor.emoji}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#333' }}>{floor.name.replace('（部長）', '')}</span>
+      </div>
+      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#999' }}>実装{floorAgents.length}体</p>
+      {workingCount > 0 ? (
+        <p style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 800, color: '#1E8449', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="pulse-dot" />稼働中 {workingCount}体
+        </p>
+      ) : (
+        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#bbb' }}>待機中</p>
+      )}
+    </button>
+  );
+}
+
 export default function AgentStatusTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [floors, setFloors] = useState<Floor[]>([]);
   const [agents, setAgents] = useState<AgentStatus[]>([]);
@@ -104,6 +181,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showVacant, setShowVacant] = useState(false);
+  const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,6 +206,12 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
   }, [authHeaders]);
 
   useEffect(() => { load(); }, [load]);
+  // ローカルで動いている間は「動いている瞬間」を見逃さないよう15秒おきに自動更新する。
+  useEffect(() => {
+    if (!local) return;
+    const timer = setInterval(load, 15000);
+    return () => clearInterval(timer);
+  }, [local, load]);
 
   const byFloor = useMemo(() => {
     const map = new Map<string, AgentStatus[]>();
@@ -149,21 +233,47 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
     return map;
   }, [vacant]);
 
+  const recentAgents = useMemo(() => {
+    return [...agents]
+      .filter(a => a.generatedAt)
+      .sort((a, b) => (b.generatedAt as string).localeCompare(a.generatedAt as string))
+      .slice(0, 3);
+  }, [agents]);
+
+  const floorName = useCallback((id: string) => floors.find(f => f.id === id)?.name ?? id, [floors]);
+
   const workingCount = agents.filter(a => a.status === 'working').length;
-  const sortedFloors = [...floors].sort((a, b) => a.order - b.order).filter(f => f.id !== 'FINANCE');
+  const execFloor = floors.find(f => f.id === 'exec');
+  const execAgents = byFloor.get('exec') ?? [];
+  const execWorking = execAgents.filter(a => a.status === 'working').length;
+  const deptFloors = [...floors].sort((a, b) => a.order - b.order).filter(f => f.id !== 'exec' && f.id !== 'FINANCE');
   const showRoster = local || synced;
   const latestSync = agents.reduce<string | null>((latest, a) => {
     const t = a.syncedAt ?? null;
     return t && (!latest || t > latest) ? t : latest;
   }, null);
 
+  const toggleFloor = (id: string) => setExpandedFloors(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
   if (loading) return <p style={{ fontSize: 13, color: '#999' }}>エージェント稼働状況を読み込み中…</p>;
 
   return (
     <div>
+      <style>{`
+        .pulse-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#27AE60; animation: hitomapPulse 1.2s infinite; flex-shrink:0; }
+        @keyframes hitomapPulse {
+          0% { box-shadow: 0 0 0 0 rgba(39,174,96,0.6); }
+          70% { box-shadow: 0 0 0 7px rgba(39,174,96,0); }
+          100% { box-shadow: 0 0 0 0 rgba(39,174,96,0); }
+        }
+      `}</style>
       <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
         agents/配下のローカルAIエージェント（Windowsタスクスケジューラで自動実行）の稼働状況を確認します。
-        書き込みはできません（読み取り専用）。フロアの考え方はagent-dashboard（ヒトマップビル）と共通です。
+        書き込みはできません（読み取り専用）。組織図は👑社長→部長→従業員の順で、動いているところは緑のパルスで分かります。
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
 
@@ -192,11 +302,13 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
 
       {showRoster && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 }}>
             {local && (
               <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #27AE60' }}>
                 <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>稼働中</p>
-                <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333' }}>{workingCount}体</p>
+                <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {workingCount > 0 && <span className="pulse-dot" />}{workingCount}体
+                </p>
               </div>
             )}
             <div style={{ ...cardStyle, padding: '12px 14px', borderTop: '3px solid #4A69BD' }}>
@@ -208,6 +320,32 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
               <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: '#333' }}>{vacant.length}件</p>
             </div>
           </div>
+
+          {/* 🕒 直近3件の実行 — 部門をまたいでどのエージェントが最近動いたかを1画面で追う */}
+          <div style={{ ...cardStyle, marginBottom: 16 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 800, color: '#444' }}>🕒 直近の実行 TOP3</p>
+            {recentAgents.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 12, color: '#999' }}>まだ実行記録がありません</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {recentAgents.map(a => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{a.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {a.name}{a.status === 'working' && <StatusBadge status={a.status} />}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 10, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {floorName(a.floor)} ／ {summarize(a.id, a.result)}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: 10, color: '#aaa', flexShrink: 0 }}>{relTime(a.generatedAt!)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={{ marginBottom: 14 }}>
             <button onClick={load} style={{
               padding: '4px 10px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
@@ -215,39 +353,66 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
             }}>↻ 最新に更新</button>
           </div>
 
-          {sortedFloors.map(floor => {
+          {/* 🏛️ 組織図：社長 → 部長（部門） → 従業員 */}
+          {execFloor && (
+            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+              <div style={{
+                ...cardStyle, display: 'inline-flex', flexDirection: 'column', alignItems: 'center', padding: '14px 26px',
+                border: execWorking > 0 ? '2px solid #27AE60' : '1.5px solid transparent',
+              }}>
+                <span style={{ fontSize: 26 }}>👑</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#333', marginTop: 2 }}>AI社長</span>
+                {execWorking > 0 ? (
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#1E8449', display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <span className="pulse-dot" />稼働中
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 10, color: '#bbb', marginTop: 4 }}>待機中</span>
+                )}
+              </div>
+              <p style={{ fontSize: 16, color: '#ccc', margin: '4px 0' }}>↓</p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 18 }}>
+            {deptFloors.map(floor => {
+              const floorAgents = byFloor.get(floor.id) ?? [];
+              if (floorAgents.length === 0) return null;
+              return (
+                <DeptCard
+                  key={floor.id}
+                  floor={floor}
+                  floorAgents={floorAgents}
+                  expanded={expandedFloors.has(floor.id)}
+                  onToggle={() => toggleFloor(floor.id)}
+                />
+              );
+            })}
+          </div>
+
+          {execAgents.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {execAgents.map(a => <AgentRow key={a.id} a={a} />)}
+              </div>
+            </div>
+          )}
+
+          {deptFloors.map(floor => {
+            if (!expandedFloors.has(floor.id)) return null;
             const floorAgents = byFloor.get(floor.id) ?? [];
             const floorVacant = vacantByFloor.get(floor.id) ?? [];
             if (floorAgents.length === 0 && floorVacant.length === 0) return null;
             return (
               <div key={floor.id} style={{ marginBottom: 18 }}>
                 <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 800, color: '#444' }}>
-                  {floor.emoji} {floor.order}F {floor.name}
+                  {floor.emoji} {floor.name}
                   <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>
                     実装{floorAgents.length}体・未着工{floorVacant.length}件
                   </span>
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {floorAgents.map(a => (
-                    <div key={a.id} style={{ ...cardStyle, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 18, flexShrink: 0 }}>{a.emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
-                          {a.name}
-                          <span style={{ marginLeft: 8, ...pillStyle(a.status !== 'resting', a.status === 'working' ? '#27AE60' : '#4A69BD') }}>
-                            {a.status === 'working' ? '実行中' : a.status === 'synced' ? '同期済み' : '待機中'}
-                          </span>
-                        </p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {summarize(a.id, a.result)}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <p style={{ margin: 0, fontSize: 10, color: '#bbb' }}>{a.schedule}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 10, color: '#ccc' }}>Lv.{a.level}（累計{a.xp}回）</p>
-                      </div>
-                    </div>
-                  ))}
+                  {floorAgents.map(a => <AgentRow key={a.id} a={a} />)}
                   {showVacant && floorVacant.map(v => (
                     <div key={`${v.floor}-${v.num}`} style={{ ...cardStyle, padding: '8px 14px', opacity: 0.55, display: 'flex', alignItems: 'center', gap: 10 }}>
                       <span style={{ fontSize: 16 }}>🚧</span>
