@@ -150,6 +150,14 @@
       "schedule": "毎日 08:45"
     },
     {
+      "id": "fact_check_watch",
+      "name": "営業メール下書きファクトチェック一次スクリーニングAI",
+      "emoji": "🦦",
+      "floor": "SALES",
+      "kind": "script",
+      "schedule": "毎日 08:55"
+    },
+    {
       "id": "payment_watch",
       "name": "6. 入金照合番人",
       "emoji": "🐮",

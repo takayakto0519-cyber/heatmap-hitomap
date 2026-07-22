@@ -51,6 +51,7 @@ export const SCRIPTS: AgentDef[] = [
   { id: 'revenue_initiative_watch', name: '収益化イニシアチブ番人', emoji: '🐸', floor: 'SALES', kind: 'script', schedule: '毎日 08:30' },
   { id: 'office_diary', name: '101. ビル日報AI', emoji: '🐤', floor: 'GA', kind: 'script', schedule: '毎日 09:15' },
   { id: 'lead_temperature', name: '4. リード温度感スコアリングAI', emoji: '🐧', floor: 'SALES', kind: 'script', schedule: '毎日 08:45' },
+  { id: 'fact_check_watch', name: '営業メール下書きファクトチェック一次スクリーニングAI', emoji: '🦦', floor: 'SALES', kind: 'script', schedule: '毎日 08:55' },
   { id: 'payment_watch', name: '6. 入金照合番人', emoji: '🐮', floor: 'FINANCE', kind: 'script', schedule: '毎日 08:50' },
   { id: 'lost_deal_archive', name: '10. 失注理由アーカイブAI', emoji: '🐋', floor: 'SALES', kind: 'script', schedule: '毎週月 09:00' },
   { id: 'schedule_watch', name: '25. スケジュール番人', emoji: '🐈', floor: 'GA', kind: 'script', schedule: '毎日 07:15' },
