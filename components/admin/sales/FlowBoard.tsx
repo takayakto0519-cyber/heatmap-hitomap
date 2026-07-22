@@ -146,6 +146,7 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [justWonMessage, setJustWonMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ org_name: '', client_type: 'business', amount: '', lead_ref: '' });
 
@@ -179,8 +180,24 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
     else setMessage(data.error ?? '保存に失敗しました');
   }
   async function patch(id: string, fields: Partial<BusinessCase>) {
+    // 受注への遷移を検知したら、伴走支援（オンボーディング）の入口を自動で作る。
+    // 「営業して終わり」で止まらないよう、受注の瞬間に次の一手をAIへ依頼しておく。
+    const before = items.find((it) => it.id === id);
+    const justWon = fields.stage === '受注' && before && before.stage !== '受注';
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...fields } : it)));
     await fetch(`/api/admin/business-cases/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    if (justWon && before) {
+      await fetch('/api/admin/action-items', {
+        method: 'POST', headers: jsonHeaders(),
+        body: JSON.stringify({
+          title: `伴走支援を開始：${before.org_name}`,
+          category: '伴走支援',
+          owner: 'AI',
+          notes: `${before.org_name}様が受注に至りました。04_人事クライアント管理_HR_Client/オンボーディング手順.md の型で顧問先カルテ（/client-dossier）を作成し、初回30日のオンボーディングを開始してください。`,
+        }),
+      });
+      setJustWonMessage(`${before.org_name}様、受注おめでとうございます。伴走支援の開始タスクを積みました。`);
+    }
     await load();
   }
   async function remove(id: string) {
@@ -199,6 +216,12 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
 
       <button style={btnStyle} onClick={() => setShowForm((v) => !v)}>{showForm ? 'キャンセル' : '+ 新しい案件'}</button>
       {message && <p style={{ fontSize: 13, color: '#E74C3C' }}>{message}</p>}
+      {justWonMessage && (
+        <div style={{ ...cardStyle, background: '#EAFBF3', border: '1.5px solid #27AE60' }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#27AE60' }}>🎉 {justWonMessage}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#666' }}>次のClaude Codeセッションで「顧問先カルテ作って」または/client-dossierと頼むと、オンボーディングの初動を進められます。</p>
+        </div>
+      )}
       {showForm && (
         <div style={cardStyle}>
           <label style={labelStyle}>組織名</label>

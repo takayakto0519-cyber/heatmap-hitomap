@@ -249,6 +249,14 @@
       "schedule": "毎日 06:00"
     },
     {
+      "id": "procurement_watch",
+      "name": "公募・実証実験監視AI",
+      "emoji": "📋",
+      "floor": "SALES",
+      "kind": "script",
+      "schedule": "毎日 06:05"
+    },
+    {
       "id": "marketing_digest",
       "name": "マーケティング日報",
       "emoji": "🦔",
@@ -314,7 +322,8 @@
         "global_market_watch",
         "academic_partnership_watch",
         "memorial_anniversary_watch",
-        "action_items_digest"
+        "action_items_digest",
+        "procurement_watch"
       ]
     },
     {

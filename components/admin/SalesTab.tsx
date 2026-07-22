@@ -12,7 +12,7 @@ import { computeFollowUp } from '@/lib/followUp';
 import { scoreLead } from '@/lib/leadTemperature';
 import { municipalityScore, SALES_SCORE_CRITERIA } from '@/lib/salesScore';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
-import { computeMrr } from '@/lib/dealMetrics';
+import { computeMrr, computePipelineSummary } from '@/lib/dealMetrics';
 import { buildUnifiedFollowQueue, type FollowQueueItem } from '@/lib/followQueue';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
@@ -35,16 +35,20 @@ interface ClientLead {
   created_at: string;
   updated_at: string;
   email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null; reply_handled_at?: string | null;
+  email_draft?: string | null; contact_email_confidence?: 'high' | 'medium' | 'low' | null; fact_check_status?: 'verified' | 'unverified' | 'flagged' | null;
 }
 interface BusinessCase {
   id: string; org_name: string; client_type: string; stage: string;
   evidence: string | null; proposal_link: string | null; next_action: string | null; lead_ref: string | null;
   last_contact_at?: string | null;
+  amount?: number | null; probability?: number | null; expected_close_date?: string | null; won_at?: string | null;
+  lost_reason?: string | null; invoice_sent_at?: string | null; payment_due?: string | null; paid_at?: string | null;
 }
 interface EmailTarget {
   id: string; company: string; email: string | null; hook: string | null; drafted: boolean; sent: boolean;
   updated_at?: string | null;
   email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null; reply_handled_at?: string | null;
+  email_draft?: string | null; contact_email_confidence?: 'high' | 'medium' | 'low' | null; fact_check_status?: 'verified' | 'unverified' | 'flagged' | null;
 }
 interface ClientDossier {
   id: string; org_name: string; plan: string | null; monthly_fee: number | null;
@@ -55,6 +59,7 @@ interface MunicipalityProfile {
   engagement_stage: string; fit_assessment: string | null; opportunity_notes: string | null; evidence_summary: string | null;
   email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null; on_hold: boolean;
   reply_handled_at?: string | null;
+  contact_email?: string | null; email_draft?: string | null; contact_email_confidence?: 'high' | 'medium' | 'low' | null; fact_check_status?: 'verified' | 'unverified' | 'flagged' | null;
 }
 interface CalendarEvent {
   title: string; start: string | null; end: string | null; all_day: boolean; location: string; html_link: string;
@@ -125,6 +130,7 @@ interface MorningItem {
   jumpLabel?: string;
   leadId?: string; // 縁の台帳カードへスクロールするため
   switchView?: SalesView; // ledger/relationのタブ自体を切り替えるため（jumpTabとは別物）
+  aiTask?: { label: string; title: string; category: string; notes: string; dueDate?: string }; // 「作る」ボタン。押すとaction_itemsに積み、次のClaude Codeセッションが下書きを作る
 }
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
@@ -242,6 +248,19 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     await load();
   }
 
+  // 「返信文を作る」「フォロー文を作る」「商談準備パックを作る」ボタン共通処理。
+  // コードは書かず、次のClaude Codeセッションへの依頼をaction_itemsに積むだけ（伴走支援の入口）。
+  const [requestedTasks, setRequestedTasks] = useState<Set<string>>(new Set());
+  async function requestAiTask(key: string, task: { title: string; category: string; notes: string; dueDate?: string }) {
+    const res = await fetch('/api/admin/action-items', {
+      method: 'POST', headers: jsonHeaders(),
+      body: JSON.stringify({ title: task.title, category: task.category, owner: 'AI', notes: task.notes, due_date: task.dueDate ?? null }),
+    });
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data.ok) { setError(data.error ?? '依頼の登録に失敗しました'); return; }
+    setRequestedTasks(prev => new Set(prev).add(key));
+  }
+
   // ---------- 縁スコアの計算 ----------
   const ledger = useMemo(() => {
     const byLead = new Map<string, EnRecord[]>();
@@ -282,6 +301,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     source: 'lead' | 'email_target' | 'municipality';
     id: string; name: string; reply: string; icon: string;
     onHandle: () => void; switchView?: SalesView;
+    replyTaskKey: string;
+    replyTaskNotes: string;
   }
   const replyInbox: ReplyInboxItem[] = useMemo(() => {
     const items: ReplyInboxItem[] = [];
@@ -290,6 +311,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         items.push({
           source: 'lead', id: l.id, name: l.org_name, reply: l.email_reply, icon: '🎓',
           onHandle: () => patchLead(l.id, { reply_handled_at: new Date().toISOString() }), switchView: 'leads',
+          replyTaskKey: `reply-lead-${l.id}`,
+          replyTaskNotes: `${l.org_name}様からの返信：\n${l.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
         });
       }
     }
@@ -298,6 +321,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         items.push({
           source: 'email_target', id: e.id, name: e.company, reply: e.email_reply, icon: '📮',
           onHandle: () => patchEmail(e.id, { reply_handled_at: new Date().toISOString() }),
+          replyTaskKey: `reply-email-${e.id}`,
+          replyTaskNotes: `${e.company}様からの返信：\n${e.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
         });
       }
     }
@@ -306,6 +331,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         items.push({
           source: 'municipality', id: p.id, name: p.region_name, reply: p.email_reply, icon: '🏛',
           onHandle: () => patchMunicipality(p.id, { reply_handled_at: new Date().toISOString() }), switchView: 'relation',
+          replyTaskKey: `reply-muni-${p.id}`,
+          replyTaskNotes: `${p.region_name}様からの返信：\n${p.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、自治体向けの型（課題解決の情報提供トーン）で返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
         });
       }
     }
@@ -359,6 +386,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         why: '送った後のフォローがないと、せっかくの出会いが冷めてしまいます',
         how: item.suggestedAction,
         switchView: item.source === 'client_lead' ? 'leads' : item.source === 'case' ? 'cases' : undefined,
+        aiTask: { label: 'フォロー文を作る', title: `フォロー文を作る：${item.name}`, category: '営業',
+          notes: `${item.name}（${item.label}）へのフォロー文を作成してください。営業メール/返信対応プレイブック.md のフォロー間隔（7〜21日、2〜4通）を参考に、06_実行待機_Approvalへ保存してください。` },
       });
     }
     // 今日のカレンダー予定と営業対象の名前を突き合わせ、一致するものだけ朝の一枚に載せる
@@ -372,6 +401,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         title: `今日${time ? time + '　' : ''}「${ev.title}」`,
         why: 'カレンダーの予定と営業対象が一致しました',
         how: '予定前にカルテ・台帳を見直し、渡せるものをひとつ用意する',
+        aiTask: { label: '商談準備パックを作る', title: `商談準備パックを作る：${matched}`, category: '営業',
+          notes: `${matched}様との商談「${ev.title}」の準備パックを作成してください。meeting-prepスキルの型（相手調査→アジェンダ→想定反論→フォロー草稿）で06_実行待機_Approvalへ保存してください。` },
       });
     }
     // 顧問先の打合せ（3日以内 or 超過）
@@ -385,6 +416,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           why: 'せっかくできた関係を大事にする',
           how: until < 0 ? '日程を組み直し、カルテの次回打合せ日を更新する' : 'カルテを見直し、渡せるもの（お礼になるもの）をひとつ用意して臨む',
           switchView: 'dossiers', jumpLabel: 'カルテを開く',
+          aiTask: until >= 0 ? { label: '商談準備パックを作る', title: `商談準備パックを作る：${d.org_name}`, category: '営業',
+            notes: `顧問先${d.org_name}様との打合せ（${d.next_meeting}）の準備パックを作成してください。meeting-prepスキルの型で06_実行待機_Approvalへ保存してください。` } : undefined,
         });
       }
     }
@@ -407,6 +440,50 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
   const [showAllMorning, setShowAllMorning] = useState(false);
   const visibleMorning = showAllMorning ? morning : morning.slice(0, 6);
+
+  // ---------- 🎯 今日送る10件（送信キューの確度high/medium×事実確認verifiedを1画面に要約） ----------
+  // 実際の送信ボタン・二重ガードはSendQueuePanel側の実装をそのまま使う（安全装置を2箇所に複製しない）。
+  // ここでは「今日これだけ送れば良い」を一目で分かるようにするだけ。
+  interface SendableItem { key: string; name: string; confidence: 'high' | 'medium'; icon: string }
+  const sendableToday = useMemo<SendableItem[]>(() => {
+    const items: SendableItem[] = [];
+    const isSendable = (c?: string | null, f?: string | null) => (c === 'high' || c === 'medium') && f === 'verified';
+    for (const l of leads) {
+      if (l.email_draft?.trim() && !l.email_sent_at && isSendable(l.contact_email_confidence, l.fact_check_status)) {
+        items.push({ key: `lead-${l.id}`, name: l.org_name, confidence: l.contact_email_confidence as 'high' | 'medium', icon: '🎓' });
+      }
+    }
+    for (const e of emails) {
+      if (e.email_draft?.trim() && !e.sent && !e.email_sent_at && isSendable(e.contact_email_confidence, e.fact_check_status)) {
+        items.push({ key: `email-${e.id}`, name: e.company, confidence: e.contact_email_confidence as 'high' | 'medium', icon: '📮' });
+      }
+    }
+    for (const p of municipalityProfiles) {
+      if (p.email_draft?.trim() && !p.email_sent_at && isSendable(p.contact_email_confidence, p.fact_check_status)) {
+        items.push({ key: `muni-${p.id}`, name: p.region_name, confidence: p.contact_email_confidence as 'high' | 'medium', icon: '🏛' });
+      }
+    }
+    return items.sort((a, b) => (a.confidence === 'high' ? 0 : 1) - (b.confidence === 'high' ? 0 : 1));
+  }, [leads, emails, municipalityProfiles]);
+  const sendableTop10 = sendableToday.slice(0, 10);
+
+  // ---------- 今週の4つの数字（送信数・返信数・商談数・パイプライン金額） ----------
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const sentTodayCount = useMemo(() => {
+    const isToday = (iso?: string | null) => Boolean(iso && iso.slice(0, 10) === todayStr);
+    return leads.filter(l => isToday(l.email_sent_at)).length
+      + emails.filter(e => isToday(e.email_sent_at)).length
+      + municipalityProfiles.filter(p => isToday(p.email_sent_at)).length;
+  }, [leads, emails, municipalityProfiles, todayStr]);
+  const negotiatingCount = useMemo(() =>
+    leads.filter(l => l.status === 'negotiating').length + cases.filter(c => c.stage === '提案' || c.stage === '承認待ち').length,
+    [leads, cases]);
+  const pipelineSummary = useMemo(() => computePipelineSummary(cases.map(c => ({
+    id: c.id, stage: c.stage, amount: c.amount ?? null, probability: c.probability ?? null,
+    expected_close_date: c.expected_close_date ?? null, won_at: c.won_at ?? null, lost_reason: c.lost_reason ?? null,
+    invoice_sent_at: c.invoice_sent_at ?? null, payment_due: c.payment_due ?? null, paid_at: c.paid_at ?? null,
+    last_contact_at: c.last_contact_at ?? null, org_name: c.org_name,
+  }))), [cases]);
 
   // ---------- 台帳の並び・絞り込み ----------
   const [ledgerFilter, setLedgerFilter] = useState<'active' | 'all'>('active');
@@ -556,6 +633,13 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                     {item.switchView && (
                       <button onClick={() => setView(item.switchView!)} style={jumpBtnStyle}>台帳を開く</button>
                     )}
+                    {requestedTasks.has(item.replyTaskKey) ? (
+                      <span style={{ fontSize: 10.5, color: '#8E44AD', fontWeight: 700, textAlign: 'center' }}>✓ 依頼しました</span>
+                    ) : (
+                      <button onClick={() => requestAiTask(item.replyTaskKey, { title: `返信文を作る：${item.name}`, category: '営業', notes: item.replyTaskNotes })} style={{
+                        ...jumpBtnStyle, borderColor: '#8E44AD', color: '#8E44AD',
+                      }}>返信文を作る</button>
+                    )}
                     <button onClick={item.onHandle} style={{
                       padding: '4px 10px', borderRadius: 14, border: 'none', background: '#8E44AD',
                       color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
@@ -567,6 +651,48 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           </div>
         </div>
       )}
+
+      {/* ---------- 🎯 今日送る10件 ---------- */}
+      {sendableToday.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <h2 style={{ ...sectionTitleStyle, margin: 0, color: '#38ADA9' }}>🎯 今日送る{sendableTop10.length}件</h2>
+            <button onClick={() => setView('sendqueue')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>送信キューを開く →</button>
+          </div>
+          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>
+            宛先確度・事実確認の両方が済んでいる下書きです。100通で商談1〜2件が実務の目安——送らない限り検証できません。実際の送信ボタンは送信キューにあります。
+          </p>
+          <div style={{ ...cardStyle, padding: '10px 14px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {sendableTop10.map(item => (
+                <span key={item.key} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 14,
+                  fontSize: 11.5, fontWeight: 700, background: item.confidence === 'high' ? '#27AE6018' : '#E5A13918',
+                  color: item.confidence === 'high' ? '#27AE60' : '#B7791F',
+                }}>{item.icon} {item.name}</span>
+              ))}
+              {sendableToday.length > 10 && (
+                <span style={{ fontSize: 11, color: '#999', alignSelf: 'center' }}>他{sendableToday.length - 10}件</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- 📊 今週の4つの数字 ---------- */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, margin: '14px 0 4px' }}>
+        {[
+          { label: '📤 今日の送信数', value: `${sentTodayCount}件`, color: '#38ADA9' },
+          { label: '📬 返信待ち', value: `${replyInbox.length}件`, color: '#8E44AD' },
+          { label: '🤝 商談数', value: `${negotiatingCount}件`, color: '#E5A139' },
+          { label: '💰 パイプライン金額', value: `${pipelineSummary.pipelineTotal.toLocaleString()}円`, color: '#27AE60' },
+        ].map(kpi => (
+          <div key={kpi.label} style={{ ...cardStyle, padding: '10px 12px', borderTop: `3px solid ${kpi.color}` }}>
+            <p style={{ margin: 0, fontSize: 10.5, color: '#999', fontWeight: 700 }}>{kpi.label}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 16, fontWeight: 800, color: '#333' }}>{kpi.value}</p>
+          </div>
+        ))}
+      </div>
 
       {/* ---------- 計器盤 ---------- */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: 10, margin: '14px 0 4px' }}>
@@ -604,6 +730,17 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </button>
       </div>
 
+      {/* ---------- ⭐ 今日の1アクション（朝の一枚の先頭を強調表示。全部やらなくてもこれだけは） ---------- */}
+      {morning.length > 0 && (
+        <div style={{ ...cardStyle, background: '#FFF9E8', border: '2px solid #E5A139', marginBottom: 14, padding: '14px 16px' }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 800, color: '#B7791F', letterSpacing: 0.5 }}>⭐ 今日の1アクション（これだけでも前進します）</p>
+          <p style={{ margin: '6px 0 0', fontSize: 15, fontWeight: 800, color: '#333' }}>
+            {morning[0].org} <span style={{ color: '#B7791F' }}>— {morning[0].title}</span>
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: '#666' }}>動き：{morning[0].how}</p>
+        </div>
+      )}
+
       {/* ---------- 朝の一枚 ---------- */}
       <h2 style={sectionTitleStyle}>🌅 朝の一枚 — 今日の一手（{morning.length}件）</h2>
       {morning.length === 0 ? (
@@ -613,7 +750,9 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {visibleMorning.map((m, i) => (
+          {visibleMorning.map((m, i) => {
+            const taskKey = `morning-${m.org}-${m.title}`;
+            return (
             <div key={i} style={{ ...cardStyle, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 20, flexShrink: 0 }}>{m.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -623,15 +762,25 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                 <p style={{ margin: '3px 0 0', fontSize: 11, color: '#999' }}>なぜ：{m.why}</p>
                 <p style={{ margin: '2px 0 0', fontSize: 12, color: '#555' }}>動き：{m.how}</p>
               </div>
-              {m.leadId ? (
-                <button onClick={() => scrollToLead(m.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
-              ) : m.switchView ? (
-                <button onClick={() => setView(m.switchView!)} style={jumpBtnStyle}>詳細へ →</button>
-              ) : m.jumpTab ? (
-                <button onClick={() => goTab(m.jumpTab!)} style={jumpBtnStyle}>{m.jumpLabel} →</button>
-              ) : null}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                {m.leadId ? (
+                  <button onClick={() => scrollToLead(m.leadId!)} style={jumpBtnStyle}>営業へ ↓</button>
+                ) : m.switchView ? (
+                  <button onClick={() => setView(m.switchView!)} style={jumpBtnStyle}>詳細へ →</button>
+                ) : m.jumpTab ? (
+                  <button onClick={() => goTab(m.jumpTab!)} style={jumpBtnStyle}>{m.jumpLabel} →</button>
+                ) : null}
+                {m.aiTask && (
+                  requestedTasks.has(taskKey) ? (
+                    <span style={{ fontSize: 10.5, color: '#38ADA9', fontWeight: 700, textAlign: 'center' }}>✓ 依頼しました</span>
+                  ) : (
+                    <button onClick={() => requestAiTask(taskKey, m.aiTask!)} style={{ ...jumpBtnStyle, whiteSpace: 'nowrap' }}>{m.aiTask.label}</button>
+                  )
+                )}
+              </div>
             </div>
-          ))}
+            );
+          })}
           {morning.length > 6 && (
             <button onClick={() => setShowAllMorning(v => !v)} style={{
               padding: '8px 0', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',

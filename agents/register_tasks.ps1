@@ -48,6 +48,7 @@ Register-Agent "HitomapRevenueInitiativeWatch" "revenue_initiative_watch.py" "08
 Register-Agent "HitomapOfficeDiary" "office_diary.py" "09:15"
 Register-Agent "HitomapLeadTemperature" "lead_temperature.py" "08:45"
 Register-Agent "HitomapFactCheckWatch" "fact_check_watch.py" "08:55"
+Register-Agent "HitomapProcurementWatch" "procurement_watch.py" "06:05"
 Register-Agent "HitomapPaymentWatch" "payment_watch.py" "08:50"
 Register-Agent "HitomapLostDealArchive" "lost_deal_archive.py" "09:05"
 Register-Agent "HitomapScheduleWatch" "schedule_watch.py" "07:15"
