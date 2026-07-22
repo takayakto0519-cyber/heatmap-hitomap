@@ -28,9 +28,10 @@ import BizModelIdeasTab from '@/components/admin/BizModelIdeasTab';
 import MarketingProposalsTab from '@/components/admin/MarketingProposalsTab';
 import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 import MinutesTab from '@/components/admin/MinutesTab';
+import OrgDocsTab from '@/components/admin/OrgDocsTab';
 import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs';
 
 // 旧タブIDからの後方互換：
 // - ?tab=aiops / ?tab=agentstatus → agents（AIエージェント2タブ統合）
@@ -65,6 +66,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   patterns: { label: '投稿パターン分析', icon: '📊', group: '調査・研究', desc: '投稿時間帯・また来たい率・話したい率・書き込みの厚み' },
   agents: { label: 'AIエージェント', icon: '🤖', group: 'AIエージェント', desc: 'AIエージェントの稼働状況とスキル名簿（全戦力）' },
   minutes: { label: '議事録', icon: '🗒', group: '秘書', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
+  orgdocs: { label: '経営資料', icon: '📁', group: '秘書', desc: '戦略メモ・提案書・対外メール下書きをフォルダ別に一覧・保管する' },
 };
 
 // 売上を最優先で見るため、営業・自治体（商流・お金）を秘書の次＝最上位に置く
@@ -311,6 +313,7 @@ export default function AdminDashboardPage() {
           {tab === 'agents' && <AgentStatusTab authHeaders={authHeaders} />}
           {tab === 'money' && <MoneyTab authHeaders={authHeaders} />}
           {tab === 'minutes' && <MinutesTab authHeaders={authHeaders} />}
+          {tab === 'orgdocs' && <OrgDocsTab authHeaders={authHeaders} />}
           {tab === 'secretary' && <SecretaryTab authHeaders={authHeaders} goTab={goTab} />}
         </div>
       </main>
