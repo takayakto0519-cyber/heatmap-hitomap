@@ -34,29 +34,39 @@ export async function POST(req: NextRequest) {
     fit_assessment?: string | null; opportunity_level?: string; opportunity_notes?: string | null;
     source_links?: string | null; contact_email?: string | null; email_draft?: string | null;
     email_sent_at?: string | null; email_reply?: string | null; is_priority_pick?: boolean;
+    origin_proposal_id?: string | null; origin_note?: string | null;
   };
   if (!body.region_name?.trim()) return NextResponse.json({ ok: false, error: '自治体名は必須です' }, { status: 400 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
-    .from('municipality_profiles')
-    .upsert({
-      region_name: body.region_name.trim(),
-      engagement_stage: body.engagement_stage?.trim() || 'lead',
-      evidence_summary: body.evidence_summary?.trim() || null,
-      relation_population_initiative: body.relation_population_initiative?.trim() || null,
-      fit_assessment: body.fit_assessment?.trim() || null,
-      opportunity_level: body.opportunity_level?.trim() || '中',
-      opportunity_notes: body.opportunity_notes?.trim() || null,
-      source_links: body.source_links?.trim() || null,
-      contact_email: body.contact_email?.trim() || null,
-      email_draft: body.email_draft?.trim() || null,
-      email_sent_at: body.email_sent_at || null,
-      email_reply: body.email_reply?.trim() || null,
-      is_priority_pick: body.is_priority_pick ?? false,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'region_name' })
-    .select().single();
+  const upsertRow: Record<string, unknown> = {
+    region_name: body.region_name.trim(),
+    engagement_stage: body.engagement_stage?.trim() || 'lead',
+    evidence_summary: body.evidence_summary?.trim() || null,
+    relation_population_initiative: body.relation_population_initiative?.trim() || null,
+    fit_assessment: body.fit_assessment?.trim() || null,
+    opportunity_level: body.opportunity_level?.trim() || '中',
+    opportunity_notes: body.opportunity_notes?.trim() || null,
+    source_links: body.source_links?.trim() || null,
+    contact_email: body.contact_email?.trim() || null,
+    email_draft: body.email_draft?.trim() || null,
+    email_sent_at: body.email_sent_at || null,
+    email_reply: body.email_reply?.trim() || null,
+    is_priority_pick: body.is_priority_pick ?? false,
+    origin_proposal_id: body.origin_proposal_id || null,
+    origin_note: body.origin_note?.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  let { data, error } = await supabaseServer
+    .from('municipality_profiles').upsert(upsertRow, { onConflict: 'region_name' }).select().single();
+  for (let i = 0; error && i < 3; i++) {
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
+    if (!missing || !(missing in upsertRow)) break;
+    delete upsertRow[missing];
+    ({ data, error } = await supabaseServer
+      .from('municipality_profiles').upsert(upsertRow, { onConflict: 'region_name' }).select().single());
+  }
 
   if (error) {
     if (isMissingTable(error.message, 'municipality_profiles')) {

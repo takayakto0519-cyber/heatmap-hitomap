@@ -6,7 +6,7 @@ const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const ALLOWED_FIELDS = [
   'title', 'organizer', 'opp_type', 'region', 'deadline', 'deadline_note',
   'announcement_date', 'prize_amount', 'url', 'status', 'memo', 'source',
-  'fit_score', 'fit_notes',
+  'fit_score', 'fit_notes', 'municipality_profile_id',
 ];
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
@@ -21,8 +21,18 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
   }
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
+  let { data, error } = await supabaseServer
     .from('funding_opportunities').update(updates).eq('id', id).select().single();
+  // マイグレーション未適用のカラムを指定した場合でも壊れないように、
+  // エラーメッセージから実際に存在しないカラム名を読み取ってその項目だけ外し再試行する。
+  for (let i = 0; error && i < ALLOWED_FIELDS.length; i++) {
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
+    if (!missing || !(missing in updates)) break;
+    delete updates[missing];
+    ({ data, error } = await supabaseServer
+      .from('funding_opportunities').update(updates).eq('id', id).select().single());
+  }
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, opportunity: data });

@@ -25,6 +25,7 @@ interface Opportunity {
   source: string | null;
   fit_score: number | null;
   fit_notes: string | null;
+  municipality_profile_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,7 +37,7 @@ function fitColor(score: number): string {
 }
 
 const OPP_TYPE_META: Record<OppType, { label: string; icon: string; color: string }> = {
-  municipal_support: { label: '自治体支援', icon: '🏛', color: '#4A69BD' },
+  municipal_support: { label: '自治体公募・RFP', icon: '🏛', color: '#4A69BD' },
   subsidy: { label: '補助金・助成金', icon: '💴', color: '#27AE60' },
   contest: { label: 'ビジコン', icon: '🏆', color: '#8E44AD' },
   funding_event: { label: '資金調達・ピッチ', icon: '🚀', color: '#E5A139' },
@@ -79,7 +80,7 @@ const emptyForm = {
   deadline: '', deadline_note: '', announcement_date: '', prize_amount: '', url: '', memo: '', source: '',
 };
 
-export default function FundingCalendarTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+export default function FundingCalendarTab({ authHeaders, goTab }: { authHeaders: () => HeadersInit; goTab?: (tab: string) => void }) {
   const [items, setItems] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -299,7 +300,7 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
             <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>該当する案件がありません。</p></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {byFit.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />)}
+              {byFit.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} goTab={goTab} />)}
             </div>
           )}
         </>
@@ -312,7 +313,7 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {upcoming.map(o => (
-                <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />
+                <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} goTab={goTab} />
               ))}
             </div>
           )}
@@ -321,7 +322,7 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
             <>
               <h2 style={sectionTitleStyle}>❓ 締切不明・随時受付（{noDeadline.length}件）</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {noDeadline.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} />)}
+                {noDeadline.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} goTab={goTab} />)}
               </div>
             </>
           )}
@@ -341,7 +342,7 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
           <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>ありません。</p></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {closedOrDone.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} muted />)}
+            {closedOrDone.map(o => <OppCard key={o.id} o={o} onPatch={patch} onRemove={remove} goTab={goTab} muted />)}
           </div>
         )
       )}
@@ -349,10 +350,11 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
   );
 }
 
-function OppCard({ o, onPatch, onRemove, muted }: {
+function OppCard({ o, onPatch, onRemove, goTab, muted }: {
   o: Opportunity;
   onPatch: (id: string, fields: Partial<Opportunity>) => void;
   onRemove: (id: string) => void;
+  goTab?: (tab: string) => void;
   muted?: boolean;
 }) {
   const typeMeta = OPP_TYPE_META[o.opp_type];
@@ -392,6 +394,16 @@ function OppCard({ o, onPatch, onRemove, muted }: {
         {o.deadline ? `締切：${o.deadline}` : o.deadline_note ? `締切：${o.deadline_note}` : '締切：未設定'}
         {o.announcement_date && ` ・ 発表予定：${o.announcement_date}`}
       </p>
+
+      {o.municipality_profile_id && goTab && (
+        <button onClick={() => {
+          sessionStorage.setItem('jump_focus_profile_id', o.municipality_profile_id!);
+          goTab('sales');
+        }} style={{
+          marginTop: 6, fontSize: 11, fontWeight: 700, color: '#4A69BD', background: 'none',
+          border: '1px solid #4A69BD', borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
+        }}>🏛 営業台帳で見る →</button>
+      )}
 
       {o.fit_notes && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#666' }}><strong style={{ color: fitColor(o.fit_score ?? 0), fontWeight: 700 }}>相性：</strong>{o.fit_notes}</p>}
       {o.memo && <p style={{ margin: '6px 0 0', fontSize: 12, color: '#555', whiteSpace: 'pre-wrap' }}>{o.memo}</p>}

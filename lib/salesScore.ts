@@ -20,10 +20,32 @@ import { HOT_WORDS } from '@/lib/leadTemperature';
 export const OPPORTUNITY_SCORE: Record<string, number> = { 高: 140, 中: 80, 低: 30 };
 export const ENGAGEMENT_BONUS: Record<string, number> = { contracted: 40, proposed: 20, lead: 0, observing: -10 };
 
-export function municipalityScore(p: { opportunity_level: string; engagement_stage: string }): number {
+// 公募中ボーナス：手動評価「高」(140)を超えて最上位帯に浮上させる。締切が近いほどさらに加点。
+export const RFP_ACTIVE_BONUS = 70;
+export const RFP_DEADLINE_SOON_BONUS = 10;
+export const RFP_DEADLINE_SOON_DAYS = 14;
+
+/** その自治体に「募集中」の公募（funding_opportunities, status=watching/preparing）が紐づいているか判定してボーナスを返す */
+export function rfpBonus(opps: { status: string; deadline: string | null }[]): number {
+  const active = opps.filter((o) => ['watching', 'preparing'].includes(o.status));
+  if (active.length === 0) return 0;
+  let bonus = RFP_ACTIVE_BONUS;
+  const soon = active.some((o) => {
+    if (!o.deadline) return false;
+    const days = (new Date(o.deadline).getTime() - Date.now()) / 86400000;
+    return days >= 0 && days <= RFP_DEADLINE_SOON_DAYS;
+  });
+  if (soon) bonus += RFP_DEADLINE_SOON_BONUS;
+  return bonus;
+}
+
+export function municipalityScore(
+  p: { opportunity_level: string; engagement_stage: string },
+  linkedOpps: { status: string; deadline: string | null }[] = [],
+): number {
   const base = OPPORTUNITY_SCORE[p.opportunity_level] ?? 30;
   const bonus = ENGAGEMENT_BONUS[p.engagement_stage] ?? 0;
-  return Math.max(0, Math.min(200, base + bonus));
+  return Math.max(0, Math.min(200, base + bonus + rfpBonus(linkedOpps)));
 }
 
 // ---- 基準の一覧（画面の凡例とドキュメントの単一ソース） ----
@@ -90,6 +112,8 @@ export const SALES_SCORE_CRITERIA: CriteriaBlock[] = [
       { when: '関わり：契約中', points: '+40' },
       { when: '関わり：提案済み', points: '+20' },
       { when: '関わり：様子見', points: '-10' },
+      { when: '🔥 公募中（募集中のRFPが紐付き）', points: `+${RFP_ACTIVE_BONUS}` },
+      { when: '　うち締切14日以内', points: `さらに+${RFP_DEADLINE_SOON_BONUS}` },
     ],
     note: '0〜200にクランプ。ランキングでは「手動評価」バッジを付けて縁スコアと区別する。',
   },

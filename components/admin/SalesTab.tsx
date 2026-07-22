@@ -11,6 +11,7 @@ import { computeEn, EN_KINDS, type EnKind, type EnRecord, type EnBreakdown } fro
 import { computeFollowUp } from '@/lib/followUp';
 import { scoreLead } from '@/lib/leadTemperature';
 import { municipalityScore, SALES_SCORE_CRITERIA } from '@/lib/salesScore';
+import { promoteToCase, type PromoteSource } from '@/lib/promoteToCase';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import { computeMrr, computePipelineSummary } from '@/lib/dealMetrics';
 import { buildUnifiedFollowQueue, type FollowQueueItem } from '@/lib/followQueue';
@@ -137,8 +138,10 @@ interface MorningItem {
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
 // 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
-const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'sendqueue'] as const;
+const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'sendqueue', 'guided'] as const;
 type SalesView = typeof SALES_VIEWS[number];
+// 受注後の伴走支援の対象ステージ（商流ボードのWON_STAGESと同じ）
+const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
 
 // サブビューを「見る画面」と「書く画面（台帳）」に分けて並べる。
 // 案件・顧問先は AIOpsTab（AIエージェント運営）から移設したもの。
@@ -147,6 +150,7 @@ const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }
     { key: 'ledger', label: '🧭 営業' },
     { key: 'relation', label: '🔁 関係人口・自治体' },
     { key: 'sendqueue', label: '📤 送信キュー' },
+    { key: 'guided', label: '🚚 伴走中' },
   ] },
   { label: '台帳', views: [
     { key: 'leads', label: '🎓 学校・法人' },
@@ -161,6 +165,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [cases, setCases] = useState<BusinessCase[]>([]);
   const [dossiers, setDossiers] = useState<ClientDossier[]>([]);
   const [municipalityProfiles, setMunicipalityProfiles] = useState<MunicipalityProfile[]>([]);
+  const [fundingOpps, setFundingOpps] = useState<{ id: string; status: string; deadline: string | null; municipality_profile_id: string | null }[]>([]);
   const [calendarToday, setCalendarToday] = useState<CalendarEvent[]>([]);
   const [procurementItems, setProcurementItems] = useState<ProcurementItem[]>([]);
   const [needsMigration, setNeedsMigration] = useState(false);
@@ -177,11 +182,22 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     goTab(target);
   }, [goTab]);
 
+  // 締切台帳（別タブ）の「営業台帳で見る →」からのジャンプ先を受け取る（タブをまたぐのでsessionStorage経由）。
+  const [focusMunicipalityIdFromJump, setFocusMunicipalityIdFromJump] = useState<string | null>(null);
+  useEffect(() => {
+    const jumpId = sessionStorage.getItem('jump_focus_profile_id');
+    if (jumpId) {
+      sessionStorage.removeItem('jump_focus_profile_id');
+      setView('relation');
+      setFocusMunicipalityIdFromJump(jumpId);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, recordsRes, casesRes, dossiersRes, profilesRes, calendarRes, procurementRes] = await Promise.all([
+      const [leadsRes, recordsRes, casesRes, dossiersRes, profilesRes, calendarRes, procurementRes, oppsRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/en-records', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json()),
@@ -189,6 +205,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
         fetch('/api/admin/calendar', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false, connected: false, today: [] })),
         fetch('/api/admin/agent-digest?ids=procurement_watch', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false, agents: [] })),
+        fetch('/api/admin/funding-opportunities', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
       ]);
       if (leadsRes.ok) setLeads(leadsRes.leads ?? []);
       if (recordsRes.ok) {
@@ -198,6 +215,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       if (casesRes.ok) setCases(casesRes.cases ?? []);
       if (dossiersRes.ok) setDossiers(dossiersRes.dossiers ?? []);
       if (profilesRes.ok) setMunicipalityProfiles(profilesRes.profiles ?? []);
+      if (oppsRes.ok) setFundingOpps(oppsRes.opportunities ?? []);
       if (calendarRes.ok && calendarRes.connected) setCalendarToday(calendarRes.today ?? []);
       if (procurementRes.ok) {
         const digest = procurementRes.agents?.[0]?.result?.digest as Record<string, ProcurementItem[]> | undefined;
@@ -238,6 +256,17 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     if (!data.ok) { setError(data.error ?? '更新に失敗しました'); return false; }
     await load();
     return true;
+  }
+  const [promotingKey, setPromotingKey] = useState<string | null>(null);
+  function adminPassword(): string {
+    return (authHeaders() as Record<string, string>)['x-admin-password'] ?? '';
+  }
+  async function handlePromoteReply(item: { replyTaskKey: string; promoteSource: PromoteSource }) {
+    setPromotingKey(item.replyTaskKey);
+    const result = await promoteToCase(item.promoteSource, cases, adminPassword());
+    setPromotingKey(null);
+    if (!result.ok) { setError(result.error ?? '案件化に失敗しました'); return; }
+    await load();
   }
   async function addRecord(leadId: string, kind: EnKind, note: string, happenedAt: string) {
     const res = await fetch('/api/admin/en-records', {
@@ -320,6 +349,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     onHandle: () => void; switchView?: SalesView;
     replyTaskKey: string;
     replyTaskNotes: string;
+    promoteSource: PromoteSource;
   }
   const replyInbox: ReplyInboxItem[] = useMemo(() => {
     const items: ReplyInboxItem[] = [];
@@ -330,6 +360,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           onHandle: () => patchLead(l.id, { reply_handled_at: new Date().toISOString() }), switchView: 'leads',
           replyTaskKey: `reply-lead-${l.id}`,
           replyTaskNotes: `${l.org_name}様からの返信：\n${l.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
+          promoteSource: { orgName: l.org_name, clientType: 'business', leadRef: l.id },
         });
       }
     }
@@ -340,6 +371,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           onHandle: () => patchEmail(e.id, { reply_handled_at: new Date().toISOString() }),
           replyTaskKey: `reply-email-${e.id}`,
           replyTaskNotes: `${e.company}様からの返信：\n${e.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
+          promoteSource: { orgName: e.company, clientType: 'business' },
         });
       }
     }
@@ -350,6 +382,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           onHandle: () => patchMunicipality(p.id, { reply_handled_at: new Date().toISOString() }), switchView: 'relation',
           replyTaskKey: `reply-muni-${p.id}`,
           replyTaskNotes: `${p.region_name}様からの返信：\n${p.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、自治体向けの型（課題解決の情報提供トーン）で返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
+          promoteSource: { orgName: p.region_name, clientType: 'municipality', municipalityProfileId: p.id, evidence: p.evidence_summary },
         });
       }
     }
@@ -540,6 +573,9 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     setView('relation');
     setFocusMunicipalityId(id);
   }
+  useEffect(() => {
+    if (focusMunicipalityIdFromJump) setFocusMunicipalityId(focusMunicipalityIdFromJump);
+  }, [focusMunicipalityIdFromJump]);
 
   const ledgerById = useMemo(() => {
     const map = new Map<string, typeof activeLedger[number]>();
@@ -567,16 +603,19 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     for (const p of municipalityProfiles) {
       if (p.on_hold) continue;
       if (leadCoreNames.has(coreRegionName(p.region_name))) continue;
+      const linkedOpps = fundingOpps.filter(o => o.municipality_profile_id === p.id);
+      const isRfpActive = linkedOpps.some(o => ['watching', 'preparing'].includes(o.status));
       items.push({
         key: `muni-${p.id}`, kind: 'municipality', icon: '🏛',
-        name: p.region_name, score: municipalityScore(p),
-        badge: `提案余地 ${p.opportunity_level}`, badgeColor: OPPORTUNITY_COLORS[p.opportunity_level] ?? '#999',
+        name: p.region_name, score: municipalityScore(p, linkedOpps),
+        badge: isRfpActive ? '🔥 公募中' : `提案余地 ${p.opportunity_level}`,
+        badgeColor: isRfpActive ? '#E55039' : (OPPORTUNITY_COLORS[p.opportunity_level] ?? '#999'),
         reason: municipalityReason(p),
         isSent: Boolean(p.email_sent_at),
       });
     }
     return items.sort((a, b) => b.score - a.score);
-  }, [activeLedger, leads, municipalityProfiles]);
+  }, [activeLedger, leads, municipalityProfiles, fundingOpps]);
 
   const activeRankedFeed = useMemo(() => rankedFeed.filter(item => !item.isSent), [rankedFeed]);
   const sentRankedFeed = useMemo(() => rankedFeed.filter(item => item.isSent), [rankedFeed]);
@@ -626,6 +665,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
       {view === 'sendqueue' && <SendQueuePanel authHeaders={authHeaders} onOpenMunicipality={openMunicipalityProfile} />}
+      {view === 'guided' && <GuidedView cases={cases} goTab={goTabOrSwitchView} />}
 
       {view === 'ledger' && <>
       {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
@@ -671,6 +711,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                       padding: '4px 10px', borderRadius: 14, border: 'none', background: '#8E44AD',
                       color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                     }}>対応済みにする</button>
+                    <button onClick={() => handlePromoteReply(item)} disabled={promotingKey === item.replyTaskKey} style={{
+                      padding: '4px 10px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
+                      color: '#38ADA9', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}>{promotingKey === item.replyTaskKey ? '処理中…' : '📇 案件化する'}</button>
                   </div>
                 </div>
               </div>
@@ -1065,6 +1109,47 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 const OPPORTUNITY_COLORS: Record<string, string> = { 高: '#27AE60', 中: '#E5A139', 低: '#999' };
 
 // ---------- 縁の台帳カード（1リード分） ----------
+// 「🚚 伴走中」サブビュー：受注〜フォローの案件だけを、次アクション期限順（未設定は最上位＝要対応）で並べる。
+function GuidedView({ cases, goTab }: { cases: BusinessCase[]; goTab: (tab: string) => void }) {
+  const guided = useMemo(() => {
+    return cases
+      .filter(c => GUIDED_STAGES.includes(c.stage))
+      .sort((a, b) => {
+        const aUrgent = !a.next_action ? -1 : 0;
+        const bUrgent = !b.next_action ? -1 : 0;
+        if (aUrgent !== bUrgent) return aUrgent - bUrgent;
+        return new Date(a.last_contact_at ?? 0).getTime() - new Date(b.last_contact_at ?? 0).getTime();
+      });
+  }, [cases]);
+
+  if (guided.length === 0) {
+    return <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>受注以降の案件はまだありません。</p></div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <p style={{ fontSize: 12, color: '#999', margin: '0 0 4px' }}>
+        受注〜フォローの案件を、次の一手が未設定のものを最優先に並べています。
+      </p>
+      {guided.map(c => (
+        <div key={c.id} style={{ ...cardStyle, padding: '12px 14px', borderLeft: c.next_action ? '3px solid #38ADA9' : '3px solid #E55039' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <b style={{ fontSize: 14 }}>{c.org_name}</b>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#8E44AD', background: '#8E44AD18', padding: '2px 9px', borderRadius: 10 }}>{c.stage}</span>
+          </div>
+          <p style={{ margin: '6px 0 0', fontSize: 12.5, color: c.next_action ? '#555' : '#E55039', fontWeight: c.next_action ? 400 : 700 }}>
+            {c.next_action ? `次の一手：${c.next_action}` : '⚠ 次の一手が未設定です'}
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <a href={`/admin/case/${c.id}`} target="_blank" rel="noopener noreferrer" style={jumpBtnStyle}>📊 専用ダッシュボード →</a>
+            <button onClick={() => goTab('cases')} style={jumpBtnStyle}>📇 商流ボードで見る →</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange, goTab, municipalityProfile }: {
   lead: { id: string; client_type: string; org_name: string; contact_name: string | null; email: string | null; phone: string | null; status: string; memo: string | null };
   records: EnRecord[];

@@ -7,6 +7,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeFollowUp } from '@/lib/followUp';
 import { smoutSearchUrl } from '@/lib/smout';
+import { rfpBonus } from '@/lib/salesScore';
+import { promoteToCase } from '@/lib/promoteToCase';
 
 interface RelationStats {
   totalContributors: number;
@@ -56,7 +58,23 @@ interface MunicipalityProfile {
   municipality_code?: string | null;
   population_stats?: { dayNightRatio?: number; statsYear?: string; statsDataId?: string; fetchedAt?: string } | null;
   population_stats_fetched_at?: string | null;
+  origin_note?: string | null;
   updated_at: string;
+}
+
+interface FundingOpp {
+  id: string;
+  title: string;
+  status: string;
+  deadline: string | null;
+  url: string | null;
+  municipality_profile_id: string | null;
+}
+
+interface BusinessCaseLite {
+  id: string;
+  lead_ref?: string | null;
+  municipality_profile_id?: string | null;
 }
 
 const ENGAGEMENT_STAGES = [
@@ -151,9 +169,54 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
   const [nameFilter, setNameFilter] = useState('');
   const [levelFilter, setLevelFilter] = useState<'all' | '高' | '中' | '低'>('all');
   const [justFocusedId, setJustFocusedId] = useState<string | null>(null);
+  const [opps, setOpps] = useState<FundingOpp[]>([]);
+  const [cases, setCases] = useState<BusinessCaseLite[]>([]);
+  const [rfpFormFor, setRfpFormFor] = useState<string | null>(null);
+  const [rfpForm, setRfpForm] = useState({ title: '', deadline: '' });
+  const [promoting, setPromoting] = useState<string | null>(null);
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
+  }
+  function adminPassword(): string {
+    return (authHeaders() as Record<string, string>)['x-admin-password'] ?? '';
+  }
+
+  async function loadOppsAndCases() {
+    const [oRes, cRes] = await Promise.all([
+      fetch('/api/admin/funding-opportunities', { headers: authHeaders() }),
+      fetch('/api/admin/business-cases', { headers: authHeaders() }),
+    ]);
+    const oData = await oRes.json().catch(() => ({ ok: false }));
+    const cData = await cRes.json().catch(() => ({ ok: false }));
+    if (oData.ok) setOpps(oData.opportunities ?? []);
+    if (cData.ok) setCases(cData.cases ?? []);
+  }
+
+  async function registerRfp(profileId: string, regionName: string) {
+    if (!rfpForm.title.trim()) return;
+    await fetch('/api/admin/funding-opportunities', {
+      method: 'POST', headers: jsonHeaders(),
+      body: JSON.stringify({
+        title: rfpForm.title.trim(), organizer: regionName, opp_type: 'municipal_support',
+        region: regionName, deadline: rfpForm.deadline || null, status: 'watching',
+        municipality_profile_id: profileId,
+      }),
+    });
+    setRfpForm({ title: '', deadline: '' });
+    setRfpFormFor(null);
+    await loadOppsAndCases();
+  }
+
+  async function handlePromote(p: MunicipalityProfile) {
+    setPromoting(p.id);
+    const result = await promoteToCase(
+      { orgName: p.region_name, clientType: 'municipality', municipalityProfileId: p.id, evidence: p.evidence_summary },
+      cases, adminPassword(),
+    );
+    setPromoting(null);
+    if (!result.ok) { setError(result.error ?? '案件化に失敗しました'); return; }
+    await loadOppsAndCases();
   }
 
   async function loadProfiles() {
@@ -172,6 +235,7 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
       .catch(() => setError('通信エラー'))
       .finally(() => setLoading(false));
     loadProfiles();
+    loadOppsAndCases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -331,6 +395,10 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
     const schedulingDetected = p.scheduling_request_detected_at
       && (Date.now() - new Date(p.scheduling_request_detected_at).getTime()) < 5 * 86400000;
     const justFocused = justFocusedId === p.id;
+    const linkedOpps = opps.filter(o => o.municipality_profile_id === p.id);
+    const activeOpps = linkedOpps.filter(o => ['watching', 'preparing'].includes(o.status));
+    const isRfpActive = rfpBonus(activeOpps) > 0;
+    const linkedCaseId = cases.find(c => c.municipality_profile_id === p.id)?.id;
     return (
       <div id={`muni-card-${p.id}`} style={{
         padding: 14, borderRadius: 10,
@@ -341,6 +409,12 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
           <b style={{ fontSize: 14 }}>
             {highlight && '🌟 '}{p.on_hold && '⏸ '}{p.region_name}
+            {isRfpActive && (
+              <span title={activeOpps.map(o => `${o.title}${o.deadline ? `（締切${o.deadline}）` : ''}`).join(' / ')} style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#fff',
+                background: '#E55039', padding: '1px 8px', borderRadius: 10,
+              }}>🔥 公募中</span>
+            )}
             {schedulingDetected && (
               <span title="Gmail AIエージェントが日程調整を求める返信を検知しました" style={{
                 marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#4A69BD',
@@ -364,9 +438,52 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
               fontSize: 11, color: p.on_hold ? '#fff' : '#888', fontWeight: 700, cursor: 'pointer',
               background: p.on_hold ? '#999' : 'none', border: '1px solid #ccc', borderRadius: 999, padding: '3px 10px',
             }} title="メール送信・フォローを一時的に止める（削除はしない）">{p.on_hold ? '再開する' : 'メール送信を保留にする'}</button>
+            {linkedCaseId ? (
+              <a href={`/admin/case/${linkedCaseId}`} target="_blank" rel="noopener noreferrer" style={{
+                fontSize: 11, fontWeight: 700, color: '#8E44AD', border: '1px solid #8E44AD', borderRadius: 999, padding: '3px 10px', textDecoration: 'none',
+              }}>📊 案件化済み →</a>
+            ) : (
+              <button onClick={() => handlePromote(p)} disabled={promoting === p.id} style={{
+                fontSize: 11, fontWeight: 700, color: '#fff', background: '#8E44AD', border: 'none', borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
+              }}>{promoting === p.id ? '処理中…' : '📇 案件化する'}</button>
+            )}
+            <button onClick={() => setRfpFormFor(rfpFormFor === p.id ? null : p.id)} style={{
+              fontSize: 11, fontWeight: 700, color: '#E55039', background: 'none', border: '1px solid #E55039', borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
+            }}>🔥 公募を登録</button>
             <button onClick={() => removeProfile(p.id)} style={{ fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer' }}>削除</button>
           </div>
         </div>
+
+        {p.origin_note && (
+          <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#4A69BD', background: '#EEF1FB', padding: '4px 10px', borderRadius: 8 }}>
+            💡 この営業先の由来：{p.origin_note}
+          </p>
+        )}
+
+        {linkedOpps.length > 0 && (
+          <div style={{ margin: '6px 0 0', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {linkedOpps.map(o => (
+              <p key={o.id} style={{ margin: 0, fontSize: 11.5, color: '#B7791F' }}>
+                🏛 {o.title}{o.deadline && ` ・ 締切${o.deadline}`}{o.url && <a href={o.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4, color: '#38ADA9' }}>↗</a>}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {rfpFormFor === p.id && (
+          <div style={{ margin: '8px 0 0', padding: 10, borderRadius: 8, background: '#FFF4F2', border: '1px solid #FBD9D2' }}>
+            <label style={labelStyle}>公募タイトル</label>
+            <input style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} value={rfpForm.title}
+              onChange={e => setRfpForm(f => ({ ...f, title: e.target.value }))} placeholder={`例：${p.region_name} 関係人口創出事業プロポーザル`} />
+            <label style={labelStyle}>締切</label>
+            <input type="date" style={inputStyle} value={rfpForm.deadline} onChange={e => setRfpForm(f => ({ ...f, deadline: e.target.value }))} />
+            <div style={{ marginTop: 8 }}>
+              <button onClick={() => registerRfp(p.id, p.region_name)} style={{
+                padding: '6px 14px', borderRadius: 8, border: 'none', background: '#E55039', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>登録する</button>
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 12, margin: '8px 0', flexWrap: 'wrap' }}>
           <div>
             <span style={{ fontSize: 10.5, color: '#999', marginRight: 6 }}>関わり方</span>

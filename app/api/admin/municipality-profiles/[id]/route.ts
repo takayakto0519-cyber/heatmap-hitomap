@@ -10,6 +10,7 @@ const ALLOWED_FIELDS = [
   'followed_up_at', 'on_hold', 'smout_sent_at', 'smout_reply', 'municipality_code', 'reply_handled_at',
   'website_url', 'contact_email_confidence', 'contact_email_source_url',
   'fact_check_status', 'fact_check_note', 'fact_checked_at', 'assigned_to',
+  'origin_proposal_id', 'origin_note',
 ];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

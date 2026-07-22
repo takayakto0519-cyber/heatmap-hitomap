@@ -27,6 +27,8 @@ interface LeadOption { id: string; org_name: string; }
 interface ProposalOption { id: string; title: string; body: string }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// 受注以降＝伴走支援フェーズ。次の一手が空のまま止まっているカードを見逃さないための判定に使う。
+const WON_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
 
 type Headers = { jsonHeaders: () => HeadersInit; authHeaders: () => HeadersInit };
 
@@ -34,14 +36,17 @@ function yen(n: number | null): string {
   return n ? `${n.toLocaleString()}円` : '未入力';
 }
 
-function CaseRow({ c, onPatch, onDelete, leads, proposals }: {
+function CaseRow({ c, onPatch, onDelete, onCreateDossier, leads, proposals }: {
   c: BusinessCase; onPatch: (id: string, fields: Partial<BusinessCase>) => void; onDelete: (id: string) => void;
+  onCreateDossier: (c: BusinessCase) => void;
   leads: LeadOption[]; proposals: Map<string, ProposalOption>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showProposalBody, setShowProposalBody] = useState(false);
   const next = nextStage(c.stage);
   const isLost = c.stage === '見送り';
+  const isWon = WON_STAGES.includes(c.stage);
+  const needsNextAction = isWon && !c.next_action?.trim();
   // proposal_linkが経営資料（strategy_proposals）のIDならそちらを正として解決して表示する。
   // 旧データ（生のファイルパス文字列）はそのまま編集可能なテキストとして残す（P1-1統合）。
   const linkedProposal = c.proposal_link && UUID_RE.test(c.proposal_link) ? proposals.get(c.proposal_link) : undefined;
@@ -57,8 +62,19 @@ function CaseRow({ c, onPatch, onDelete, leads, proposals }: {
             </span>
           )}
           <p style={{ margin: '2px 0 0', fontSize: 12.5, color: '#4A69BD', fontWeight: 700 }}>{yen(c.amount)}</p>
+          {needsNextAction && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#E55039', background: '#E5503918', padding: '2px 9px', borderRadius: 10 }}>
+              ⚠ 次の一手が未設定
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          {isWon && (
+            <a href={`/admin/case/${c.id}`} target="_blank" rel="noopener noreferrer" style={{
+              padding: '6px 10px', borderRadius: 8, border: '1px solid #8E44AD', background: '#fff',
+              color: '#8E44AD', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap',
+            }}>📊 ダッシュボード</a>
+          )}
           {!isLost && next && (
             <button onClick={() => onPatch(c.id, { stage: next })} style={{
               padding: '6px 12px', borderRadius: 8, border: 'none', background: '#38ADA9',
@@ -155,8 +171,15 @@ function CaseRow({ c, onPatch, onDelete, leads, proposals }: {
           <textarea defaultValue={c.next_action ?? ''} rows={2} style={{ ...inputStyle, resize: 'vertical' }}
             onBlur={(e) => { if (e.target.value !== (c.next_action ?? '')) onPatch(c.id, { next_action: e.target.value }); }} />
 
+          {isWon && (
+            <button onClick={() => onCreateDossier(c)} style={{
+              marginTop: 10, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#38ADA9',
+              color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            }}>🤝 顧問先カルテを作る</button>
+          )}
+
           <button onClick={() => onDelete(c.id)} style={{
-            marginTop: 8, fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer',
+            marginTop: 8, marginLeft: 10, fontSize: 11, color: '#E74C3C', background: 'none', border: 'none', cursor: 'pointer',
           }}>削除</button>
         </div>
       )}
@@ -240,6 +263,15 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
     await fetch(`/api/admin/business-cases/${id}`, { method: 'DELETE', headers: authHeaders() });
     await load();
   }
+  async function createDossier(c: BusinessCase) {
+    const res = await fetch('/api/admin/client-dossiers', {
+      method: 'POST', headers: jsonHeaders(),
+      body: JSON.stringify({ org_name: c.org_name, notes: c.evidence || null }),
+    });
+    const data = await res.json();
+    if (data.ok) setMessage(`${c.org_name}様の顧問先カルテを作成しました。「🤝 顧問先」タブから編集できます。`);
+    else setMessage(data.error ?? '顧問先カルテの作成に失敗しました');
+  }
 
   const outreach = items
     .filter((c) => c.invoice_sent_at || c.stage !== '発案') // 送信済み以降（=何かしら接触が始まった案件）を母数にする
@@ -288,7 +320,7 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
                 <span style={{ fontSize: 11, color: '#999' }}>{stageItems.length}件</span>
                 {subtotal > 0 && <span style={{ fontSize: 11, color: '#4A69BD', fontWeight: 700 }}>{yen(subtotal)}</span>}
               </div>
-              {stageItems.map((c) => <CaseRow key={c.id} c={c} onPatch={patch} onDelete={remove} leads={leads} proposals={proposals} />)}
+              {stageItems.map((c) => <CaseRow key={c.id} c={c} onPatch={patch} onDelete={remove} onCreateDossier={createDossier} leads={leads} proposals={proposals} />)}
             </div>
           );
         })

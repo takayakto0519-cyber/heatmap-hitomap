@@ -24,8 +24,10 @@ interface QueueItem {
   sendPath: string;
   patchPath: string;
   assignedTo: string | null;
+  municipalityProfileId: string | null;
 }
 interface TeamMember { id: string; name: string; is_lead: boolean; is_active: boolean }
+interface FundingOppLite { id: string; status: string; deadline: string | null; municipality_profile_id: string | null }
 
 const CONFIDENCE_BADGE: Record<'high' | 'medium' | 'low', { label: string; color: string }> = {
   high: { label: '🟢 確度高', color: '#27AE60' },
@@ -58,6 +60,7 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [opps, setOpps] = useState<FundingOppLite[]>([]);
   // 「表示」フィルタ：''=全員 / '__unassigned'=未割当 / それ以外=team_members.name
   const [viewFilter, setViewFilter] = useState('');
   // 一括割り当て・一括事実確認用のチェック選択（`${source}-${id}`のSet）
@@ -80,10 +83,12 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, muniRes] = await Promise.all([
+      const [leadsRes, muniRes, oppsRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then((r) => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then((r) => r.json()).catch(() => ({ ok: false })),
+        fetch('/api/admin/funding-opportunities', { headers: authHeaders() }).then((r) => r.json()).catch(() => ({ ok: false })),
       ]);
+      if (oppsRes.ok) setOpps(oppsRes.opportunities ?? []);
 
       const queue: QueueItem[] = [];
       if (leadsRes.ok) {
@@ -95,6 +100,7 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
               factCheckStatus: l.fact_check_status ?? 'unverified', factCheckNote: l.fact_check_note ?? null,
               draft: l.email_draft, sendPath: `/api/admin/client-leads/${l.id}/send`,
               patchPath: `/api/admin/client-leads/${l.id}`, assignedTo: l.assigned_to ?? null,
+              municipalityProfileId: null,
             });
           }
         }
@@ -108,6 +114,7 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
               factCheckStatus: p.fact_check_status ?? 'unverified', factCheckNote: p.fact_check_note ?? null,
               draft: p.email_draft, sendPath: `/api/admin/municipality-profiles/${p.id}/send`,
               patchPath: `/api/admin/municipality-profiles/${p.id}`, assignedTo: p.assigned_to ?? null,
+              municipalityProfileId: p.id,
             });
           }
         }
@@ -320,9 +327,24 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
       )}
 
       {(() => {
-        const visibleItems = viewFilter === '' ? items
+        const filtered = viewFilter === '' ? items
           : viewFilter === '__unassigned' ? items.filter((i) => !i.assignedTo)
           : items.filter((i) => i.assignedTo === viewFilter);
+
+        // 🔥公募中→締切が近い順→それ以外の順で並べ替える（募集中の自治体案件を見逃さない）。
+        function rfpDeadline(item: QueueItem): { active: boolean; deadline: number } {
+          if (!item.municipalityProfileId) return { active: false, deadline: Infinity };
+          const linked = opps.filter((o) => o.municipality_profile_id === item.municipalityProfileId && ['watching', 'preparing'].includes(o.status));
+          if (linked.length === 0) return { active: false, deadline: Infinity };
+          const deadlines = linked.map((o) => (o.deadline ? new Date(o.deadline).getTime() : Infinity));
+          return { active: true, deadline: Math.min(...deadlines) };
+        }
+        const visibleItems = [...filtered].sort((a, b) => {
+          const ra = rfpDeadline(a); const rb = rfpDeadline(b);
+          if (ra.active !== rb.active) return ra.active ? -1 : 1;
+          if (ra.active && rb.active) return ra.deadline - rb.deadline;
+          return 0;
+        });
 
         if (visibleItems.length === 0) {
           return <p style={{ fontSize: 12, color: '#999', margin: 0 }}>{items.length === 0 ? '送信待ちの下書きはありません。' : 'このフィルタに該当する下書きはありません。'}</p>;
@@ -338,6 +360,10 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
             const expanded = expandedId === item.id;
             const itemKey = `${item.source}-${item.id}`;
             const isChecked = checked.has(itemKey);
+            const linkedOpps = item.municipalityProfileId
+              ? opps.filter((o) => o.municipality_profile_id === item.municipalityProfileId && ['watching', 'preparing'].includes(o.status))
+              : [];
+            const nearestDeadline = linkedOpps.map((o) => o.deadline).filter(Boolean).sort()[0] as string | undefined;
             return (
               <div key={itemKey} style={{ padding: '10px 12px', borderRadius: 10, background: '#F4F6F5' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -349,7 +375,14 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
                     style={{ marginTop: 3, flexShrink: 0 }}
                   />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#222' }}>{item.name}</p>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#222' }}>
+                      {item.name}
+                      {linkedOpps.length > 0 && (
+                        <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 800, color: '#fff', background: '#E55039', padding: '1px 8px', borderRadius: 10 }}>
+                          🔥 公募中{nearestDeadline && `・締切${nearestDeadline}`}
+                        </span>
+                      )}
+                    </p>
                     <p style={{ margin: '2px 0 0', fontSize: 11.5, color: '#666' }}>{subjectOf(item.draft)}</p>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
                       <input

@@ -6,7 +6,7 @@ const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const ALLOWED_FIELDS = [
   'org_name', 'client_type', 'stage', 'evidence', 'proposal_link', 'next_action', 'lead_ref',
   'amount', 'probability', 'expected_close_date', 'won_at', 'lost_reason',
-  'invoice_sent_at', 'payment_due', 'paid_at', 'last_contact_at',
+  'invoice_sent_at', 'payment_due', 'paid_at', 'last_contact_at', 'municipality_profile_id',
 ];
 // これらのステージへ遷移した瞬間、対応する日付列を自動でセットする（入力の手間を減らす導線）。
 // 既に値が入っている場合や、呼び出し側が明示的に指定した場合はそちらを優先する。
@@ -33,8 +33,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!current?.invoice_sent_at) patch.invoice_sent_at = new Date().toISOString().slice(0, 10);
   }
 
-  const { data, error } = await supabaseServer
+  let { data, error } = await supabaseServer
     .from('business_cases').update(patch).eq('id', params.id).select().single();
+  for (let i = 0; error && i < ALLOWED_FIELDS.length; i++) {
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
+    if (!missing || !(missing in patch)) break;
+    delete patch[missing];
+    ({ data, error } = await supabaseServer
+      .from('business_cases').update(patch).eq('id', params.id).select().single());
+  }
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, case: data });
 }

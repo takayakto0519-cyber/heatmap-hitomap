@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { scoreLead } from '@/lib/leadTemperature';
 import { Card, inputStyle } from '@/components/admin/adminShared';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
+import { promoteToCase } from '@/lib/promoteToCase';
 
 export interface ClientLead {
   id: string;
@@ -18,6 +19,7 @@ export interface ClientLead {
   created_at: string;
   updated_at: string;
   scheduling_request_detected_at?: string | null;
+  origin_note?: string | null;
 }
 
 export const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -48,6 +50,25 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
   const [proposalLoading, setProposalLoading] = useState<Record<string, boolean>>({});
   const [proposalDraft, setProposalDraft] = useState<Record<string, string>>({});
   const [proposalError, setProposalError] = useState<Record<string, string>>({});
+  const [cases, setCases] = useState<{ id: string; lead_ref: string | null; municipality_profile_id: string | null }[]>([]);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/api/admin/business-cases', { headers: authHeaders() })
+      .then(r => r.json()).then(d => { if (d.ok) setCases(d.cases ?? []); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function adminPassword(): string {
+    return (authHeaders() as Record<string, string>)['x-admin-password'] ?? '';
+  }
+  async function handlePromote(l: ClientLead) {
+    setPromotingId(l.id);
+    const result = await promoteToCase({ orgName: l.org_name, clientType: 'business', leadRef: l.id, evidence: l.memo }, cases, adminPassword());
+    setPromotingId(null);
+    if (!result.ok) { setError(result.error ?? '案件化に失敗しました'); return; }
+    const res = await fetch('/api/admin/business-cases', { headers: authHeaders() });
+    const data = await res.json();
+    if (data.ok) setCases(data.cases ?? []);
+  }
 
   // 自治体・法人向け集計ダッシュボードの専用URL発行（地図範囲でも絞り込める）
   const [dashOpen, setDashOpen] = useState<Record<string, boolean>>({});
@@ -359,10 +380,25 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
                       {!l.contact_name && !l.email && !l.phone && '連絡先未登録'}
                     </p>
                   </div>
-                  <button onClick={() => removeLead(l.id)} style={{
-                    padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
-                  }}>削除</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end', flexShrink: 0 }}>
+                    {cases.some(c => c.lead_ref === l.id) ? (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8E44AD' }}>📇 案件化済み</span>
+                    ) : (
+                      <button onClick={() => handlePromote(l)} disabled={promotingId === l.id} style={{
+                        padding: '4px 10px', borderRadius: 14, border: '1px solid #8E44AD', background: '#fff',
+                        color: '#8E44AD', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>{promotingId === l.id ? '処理中…' : '📇 案件化する'}</button>
+                    )}
+                    <button onClick={() => removeLead(l.id)} style={{
+                      padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                    }}>削除</button>
+                  </div>
                 </div>
+                {l.origin_note && (
+                  <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#4A69BD', background: '#EEF1FB', padding: '4px 10px', borderRadius: 8 }}>
+                    💡 この営業先の由来：{l.origin_note}
+                  </p>
+                )}
 
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
                   {Object.entries(LEAD_STATUS_LABELS).map(([key, info]) => (

@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
           {tab === 'bizmodels' && <BizModelIdeasTab authHeaders={authHeaders} />}
           {tab === 'marketing' && <MarketingProposalsTab authHeaders={authHeaders} />}
           {tab === 'proposals' && <StrategyProposalsTab authHeaders={authHeaders} />}
-          {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} />}
+          {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} goTab={goTab} />}
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={goTab} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}

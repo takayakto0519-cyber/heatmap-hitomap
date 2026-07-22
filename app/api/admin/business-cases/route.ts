@@ -24,26 +24,32 @@ export async function POST(req: NextRequest) {
     org_name?: string; client_type?: string; stage?: string;
     evidence?: string | null; proposal_link?: string | null; next_action?: string | null;
     lead_ref?: string | null; amount?: number | null; probability?: number | null;
-    expected_close_date?: string | null;
+    expected_close_date?: string | null; municipality_profile_id?: string | null;
   };
   if (!body.org_name?.trim()) return NextResponse.json({ ok: false, error: '組織名は必須です' }, { status: 400 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
-    .from('business_cases')
-    .insert({
-      org_name: body.org_name.trim(),
-      client_type: body.client_type?.trim() || 'business',
-      stage: body.stage?.trim() || '発案',
-      evidence: body.evidence?.trim() || null,
-      proposal_link: body.proposal_link?.trim() || null,
-      next_action: body.next_action?.trim() || null,
-      lead_ref: body.lead_ref || null,
-      amount: body.amount ?? null,
-      probability: body.probability ?? 50,
-      expected_close_date: body.expected_close_date || null,
-    })
-    .select().single();
+  const insertRow: Record<string, unknown> = {
+    org_name: body.org_name.trim(),
+    client_type: body.client_type?.trim() || 'business',
+    stage: body.stage?.trim() || '発案',
+    evidence: body.evidence?.trim() || null,
+    proposal_link: body.proposal_link?.trim() || null,
+    next_action: body.next_action?.trim() || null,
+    lead_ref: body.lead_ref || null,
+    amount: body.amount ?? null,
+    probability: body.probability ?? 50,
+    expected_close_date: body.expected_close_date || null,
+    municipality_profile_id: body.municipality_profile_id || null,
+  };
+  let { data, error } = await supabaseServer.from('business_cases').insert(insertRow).select().single();
+  for (let i = 0; error && i < 3; i++) {
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
+    if (!missing || !(missing in insertRow)) break;
+    delete insertRow[missing];
+    ({ data, error } = await supabaseServer.from('business_cases').insert(insertRow).select().single());
+  }
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, case: data });

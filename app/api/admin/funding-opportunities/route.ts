@@ -34,31 +34,38 @@ export async function POST(req: NextRequest) {
     title?: string; organizer?: string | null; opp_type?: string; region?: string | null;
     deadline?: string | null; deadline_note?: string | null; announcement_date?: string | null;
     prize_amount?: string | null; url?: string | null; status?: string; memo?: string | null; source?: string | null;
-    fit_score?: number | null; fit_notes?: string | null;
+    fit_score?: number | null; fit_notes?: string | null; municipality_profile_id?: string | null;
   };
   if (!body.title?.trim()) return NextResponse.json({ ok: false, error: 'タイトルは必須です' }, { status: 400 });
   if (body.opp_type && !OPP_TYPES.has(body.opp_type)) return NextResponse.json({ ok: false, error: '種別が不正です' }, { status: 400 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
-    .from('funding_opportunities')
-    .insert({
-      title: body.title.trim(),
-      organizer: body.organizer?.trim() || null,
-      opp_type: body.opp_type ?? 'contest',
-      region: body.region?.trim() || null,
-      deadline: body.deadline || null,
-      deadline_note: body.deadline_note?.trim() || null,
-      announcement_date: body.announcement_date || null,
-      prize_amount: body.prize_amount?.trim() || null,
-      url: body.url?.trim() || null,
-      status: body.status ?? 'watching',
-      memo: body.memo?.trim() || null,
-      source: body.source?.trim() || null,
-      fit_score: body.fit_score ?? null,
-      fit_notes: body.fit_notes?.trim() || null,
-    })
-    .select().single();
+  const insertRow: Record<string, unknown> = {
+    title: body.title.trim(),
+    organizer: body.organizer?.trim() || null,
+    opp_type: body.opp_type ?? 'contest',
+    region: body.region?.trim() || null,
+    deadline: body.deadline || null,
+    deadline_note: body.deadline_note?.trim() || null,
+    announcement_date: body.announcement_date || null,
+    prize_amount: body.prize_amount?.trim() || null,
+    url: body.url?.trim() || null,
+    status: body.status ?? 'watching',
+    memo: body.memo?.trim() || null,
+    source: body.source?.trim() || null,
+    fit_score: body.fit_score ?? null,
+    fit_notes: body.fit_notes?.trim() || null,
+    municipality_profile_id: body.municipality_profile_id || null,
+  };
+  let { data, error } = await supabaseServer.from('funding_opportunities').insert(insertRow).select().single();
+  // 20260723マイグレーション未適用時、municipality_profile_id列が無くても壊れないように再試行する。
+  for (let i = 0; error && i < 3; i++) {
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
+    if (!missing || !(missing in insertRow)) break;
+    delete insertRow[missing];
+    ({ data, error } = await supabaseServer.from('funding_opportunities').insert(insertRow).select().single());
+  }
 
   if (error) {
     if (isMissingTable(error.message, 'funding_opportunities')) {
