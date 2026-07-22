@@ -24,6 +24,9 @@ interface BusinessCase extends DealCase {
   lead_ref: string | null;
 }
 interface LeadOption { id: string; org_name: string; }
+interface ProposalOption { id: string; title: string; body: string }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Headers = { jsonHeaders: () => HeadersInit; authHeaders: () => HeadersInit };
 
@@ -31,13 +34,17 @@ function yen(n: number | null): string {
   return n ? `${n.toLocaleString()}円` : '未入力';
 }
 
-function CaseRow({ c, onPatch, onDelete, leads }: {
+function CaseRow({ c, onPatch, onDelete, leads, proposals }: {
   c: BusinessCase; onPatch: (id: string, fields: Partial<BusinessCase>) => void; onDelete: (id: string) => void;
-  leads: LeadOption[];
+  leads: LeadOption[]; proposals: Map<string, ProposalOption>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showProposalBody, setShowProposalBody] = useState(false);
   const next = nextStage(c.stage);
   const isLost = c.stage === '見送り';
+  // proposal_linkが経営資料（strategy_proposals）のIDならそちらを正として解決して表示する。
+  // 旧データ（生のファイルパス文字列）はそのまま編集可能なテキストとして残す（P1-1統合）。
+  const linkedProposal = c.proposal_link && UUID_RE.test(c.proposal_link) ? proposals.get(c.proposal_link) : undefined;
 
   return (
     <div style={cardStyle}>
@@ -126,8 +133,24 @@ function CaseRow({ c, onPatch, onDelete, leads }: {
           <textarea defaultValue={c.evidence ?? ''} rows={2} style={{ ...inputStyle, resize: 'vertical' }}
             onBlur={(e) => { if (e.target.value !== (c.evidence ?? '')) onPatch(c.id, { evidence: e.target.value }); }} />
           <label style={labelStyle}>提案書リンク</label>
-          <input defaultValue={c.proposal_link ?? ''} style={inputStyle}
-            onBlur={(e) => { if (e.target.value !== (c.proposal_link ?? '')) onPatch(c.id, { proposal_link: e.target.value || null }); }} />
+          {linkedProposal ? (
+            <div style={{ background: '#F4F6F5', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#38ADA9' }}>📁 {linkedProposal.title}</span>
+                <button onClick={() => setShowProposalBody((v) => !v)} style={{
+                  padding: '3px 9px', borderRadius: 12, border: '1px solid #38ADA9', background: '#fff',
+                  color: '#38ADA9', fontSize: 10.5, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}>{showProposalBody ? '閉じる' : '本文を見る'}</button>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: 10.5, color: '#999' }}>経営資料タブに登録されている提案書です</p>
+              {showProposalBody && (
+                <pre style={{ marginTop: 6, padding: 8, background: '#fff', borderRadius: 6, fontSize: 11, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>{linkedProposal.body}</pre>
+              )}
+            </div>
+          ) : (
+            <input defaultValue={c.proposal_link ?? ''} style={inputStyle}
+              onBlur={(e) => { if (e.target.value !== (c.proposal_link ?? '')) onPatch(c.id, { proposal_link: e.target.value || null }); }} />
+          )}
           <label style={labelStyle}>次アクション</label>
           <textarea defaultValue={c.next_action ?? ''} rows={2} style={{ ...inputStyle, resize: 'vertical' }}
             onBlur={(e) => { if (e.target.value !== (c.next_action ?? '')) onPatch(c.id, { next_action: e.target.value }); }} />
@@ -144,6 +167,7 @@ function CaseRow({ c, onPatch, onDelete, leads }: {
 function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
   const [items, setItems] = useState<BusinessCase[]>([]);
   const [leads, setLeads] = useState<LeadOption[]>([]);
+  const [proposals, setProposals] = useState<Map<string, ProposalOption>>(new Map());
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [justWonMessage, setJustWonMessage] = useState('');
@@ -162,6 +186,17 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
     fetch('/api/admin/client-leads', { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => { if (d.ok) setLeads((d.leads ?? []).map((l: { id: string; org_name: string }) => ({ id: l.id, org_name: l.org_name }))); })
+      .catch(() => {});
+    // 提案書リンクがstrategy_proposalsのIDを指している場合にタイトル・本文を解決するための一覧（P1-1統合）
+    fetch('/api/admin/strategy-proposals', { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          const map = new Map<string, ProposalOption>();
+          for (const p of d.proposals ?? []) map.set(p.id, { id: p.id, title: p.title, body: p.body ?? '' });
+          setProposals(map);
+        }
+      })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -253,7 +288,7 @@ function FlowBoardInner({ jsonHeaders, authHeaders }: Headers) {
                 <span style={{ fontSize: 11, color: '#999' }}>{stageItems.length}件</span>
                 {subtotal > 0 && <span style={{ fontSize: 11, color: '#4A69BD', fontWeight: 700 }}>{yen(subtotal)}</span>}
               </div>
-              {stageItems.map((c) => <CaseRow key={c.id} c={c} onPatch={patch} onDelete={remove} leads={leads} />)}
+              {stageItems.map((c) => <CaseRow key={c.id} c={c} onPatch={patch} onDelete={remove} leads={leads} proposals={proposals} />)}
             </div>
           );
         })

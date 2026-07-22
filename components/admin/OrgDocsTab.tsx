@@ -107,7 +107,7 @@ export default function OrgDocsTab({ authHeaders }: { authHeaders: () => Headers
     <div>
       <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
         戦略メモ・提案書・対外メール下書きをフォルダ（01〜06）ごとに一覧します。ローカルの同名フォルダには
-        重複保存しません——ここが正の置き場所です。
+        重複保存しません——ここが正の置き場所です。新規事業の仮説・アイデアは「💡ビジネスモデル案」タブへ（ここには置きません）。
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {migrationFile && <MigrationNotice title="経営資料ボードのテーブルがまだ作成されていません" migrationFile={migrationFile} />}
