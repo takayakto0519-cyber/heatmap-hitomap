@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   };
   let { data, error } = await supabaseServer.from('funding_opportunities').insert(insertRow).select().single();
   // 20260723マイグレーション未適用時、municipality_profile_id列が無くても壊れないように再試行する。
-  for (let i = 0; error && i < 3; i++) {
+  for (let i = 0; error && i < Object.keys(insertRow).length; i++) {
     const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
       ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
     if (!missing || !(missing in insertRow)) break;

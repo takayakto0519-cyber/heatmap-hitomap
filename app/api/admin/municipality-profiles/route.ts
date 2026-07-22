@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   };
   let { data, error } = await supabaseServer
     .from('municipality_profiles').upsert(upsertRow, { onConflict: 'region_name' }).select().single();
-  for (let i = 0; error && i < 3; i++) {
+  for (let i = 0; error && i < Object.keys(upsertRow).length; i++) {
     const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
       ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
     if (!missing || !(missing in upsertRow)) break;

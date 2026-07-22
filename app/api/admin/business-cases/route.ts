@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     municipality_profile_id: body.municipality_profile_id || null,
   };
   let { data, error } = await supabaseServer.from('business_cases').insert(insertRow).select().single();
-  for (let i = 0; error && i < 3; i++) {
+  for (let i = 0; error && i < Object.keys(insertRow).length; i++) {
     const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
       ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
     if (!missing || !(missing in insertRow)) break;
