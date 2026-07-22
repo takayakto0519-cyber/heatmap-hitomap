@@ -43,15 +43,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { subject, body } = parseEmailDraft(row.email_draft);
   if (!body.trim()) return NextResponse.json({ ok: false, error: '本文が空です' }, { status: 400 });
 
+  // 二重送信防止：実際に送信する前に「未送信のときだけ」の条件付き更新で送信権を確保する。
+  // 2人がほぼ同時に送信ボタンを押しても、email_sent_atをIS NULL条件で更新できるのは
+  // 片方だけなので、後発リクエストはここで弾かれ、Gmail送信自体が行われない。
+  const { data: claimed, error: claimError } = await supabaseServer
+    .from('client_leads').update({ email_sent_at: new Date().toISOString() })
+    .eq('id', params.id).is('email_sent_at', null).select('id');
+  if (claimError) return NextResponse.json({ ok: false, error: claimError.message }, { status: 500 });
+  if (!claimed || claimed.length === 0) {
+    return NextResponse.json({ ok: false, error: '既に送信済みです（他の方が同時に送信した可能性があります）' }, { status: 409 });
+  }
+
   try {
     await sendEmail({ to: row.email, subject: subject ?? `${row.org_name}様へのご提案（ヒトマップ）`, body });
   } catch (e) {
+    // 送信自体が失敗した場合は、確保した送信権を元に戻して再送信できるようにする
+    await supabaseServer.from('client_leads').update({ email_sent_at: null }).eq('id', params.id);
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
-
-  const { error: patchError } = await supabaseServer
-    .from('client_leads').update({ email_sent_at: new Date().toISOString() }).eq('id', params.id);
-  if (patchError) return NextResponse.json({ ok: false, error: `送信は成功しましたが記録に失敗しました: ${patchError.message}` }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

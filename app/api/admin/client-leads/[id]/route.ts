@@ -23,7 +23,8 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
   // マイグレーション未適用のカラムを指定した場合でも壊れないように、
   // エラーメッセージから実際に存在しないカラム名を読み取ってその項目だけ外し再試行する。
   for (let i = 0; error && i < ALLOWED_FIELDS.length; i++) {
-    const missing = error.message.match(/column ["']?(?:\w+\.)?([a-zA-Z_]+)["']?/)?.[1];
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
     if (!missing || !(missing in updates)) break;
     delete updates[missing];
     ({ data, error } = await supabaseServer
