@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabaseServer
     .from('client_leads')
     .insert({
-      client_type: body.client_type === 'school' ? 'school' : 'business',
+      client_type: ['school', 'municipality'].includes(body.client_type ?? '') ? body.client_type : 'business',
       org_name: body.org_name.trim(),
       contact_name: body.contact_name?.trim() || null,
       email: body.email?.trim() || null,

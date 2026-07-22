@@ -4,10 +4,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { scoreLead } from '@/lib/leadTemperature';
 import { Card, inputStyle } from '@/components/admin/adminShared';
+import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 
 export interface ClientLead {
   id: string;
-  client_type: 'school' | 'business';
+  client_type: 'school' | 'business' | 'municipality';
   org_name: string;
   contact_name: string | null;
   email: string | null;
@@ -28,7 +29,7 @@ export const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }
 };
 
 export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
-  const [filter, setFilter] = useState<'all' | 'school' | 'business'>('all');
+  const [filter, setFilter] = useState<'all' | 'school' | 'business' | 'municipality'>('all');
   const [hotSort, setHotSort] = useState(false);
   const [leads, setLeads] = useState<ClientLead[]>([]);
   const [includeDemo, setIncludeDemo] = useState(false);
@@ -247,6 +248,7 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
     all: leads.length,
     school: leads.filter(l => l.client_type === 'school').length,
     business: leads.filter(l => l.client_type === 'business').length,
+    municipality: leads.filter(l => l.client_type === 'municipality').length,
     hot: leads.filter(l => scoreLead(l).score >= 45).length,
   };
 
@@ -256,6 +258,13 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
         学校・法人からの問い合わせや契約状況をまとめる「縁のデータベース」です。<a href="/company/school" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}>学校向けページ ↗</a>
         {' '}・<a href="/company/business" target="_blank" rel="noopener noreferrer" style={{ color: '#38ADA9' }}> 法人向けページ ↗</a>
       </p>
+
+      <AgentDigestPanel
+        authHeaders={authHeaders}
+        agentIds={['lead-scout']}
+        title="🧩 リード番人の報告"
+        hint="Claude Codeセッションで「リード探して」（/lead-scout）と頼むとここに結果が残ります。他の番人と違い毎朝の自動実行ではなく、会長が呼んだときだけ動きます。"
+      />
 
       {(includeDemo || demoHiddenCount > 0) && (
         <label style={{
@@ -269,7 +278,7 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
       )}
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {([['all', `すべて（${counts.all}）`], ['school', `🏫 学校（${counts.school}）`], ['business', `🏢 法人（${counts.business}）`]] as [typeof filter, string][]).map(([id, label]) => (
+        {([['all', `すべて（${counts.all}）`], ['school', `🏫 学校（${counts.school}）`], ['business', `🏢 法人（${counts.business}）`], ['municipality', `🏛 自治体（${counts.municipality}）`]] as [typeof filter, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setFilter(id)} style={{
             padding: '7px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
             background: filter === id ? '#38ADA9' : '#fff',
@@ -291,6 +300,7 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
             <select value={form.client_type} onChange={e => setForm(f => ({ ...f, client_type: e.target.value }))} style={inputStyle}>
               <option value="business">🏢 法人</option>
               <option value="school">🏫 学校</option>
+              <option value="municipality">🏛 自治体</option>
             </select>
             <input placeholder="団体名 *" value={form.org_name} onChange={e => setForm(f => ({ ...f, org_name: e.target.value }))} style={inputStyle} required />
             <input placeholder="担当者名" value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} style={inputStyle} />
@@ -330,7 +340,7 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div>
                     <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 15 }}>
-                      {l.client_type === 'school' ? '🏫' : '🏢'} {l.org_name}
+                      {l.client_type === 'school' ? '🏫' : l.client_type === 'municipality' ? '🏛' : '🏢'} {l.org_name}
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
                       <span title={temperature.reasons.join('・') || '加点要素なし'} style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#B7791F' }}>
                         {temperature.temp}（{temperature.score}点）

@@ -120,6 +120,22 @@ export default function CorpHeader() {
             >
               お問い合わせ
             </a>
+            <a
+              href="/schedule"
+              className="hm-btn"
+              style={{
+                fontSize: 13,
+                color: corpColor.white,
+                background: corpColor.moss,
+                textDecoration: 'none',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                padding: '6px 12px',
+                borderRadius: corpRadius.sm,
+              }}
+            >
+              🗓 無料相談を予約
+            </a>
           </nav>
 
           <span className="hm-header-sep" style={{ width: 1, height: 22, background: corpColor.lineSoft, flexShrink: 0 }} />
@@ -224,9 +240,16 @@ export default function CorpHeader() {
           <a
             href="/company/contact"
             onClick={() => setOpen(false)}
-            style={{ padding: '17px 4px', fontSize: 17, fontFamily: corpFont.mincho, color: corpColor.moss, textDecoration: 'none', fontWeight: 600 }}
+            style={{ padding: '17px 4px', fontSize: 17, fontFamily: corpFont.mincho, color: corpColor.moss, textDecoration: 'none', fontWeight: 600, borderBottom: `1px solid ${corpColor.line}` }}
           >
             お問い合わせ
+          </a>
+          <a
+            href="/schedule"
+            onClick={() => setOpen(false)}
+            style={{ padding: '17px 4px', fontSize: 17, fontFamily: corpFont.mincho, color: corpColor.moss, textDecoration: 'none', fontWeight: 700 }}
+          >
+            🗓 無料相談を予約
           </a>
         </nav>
       </div>

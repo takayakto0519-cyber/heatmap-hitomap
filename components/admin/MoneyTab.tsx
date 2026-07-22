@@ -4,6 +4,7 @@
 // もともと AIOpsTab（AIエージェント運営）の中にあったが、営業でも秘書でもない「お金」の
 // 文脈なので独立タブにした。中身の挙動は移設前と同じ。
 import { useEffect, useState } from 'react';
+import { computeMrr, computeCashflow, type DealCase } from '@/lib/dealMetrics';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '9px 11px', borderRadius: 8,
@@ -20,21 +21,106 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
 type Headers = { jsonHeaders: () => HeadersInit; authHeaders: () => HeadersInit };
 
 const VIEWS = [
+  { key: 'cashflow', label: '💴 入金予定' },
   { key: 'revenue', label: '🐸 収益化イニシアチブ' },
   { key: 'pnl', label: '💰 事業別損益(P&L)' },
 ] as const;
 type View = typeof VIEWS[number]['key'];
 
+function yenTop(n: number): string {
+  return `${n.toLocaleString()}円`;
+}
+
+// 顧問先のMRR・案件の入金予定は、営業タブ（商流ボード）と同じ lib/dealMetrics.ts を使い、
+// タブをまたいで数字が食い違わないようにする。
+function MoneySummary({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [mrr, setMrr] = useState<number | null>(null);
+  const [cashflow, setCashflow] = useState<ReturnType<typeof computeCashflow> | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/client-dossiers', { headers: authHeaders() }).then(r => r.json())
+      .then(d => { if (d.ok) setMrr(computeMrr(d.dossiers ?? [])); }).catch(() => {});
+    fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json())
+      .then(d => { if (d.ok) setCashflow(computeCashflow(d.cases as DealCase[] ?? [])); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cards = [
+    { label: 'MRR（顧問先月額計）', value: mrr === null ? '…' : yenTop(mrr), color: '#27AE60' },
+    { label: '今月の受注額', value: cashflow ? yenTop(cashflow.wonThisMonth) : '…', color: '#4A69BD' },
+    { label: '今月の入金済み', value: cashflow ? yenTop(cashflow.paidThisMonth) : '…', color: '#38ADA9' },
+    { label: '未入金', value: cashflow ? yenTop(cashflow.unpaidTotal) : '…', sub: cashflow && cashflow.overdueTotal > 0 ? `期限超過 ${yenTop(cashflow.overdueTotal)}` : undefined, color: cashflow && cashflow.overdueTotal > 0 ? '#E74C3C' : '#E5A139' },
+  ];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 16 }}>
+      {cards.map(c => (
+        <div key={c.label} style={{ ...cardStyle, marginBottom: 0, padding: '12px 14px', borderTop: `3px solid ${c.color}` }}>
+          <p style={{ margin: 0, fontSize: 11, color: '#999', fontWeight: 700 }}>{c.label}</p>
+          <p style={{ margin: '4px 0 2px', fontSize: 17, fontWeight: 800, color: '#333' }}>{c.value}</p>
+          {c.sub && <p style={{ margin: 0, fontSize: 11, color: '#aaa' }}>{c.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CashflowSection({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [cases, setCases] = useState<DealCase[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json())
+      .then(d => { if (d.ok) setCases(d.cases ?? []); setLoading(false); }).catch(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) return <p style={{ fontSize: 13, color: '#999' }}>読み込み中…</p>;
+  const { unpaid, unpaidTotal, overdueTotal } = computeCashflow(cases);
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+        商流ボードで「請求」ステージに進んだ案件（invoice_sent_at）のうち、まだ入金確認していないものを期日順に並べています。
+        入金確認は商流ボードの案件詳細で「入金確認済み」にチェックしてください。
+      </p>
+      {unpaid.length === 0 ? (
+        <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#27AE60', fontWeight: 700 }}>未入金の案件はありません</p></div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
+            <span>合計 <b>{yenTop(unpaidTotal)}</b></span>
+            {overdueTotal > 0 && <span style={{ color: '#E74C3C' }}>うち期限超過 <b>{yenTop(overdueTotal)}</b></span>}
+          </div>
+          {unpaid.map(r => (
+            <div key={r.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: r.overdue ? '4px solid #E74C3C' : '4px solid transparent' }}>
+              <div>
+                <b style={{ fontSize: 14 }}>{r.org_name}</b>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: r.overdue ? '#E74C3C' : '#999' }}>
+                  {r.payment_due ? `入金期日: ${r.payment_due}${r.overdue ? '（超過）' : ''}` : '入金期日 未設定'}
+                </p>
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 800, color: '#4A69BD' }}>{yenTop(r.amount)}</span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function MoneyTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
-  const [view, setView] = useState<View>('revenue');
+  const [view, setView] = useState<View>('cashflow');
   const jsonHeaders = (): HeadersInit => ({ ...authHeaders(), 'Content-Type': 'application/json' });
   return (
     <div>
+      <MoneySummary authHeaders={authHeaders} />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {VIEWS.map(v => (
           <div key={v.key} style={pillStyle(view === v.key)} onClick={() => setView(v.key)}>{v.label}</div>
         ))}
       </div>
+      {view === 'cashflow' && <CashflowSection authHeaders={authHeaders} />}
       {view === 'revenue' && <RevenueSection jsonHeaders={jsonHeaders} authHeaders={authHeaders} />}
       {view === 'pnl' && <PnlSection jsonHeaders={jsonHeaders} authHeaders={authHeaders} />}
     </div>

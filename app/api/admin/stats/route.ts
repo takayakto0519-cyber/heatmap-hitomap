@@ -5,6 +5,8 @@ import { summarizeValence } from '@/lib/emotions';
 import { DEMO_SESSION_CODE, DEMO_TITLE_PREFIX } from '@/lib/demoData';
 import { safeCount, safeRows } from '@/lib/adminApi';
 import { computeFollowUp } from '@/lib/followUp';
+import { computeCashflow, type DealCase } from '@/lib/dealMetrics';
+import { buildUnifiedFollowQueue } from '@/lib/followQueue';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
@@ -85,8 +87,31 @@ export async function GET(req: NextRequest) {
     ),
   ]);
 
-  const overdueCount = [...emailTargets, ...municipalityTargets]
-    .filter(r => computeFollowUp(r)?.status === 'overdue').length;
+  // salesバッジ＝要フォロー件数。以前はメール便り＋自治体の2ソースのみだったが、
+  // 学校・法人（client_leads）と案件のフォローステージ（business_cases）も同じ基準で数える（lib/followQueue.ts）。
+  const [leadsForFollow, casesForFollow] = await Promise.all([
+    safeRows<{ id: string; org_name: string; email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null; status: string }>(
+      () => supabaseServer.from('client_leads').select('id, org_name, email_sent_at, email_reply, followed_up_at, status').not('email_sent_at', 'is', null),
+    ),
+    safeRows<{ id: string; org_name: string; stage: string; last_contact_at: string | null }>(
+      () => supabaseServer.from('business_cases').select('id, org_name, stage, last_contact_at').eq('stage', 'フォロー'),
+    ),
+  ]);
+  const overdueCount = buildUnifiedFollowQueue({
+    leads: leadsForFollow,
+    emailTargets: emailTargets.map((r, i) => ({ id: String(i), company: '', ...r })),
+    municipalities: municipalityTargets.map((r, i) => ({ id: String(i), region_name: '', ...r })),
+    cases: casesForFollow,
+    dossiers: [],
+  }).filter(i => i.status === 'overdue').length;
+
+  // moneyバッジ＝期限超過の未入金件数。business_casesに金額列が無かった頃はここが計算不能だった。
+  const casesForCashflow = await safeRows<DealCase>(
+    () => supabaseServer.from('business_cases')
+      .select('id, stage, amount, probability, expected_close_date, won_at, lost_reason, invoice_sent_at, payment_due, paid_at, last_contact_at, org_name')
+      .not('invoice_sent_at', 'is', null).is('paid_at', null),
+  );
+  const overdueUnpaidCount = computeCashflow(casesForCashflow).unpaid.filter(r => r.overdue).length;
 
   // タブIDをキーにしたマップで返す。バッジを増やしたいときはここにキーを足すだけでよく、
   // 画面側（page.tsx の badgeFor / OverviewTab のクイックアクセス）は変更不要。
@@ -98,6 +123,7 @@ export async function GET(req: NextRequest) {
     marketing: marketingUnread,
     funding: fundingSoon,
     sales: overdueCount,
+    money: overdueUnpaidCount,
   };
 
   return NextResponse.json({

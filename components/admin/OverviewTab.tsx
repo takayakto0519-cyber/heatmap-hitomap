@@ -6,6 +6,7 @@
 // 数値は /api/admin/stats（既存・ログイン確認兼用）と /api/admin/biz-stats（分野別）の2本から取る。
 import { useEffect, useState } from 'react';
 import { ErrorBanner, LoadingLine, type TabBadgeCounts, type AttentionItem, ATTENTION_JUMP } from '@/components/admin/adminShared';
+import { computePipelineSummary, computeCashflow, type DealCase } from '@/lib/dealMetrics';
 
 interface RegionValence { region: string; valence: { positive: number; negative: number; neutral: number; total: number } }
 
@@ -99,6 +100,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
   const [regionValence, setRegionValence] = useState<RegionValence[] | null>(null);
   const [includeDemo, setIncludeDemo] = useState(false);
   const [demoHiddenCount, setDemoHiddenCount] = useState(0);
+  const [cases, setCases] = useState<DealCase[] | null>(null);
 
   useEffect(() => {
     const demoParam = includeDemo ? '?includeDemo=true' : '';
@@ -123,6 +125,11 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
     fetch('/api/admin/command-center', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => { if (d.ok) setAttention(d.result?.attention_items ?? []); })
+      .catch(() => {});
+    // 商流サマリー（パイプライン総額・今月受注額・未入金）はlib/dealMetrics.tsで営業タブと同じ計算式を使う
+    fetch('/api/admin/business-cases', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setCases(d.cases ?? []); })
       .catch(() => {});
   }, [authHeaders, includeDemo]);
 
@@ -182,6 +189,23 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         </Card>
       )}
 
+      {/* 商流サマリー：売上を最優先で見るホームなので、投稿数より先に置く */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 10 }}>
+        {(() => {
+          const pipeline = cases ? computePipelineSummary(cases) : null;
+          const cashflow = cases ? computeCashflow(cases) : null;
+          const followCount = badgeCounts?.sales ?? 0;
+          return (
+            <>
+              <Kpi label="パイプライン総額" value={pipeline ? `${pipeline.pipelineTotal.toLocaleString()}円` : '—'} onClick={() => goTab('sales')} />
+              <Kpi label="今月の受注額" value={cashflow ? `${cashflow.wonThisMonth.toLocaleString()}円` : '—'} onClick={() => goTab('money')} />
+              <Kpi label="未入金" value={cashflow ? `${cashflow.unpaidTotal.toLocaleString()}円` : '—'} urgent={(cashflow?.overdueTotal ?? 0) > 0} onClick={() => goTab('money')} />
+              <Kpi label="要フォロー" value={`${followCount}件`} urgent={followCount > 0} onClick={() => goTab('sales')} />
+            </>
+          );
+        })()}
+      </div>
+
       {(includeDemo || demoHiddenCount > 0) && (
         <label style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '5px 12px',
@@ -231,31 +255,6 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         </p>
       </Card>
 
-      {/* 外部コンテスト応募状況（このカードの中身は手動更新。締切は「コンテスト・助成金」タブの
-          締切台帳へ移行できるので、移行したらこのカードごと削除してよい） */}
-      <Card style={{ marginTop: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 800 }}>🏆 牧之原市チャレンジビジネスコンテスト2026</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#4A69BD', padding: '2px 9px', borderRadius: 10 }}>応募中</span>
-        </div>
-        <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: '#555', lineHeight: 1.9 }}>
-          <li>エントリー済み（受付は2026-07-17で終了）</li>
-          <li>ビジネスプラン最終提出期限：2026-08-03</li>
-          <li>協賛企業：SBプレイヤーズ株式会社を想定</li>
-          <li>10/21 協業ミートアップ（受賞可否に関わらず参加可）</li>
-        </ul>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-          <a href="/admin/makichalle" style={{
-            fontSize: 12, fontWeight: 700, textDecoration: 'none',
-            border: '1px solid #4A69BD', borderRadius: 12, padding: '4px 12px', color: '#4A69BD',
-          }}>📊 まきチャレ専用ダッシュボードを開く ↗</a>
-          <button onClick={() => goTab('funding')} style={{
-            fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-            border: '1px solid #ddd', borderRadius: 12, padding: '4px 12px', background: '#fff', color: '#888',
-          }}>🏆 締切台帳へ →</button>
-        </div>
-      </Card>
-
       {/* マネタイズ */}
       <SectionHeading icon="💰" title="マネタイズ" hint="収益の入口の状態" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
@@ -283,16 +282,6 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         <Kpi label="未処理の通報" value={pendingReports} urgent={pendingReports > 0} onClick={() => goTab('reports')} />
         <Kpi label="非表示にした煩悩投稿" value={biz?.risk.bonnoHidden ?? '—'} onClick={() => goTab('routes')} />
       </div>
-      <Card style={{ marginTop: 10 }}>
-        <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 13 }}>点検メモ（2026-07-16 全体点検の記録）</p>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#555', lineHeight: 2 }}>
-          <li>✅ スキーマ変更の入口（/api/migrate）を運営パスワード必須にした</li>
-          <li>✅ 投稿テーブルの直接更新・削除をサーバー経由のみに締めた</li>
-          <li>⚠ 投稿受付の回数制限は未導入——Discord通知での監視を継続</li>
-          <li>⚠ 煩悩投稿は即時表示。学校イベントで使う前に事前確認モードを入れること</li>
-        </ul>
-      </Card>
-
       {/* クイックアクセス */}
       <div style={{ marginTop: 24 }}>
         <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>⚡ クイックアクセス</p>

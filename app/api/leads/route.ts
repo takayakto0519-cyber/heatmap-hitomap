@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   const email = body.email?.trim().slice(0, MAX_LEN) ?? '';
   const phone = body.phone?.trim().slice(0, MAX_LEN) ?? '';
   const memo = body.memo?.trim().slice(0, MAX_LEN) ?? '';
-  const clientType = body.client_type === 'school' ? 'school' : 'business';
+  const clientType = ['school', 'municipality'].includes(body.client_type ?? '') ? (body.client_type as string) : 'business';
 
   if (!orgName) {
     return NextResponse.json({ ok: false, error: '団体名・組織名を入力してください' }, { status: 400 });
@@ -81,11 +81,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: '送信に失敗しました。時間をおいて再度お試しください' }, { status: 500 });
   }
 
+  const clientTypeLabel = clientType === 'school' ? '学校' : clientType === 'municipality' ? '自治体' : '法人';
   notifyDiscord(
-    `📮 新しい問い合わせが届きました（${clientType === 'school' ? '学校' : '法人・自治体'}）\n`
+    `📮 新しい問い合わせが届きました（${clientTypeLabel}）\n`
     + `団体名：${orgName}\n担当者：${contactName || '未記入'}\n連絡先：${email || phone}\n`
     + `運営ダッシュボードの「学校・法人」タブから確認してください`
   );
+
+  // 受付確認の自動返信（定型文のみ・営業文面は含まない）。失敗しても問い合わせ自体は成功扱いにする。
+  if (email) {
+    try {
+      const { sendEmail } = await import('@/lib/gmailServer');
+      await sendEmail({
+        to: email,
+        subject: '【ヒトマップ】お問い合わせを受け付けました',
+        body: `${contactName || orgName} 様\n\n`
+          + `この度はヒトマップへお問い合わせいただき、ありがとうございます。\n`
+          + `以下の内容で受け付けました。内容を確認のうえ、担当より折り返しご連絡いたします。\n\n`
+          + `団体名：${orgName}\nご相談内容：${memo || '（未記入）'}\n\n`
+          + `お急ぎの場合は、こちらから無料相談の日程を直接お選びいただけます。\n`
+          + `https://hitomap.com/schedule\n\n`
+          + `--\nヒトマップ\nhitomap.info@gmail.com`,
+      });
+    } catch (e) {
+      console.error('問い合わせ受付メールの送信に失敗しました', e);
+    }
+  }
 
   return NextResponse.json({ ok: true, id: data.id });
 }

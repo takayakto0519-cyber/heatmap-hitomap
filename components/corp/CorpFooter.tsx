@@ -17,6 +17,7 @@ const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
       { href: '/company/business', label: '法人・行政の方へ' },
       { href: '/company/works', label: '実績' },
       { href: '/company/contact', label: 'お問い合わせ' },
+      { href: '/schedule', label: '🗓 無料相談を予約' },
     ],
   },
   {

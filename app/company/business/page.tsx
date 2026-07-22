@@ -14,6 +14,42 @@ const PAIN_POINTS = [
   '地域とのつながりが、単発のイベントで終わり、次に続かない',
 ];
 
+// 提供メニュー4本。価格は目安（会長確認前の仮値）。実数値が固まり次第、運営が更新する。
+const SERVICES = [
+  {
+    id: 'advisory',
+    icon: '🧭',
+    title: 'AI顧問業',
+    lead: '生成AIの導入は、道具を渡すことでは終わらない。',
+    body: '現場の痕跡（今どこで詰まっているか）を毎月読み解き、次の一手を決める。ツールの説明会ではなく、伴走する顧問契約です。',
+    price: '月額 5万円〜（初回相談無料）',
+  },
+  {
+    id: 'kit',
+    icon: '📦',
+    title: '導入キット',
+    lead: '同じ悩みを、また一から解く必要はない。',
+    body: '業種ごとに磨いた「AI利用ルール・業務棚卸し・月次レポート」を型として提供します。自走できる組織を前提に設計しています。',
+    price: '20万円〜（業種・規模により見積り）',
+  },
+  {
+    id: 'training',
+    icon: '🎓',
+    title: '生成AI研修',
+    lead: '知ることと、行うことを分けない。',
+    body: '座学だけでは現場は変わりません。実際の業務データを使い、その場で手を動かす研修です。学校・自治体・企業、いずれも対応します。',
+    price: '1回 10万円〜（半日〜1日）',
+  },
+  {
+    id: 'tourism-ambassador',
+    icon: '🗺',
+    title: 'デジタル観光大使AI',
+    lead: '名所ではなく、そこで生きた人に会いに行く。',
+    body: '地域に眠る痕跡データを使い、訪れた人をその土地の言葉で案内するAIナビゲーターを設計・実装します。自治体の関係人口施策の核になります。',
+    price: 'ご相談（実証実験からのスモールスタートも可）',
+  },
+] as const;
+
 const VALUES = [
   {
     n: '壱',
@@ -33,9 +69,9 @@ const VALUES = [
 ];
 
 export const metadata: Metadata = {
-  title: '法人・行政の方へ｜組織の分断・孤独を解決する環境設計',
+  title: 'AI顧問・生成AI導入支援・自治体DX｜ヒトマップ 法人・行政の方へ',
   description:
-    '社員の離職・部署間の分断・地域の孤立に悩む企業・行政向けの支援です。痕跡から人と組織の生き様を可視化し、採用インターン・組織ブランディングに活かします。',
+    '生成AI導入支援・AI顧問業・自治体DX・採用インターン・組織ブランディングまで。痕跡から人と組織の生き様を可視化し、社員の離職・部署間の分断・地域の孤立という課題に取り組みます。',
   alternates: { canonical: '/company/business' },
 };
 
@@ -205,6 +241,38 @@ export default async function CompanyBusinessPage() {
           </div>
         </section>
 
+        {/* 提供メニュー：AI顧問・導入キット・研修・観光大使AI。検索から直接たどり着けるよう見出しに事業名を明記する */}
+        <section style={{ padding: '56px 24px', background: corpColor.surfaceSoft }} id="services">
+          <div style={{ maxWidth: 720, margin: '0 auto' }}>
+            <Reveal y={16}>
+              <p style={{ margin: '0 0 12px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.trust, fontFamily: corpFont.body, fontWeight: 700 }}>
+                提供メニュー
+              </p>
+              <h2 style={{ margin: '0 0 36px', fontFamily: corpFont.mincho, fontSize: 'clamp(20px, 2.8vw, 26px)', lineHeight: 1.7, color: corpColor.ink, fontWeight: 600 }}>
+                AI顧問業・導入キット・生成AI研修・デジタル観光大使AI。
+              </h2>
+            </Reveal>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {SERVICES.map((s, i) => (
+                <Reveal key={s.id} delay={i * 90} y={16}>
+                  <div id={s.id} className="hm-lift" style={{
+                    padding: 24, border: `1px solid ${corpColor.lineSoft}`, borderRadius: corpRadius.md,
+                    boxShadow: corpShadow.card, background: corpColor.surface,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+                      <span style={{ fontSize: 20 }}>{s.icon}</span>
+                      <h3 style={{ margin: 0, fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink }}>{s.title}</h3>
+                    </div>
+                    <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: corpColor.trust, fontFamily: corpFont.body }}>{s.lead}</p>
+                    <p style={{ margin: '0 0 14px', fontSize: 13.5, lineHeight: 1.9, color: corpColor.inkSoft, fontFamily: corpFont.body }}>{s.body}</p>
+                    <p style={{ margin: 0, fontSize: 12.5, color: corpColor.gray, fontFamily: corpFont.body }}>{s.price}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* 以下は運営ダッシュボード（サイトCMS）から自由に編集・追加・並び替えできる */}
         <BlockRenderer blocks={blocks} />
 
@@ -234,6 +302,25 @@ export default async function CompanyBusinessPage() {
                   }}
                 >
                   お問い合わせ
+                </a>
+                <a
+                  href="/schedule"
+                  className="hm-lift hm-btn"
+                  style={{
+                    display: 'inline-block',
+                    padding: '15px 32px',
+                    background: corpColor.white,
+                    color: corpColor.trust,
+                    textDecoration: 'none',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    fontFamily: corpFont.body,
+                    letterSpacing: '0.05em',
+                    borderRadius: corpRadius.sm,
+                    border: `1.5px solid ${corpColor.trust}`,
+                  }}
+                >
+                  🗓 初回相談（無料）を予約
                 </a>
                 <a
                   href="/company/works"

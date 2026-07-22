@@ -64,9 +64,15 @@ export default async function ContactPage() {
                 >
                   まずは、お気軽にご連絡ください。
                 </h1>
-                <p style={{ margin: '0 0 36px', fontSize: 14, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
+                <p style={{ margin: '0 0 20px', fontSize: 14, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
                   法人・行政・学校でのご利用、取材・提携のご相談など、内容にかかわらずご連絡ください。
                 </p>
+                <div style={{ margin: '0 0 32px', padding: '14px 18px', borderRadius: 12, background: corpColor.surfaceSoft, border: `1px solid ${corpColor.lineSoft}` }}>
+                  <p style={{ margin: 0, fontSize: 13, color: corpColor.ink, fontFamily: corpFont.body }}>
+                    日程を直接おさえたい方は
+                    <a href="/schedule" style={{ color: corpColor.moss, fontWeight: 700, marginLeft: 6 }}>🗓 無料相談を予約する →</a>
+                  </p>
+                </div>
               </>
             )}
 

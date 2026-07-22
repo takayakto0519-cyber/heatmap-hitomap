@@ -17,7 +17,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export default function ContactForm() {
-  const [clientType, setClientType] = useState<'business' | 'school'>('business');
+  const [clientType, setClientType] = useState<'business' | 'school' | 'municipality'>('business');
   const [orgName, setOrgName] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
@@ -65,13 +65,13 @@ export default function ContactForm() {
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        {(['business', 'school'] as const).map(t => (
+        {(['business', 'municipality', 'school'] as const).map(t => (
           <button key={t} type="button" onClick={() => setClientType(t)} style={{
             flex: 1, padding: '10px 0', fontSize: 13, fontFamily: corpFont.body, cursor: 'pointer',
             border: `1.5px solid ${clientType === t ? corpColor.moss : corpColor.line}`,
             background: clientType === t ? corpColor.moss : corpColor.white,
             color: clientType === t ? corpColor.white : corpColor.inkSoft, fontWeight: 700,
-          }}>{t === 'business' ? '法人・自治体' : '学校・教育機関'}</button>
+          }}>{t === 'business' ? '法人' : t === 'municipality' ? '自治体' : '学校・教育機関'}</button>
         ))}
       </div>
 

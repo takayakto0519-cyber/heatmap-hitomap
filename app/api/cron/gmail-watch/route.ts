@@ -3,9 +3,12 @@
 // PCが閉じていても動くようVercel Cron + lib/gmailServer.tsに移植したもの。
 //
 // やること（gmail_watch.pyと同じ）：
-//  ① municipality_profiles（contact_emailが入っている行）ごとに、
-//     送信済みか・実際に送った本文・相手からの返信本文を確認し、email_sent_at/email_sent_content/email_reply を更新。
-//     新しく返信が付いた自治体があればDiscordに通知（自動返信かどうかは判定しない＝どんな返信でも反映・通知する）。
+//  ① client_leads・sales_email_targets・municipality_profiles（連絡先メールが入っている行）ごとに、
+//     送信済みか・実際に送った本文・相手からの返信本文を確認し、email_sent_at/email_reply を更新
+//     （email_sent_contentはmunicipality_profilesのみ持つ列）。
+//     以前は自治体だけが対象で、学校・法人（client_leads）と便り（sales_email_targets）は
+//     会長が手動でしか反映できず、営業タブの返信率KPIやフォローキューが不正確だった。
+//     新しく返信が付いた相手があればDiscordに通知（自動返信かどうかは判定しない＝どんな返信でも反映・通知する）。
 //  ② 受信箱全体（直近2日・学校/法人宛も含む）に届いた「自分が送った以外」の全メールを検知し
 //     （日程調整キーワードを含むかどうかに関わらず＝自動返信・不在通知なども対象）、
 //     client_leads / sales_email_targets / municipality_profiles のいずれかに登録済みなら
@@ -28,20 +31,25 @@ const SCAN_WINDOW_DAYS = 2;
 const SEEN_SCHEDULING_IDS_KEY = 'gmail_watch_scheduling_seen';
 const SEEN_SCHEDULING_IDS_MAX = 500;
 
-interface MunicipalityProfileRow {
+interface ContactRow {
   id: string;
-  region_name: string;
-  contact_email: string | null;
+  name: string;
+  email: string | null;
   email_sent_at: string | null;
   email_sent_content: string | null;
   email_reply: string | null;
 }
 
-const CONTACT_TABLES: { table: string; emailCol: string; nameCol: string }[] = [
-  { table: 'client_leads', emailCol: 'email', nameCol: 'org_name' },
-  { table: 'sales_email_targets', emailCol: 'email', nameCol: 'company' },
-  { table: 'municipality_profiles', emailCol: 'contact_email', nameCol: 'region_name' },
+// ①の返信チェック対象。municipality_profilesだけがemail_sent_content列を持つため、hasSentContentで分岐する。
+const REPLY_CHECK_TABLES: { table: string; emailCol: string; nameCol: string; hasSentContent: boolean; label: string }[] = [
+  { table: 'client_leads', emailCol: 'email', nameCol: 'org_name', hasSentContent: false, label: '学校・法人' },
+  { table: 'sales_email_targets', emailCol: 'email', nameCol: 'company', hasSentContent: false, label: '便り' },
+  { table: 'municipality_profiles', emailCol: 'contact_email', nameCol: 'region_name', hasSentContent: true, label: '自治体' },
 ];
+
+// ②の受信箱スキャンで「登録済みの相手か」を突き合わせるテーブル一覧（①と同じ3テーブル）
+const CONTACT_TABLES: { table: string; emailCol: string; nameCol: string }[] =
+  REPLY_CHECK_TABLES.map(({ table, emailCol, nameCol }) => ({ table, emailCol, nameCol }));
 
 function sendDiscordMessage(content: string) {
   // gmail_watch.pyの投稿名(username)は素のwebhook POSTでしか設定できないため、
@@ -83,58 +91,64 @@ export async function GET(req: NextRequest) {
 
   const { supabaseServer } = await import('@/lib/supabase/server');
 
-  // ① 自治体プロファイルの返信チェック
-  const { data: profilesData, error: profilesError } = await supabaseServer
-    .from('municipality_profiles')
-    .select('id, region_name, contact_email, email_sent_at, email_sent_content, email_reply')
-    .not('contact_email', 'is', null);
-
-  if (profilesError) {
-    notifyDiscordError('gmail-watch', profilesError);
-    return NextResponse.json({ ok: false, error: profilesError.message }, { status: 500 });
-  }
-
-  const profiles = (profilesData ?? []) as MunicipalityProfileRow[];
+  // ① 学校・法人／便り／自治体、それぞれの返信チェック（3テーブル共通ロジック）
   let checked = 0;
   let updated = 0;
-  const errors: { region_name: string; error: string }[] = [];
-  const newReplies: { region_name: string; reply: string }[] = [];
+  const errors: { name: string; error: string }[] = [];
+  const newReplies: { label: string; name: string; reply: string }[] = [];
 
-  for (const p of profiles) {
-    const contact = (p.contact_email ?? '').trim();
-    if (!contact) continue;
-    checked++;
-    let status;
-    try {
-      status = await checkThreadForContact(contact);
-    } catch (e) {
-      errors.push({ region_name: p.region_name, error: e instanceof Error ? e.message : String(e) });
-      continue;
+  for (const { table, emailCol, nameCol, hasSentContent, label } of REPLY_CHECK_TABLES) {
+    const selectCols = ['id', nameCol, emailCol, 'email_sent_at', 'email_reply', ...(hasSentContent ? ['email_sent_content'] : [])].join(', ');
+    const { data: rowsData, error: rowsError } = await supabaseServer
+      .from(table).select(selectCols).not(emailCol, 'is', null);
+
+    if (rowsError) {
+      notifyDiscordError('gmail-watch', rowsError);
+      continue; // 1テーブルの失敗で他テーブルの処理を止めない
     }
 
-    const patch: Record<string, unknown> = {};
-    if (status.sent && !p.email_sent_at) patch.email_sent_at = new Date().toISOString();
-    if (status.sentContent && status.sentContent !== (p.email_sent_content ?? '')) patch.email_sent_content = status.sentContent;
-    // どんな返信でも（自動返信かどうかを判定せず）反映・通知する
-    if (status.reply && status.reply !== (p.email_reply ?? '')) {
-      patch.email_reply = status.reply;
-      newReplies.push({ region_name: p.region_name, reply: status.reply });
-    }
+    const rows = ((rowsData ?? []) as unknown as Record<string, unknown>[]).map((r): ContactRow => ({
+      id: r.id as string, name: r[nameCol] as string, email: r[emailCol] as string | null,
+      email_sent_at: r.email_sent_at as string | null, email_reply: r.email_reply as string | null,
+      email_sent_content: hasSentContent ? (r.email_sent_content as string | null) : null,
+    }));
 
-    if (Object.keys(patch).length > 0) {
-      const { error: patchError } = await supabaseServer.from('municipality_profiles').update(patch).eq('id', p.id);
-      if (patchError) errors.push({ region_name: p.region_name, error: patchError.message });
-      else updated++;
+    for (const row of rows) {
+      const contact = (row.email ?? '').trim();
+      if (!contact) continue;
+      checked++;
+      let status;
+      try {
+        status = await checkThreadForContact(contact);
+      } catch (e) {
+        errors.push({ name: row.name, error: e instanceof Error ? e.message : String(e) });
+        continue;
+      }
+
+      const patch: Record<string, unknown> = {};
+      if (status.sent && !row.email_sent_at) patch.email_sent_at = new Date().toISOString();
+      if (hasSentContent && status.sentContent && status.sentContent !== (row.email_sent_content ?? '')) patch.email_sent_content = status.sentContent;
+      // どんな返信でも（自動返信かどうかを判定せず）反映・通知する
+      if (status.reply && status.reply !== (row.email_reply ?? '')) {
+        patch.email_reply = status.reply;
+        newReplies.push({ label, name: row.name, reply: status.reply });
+      }
+
+      if (Object.keys(patch).length > 0) {
+        const { error: patchError } = await supabaseServer.from(table).update(patch).eq('id', row.id);
+        if (patchError) errors.push({ name: row.name, error: patchError.message });
+        else updated++;
+      }
     }
   }
 
   if (newReplies.length > 0) {
-    const lines = [`**📬 自治体から新しい返信が届きました（${newReplies.length}件）**`];
+    const lines = [`**📬 新しい返信が届きました（${newReplies.length}件）**`];
     for (const r of newReplies) {
       const preview = r.reply.slice(0, 120).replace(/\n/g, ' ');
-      lines.push(`・${r.region_name}：${preview}${r.reply.length > 120 ? '…' : ''}`);
+      lines.push(`・[${r.label}] ${r.name}：${preview}${r.reply.length > 120 ? '…' : ''}`);
     }
-    lines.push('運営ダッシュボードの「関係人口」タブで全文を確認してください。');
+    lines.push('運営ダッシュボードの「営業」タブで全文を確認してください。');
     sendDiscordMessage(lines.join('\n'));
   }
 

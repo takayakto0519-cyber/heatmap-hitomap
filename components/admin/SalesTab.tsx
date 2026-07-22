@@ -12,10 +12,12 @@ import { computeFollowUp } from '@/lib/followUp';
 import { scoreLead } from '@/lib/leadTemperature';
 import { municipalityScore, SALES_SCORE_CRITERIA } from '@/lib/salesScore';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
+import { computeMrr } from '@/lib/dealMetrics';
+import { buildUnifiedFollowQueue, type FollowQueueItem } from '@/lib/followQueue';
 import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
 import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
-import CasesSection from '@/components/admin/sales/CasesSection';
+import FlowBoard from '@/components/admin/sales/FlowBoard';
 import DossiersSection from '@/components/admin/sales/DossiersSection';
 import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
 
@@ -31,10 +33,12 @@ interface ClientLead {
   memo: string | null;
   created_at: string;
   updated_at: string;
+  email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null;
 }
 interface BusinessCase {
   id: string; org_name: string; client_type: string; stage: string;
   evidence: string | null; proposal_link: string | null; next_action: string | null; lead_ref: string | null;
+  last_contact_at?: string | null;
 }
 interface EmailTarget {
   id: string; company: string; email: string | null; hook: string | null; drafted: boolean; sent: boolean;
@@ -135,7 +139,7 @@ const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }
   ] },
   { label: '台帳', views: [
     { key: 'leads', label: '🎓 学校・法人' },
-    { key: 'cases', label: '📇 案件' },
+    { key: 'cases', label: '📇 商流ボード' },
     { key: 'dossiers', label: '🤝 顧問先' },
   ] },
 ];
@@ -240,13 +244,19 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const activeLedger = ledger.filter(e => e.lead.status !== 'lost');
   const coldCount = activeLedger.filter(e => e.en.freshness <= 0.65).length;
   const contracted = ledger.filter(e => e.lead.status === 'contracted');
-  const monthlyRecurring = dossiers.reduce((sum, d) => sum + (d.monthly_fee ?? 0), 0);
+  const monthlyRecurring = computeMrr(dossiers);
   const pendingApproval = cases.filter(c => c.stage === '承認待ち');
   const draftedUnsent = emails.filter(e => e.drafted && !e.sent);
-  const overdueFollowUps = useMemo(
-    () => municipalityProfiles.filter(p => !p.on_hold && computeFollowUp(p)?.status === 'overdue'),
-    [municipalityProfiles]
-  );
+  // 統合フォローキュー：学校・法人／便り／自治体／案件（フォロー段階）／顧問先を同じ基準で並べる。
+  // ⏰要フォローのKPIカードと朝の一枚（client_lead/email_target/caseの3ソース）の両方がこれを使う。
+  const followQueue: FollowQueueItem[] = useMemo(() => buildUnifiedFollowQueue({
+    leads: leads.map(l => ({ id: l.id, org_name: l.org_name, email_sent_at: l.email_sent_at ?? null, email_reply: l.email_reply ?? null, followed_up_at: l.followed_up_at ?? null, status: l.status })),
+    emailTargets: emails.map(e => ({ id: e.id, company: e.company, email_sent_at: e.email_sent_at ?? null, email_reply: e.email_reply ?? null, followed_up_at: e.followed_up_at ?? null })),
+    municipalities: municipalityProfiles.map(p => ({ id: p.id, region_name: p.region_name, email_sent_at: p.email_sent_at, email_reply: p.email_reply, followed_up_at: p.followed_up_at, on_hold: p.on_hold })),
+    cases: cases.map(c => ({ id: c.id, org_name: c.org_name, stage: c.stage, last_contact_at: c.last_contact_at ?? null })),
+    dossiers: dossiers.map(d => ({ id: d.id, org_name: d.org_name, next_meeting: d.next_meeting })),
+  }), [leads, emails, municipalityProfiles, cases, dossiers]);
+  const overdueFollowUps = useMemo(() => followQueue.filter(i => i.status === 'overdue'), [followQueue]);
 
   // ---------- 朝の一枚（今日の一手）の自動生成 ----------
   const morning = useMemo(() => {
@@ -282,6 +292,19 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         why: '送った後のフォローがないと、せっかくの出会いが冷めてしまいます',
         how: '電話・再送などでフォローし、関係人口タブで「フォロー済みにする」を押す',
         switchView: 'relation',
+      });
+    }
+    // 統合フォローキューのうち、自治体・顧問先以外（学校・法人／便り／案件のフォロー段階）は
+    // ここに専用の一手が無かったので追加する。自治体・顧問先は上の2ループが個別の文言で既に扱っている。
+    for (const item of followQueue) {
+      if (item.source !== 'client_lead' && item.source !== 'email_target' && item.source !== 'case') continue;
+      items.push({
+        priority: item.status === 'overdue' ? 0.7 : 1.5,
+        icon: item.icon, org: item.name,
+        title: item.label,
+        why: '送った後のフォローがないと、せっかくの出会いが冷めてしまいます',
+        how: item.suggestedAction,
+        switchView: item.source === 'client_lead' ? 'leads' : item.source === 'case' ? 'cases' : undefined,
       });
     }
     // 今日のカレンダー予定と営業対象の名前を突き合わせ、一致するものだけ朝の一枚に載せる
@@ -326,7 +349,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       });
     }
     return items.sort((a, b) => a.priority - b.priority);
-  }, [pendingApproval, draftedUnsent, dossiers, activeLedger, municipalityProfiles, calendarToday, leads]);
+  }, [pendingApproval, draftedUnsent, dossiers, activeLedger, municipalityProfiles, calendarToday, leads, followQueue]);
 
   const [showAllMorning, setShowAllMorning] = useState(false);
   const visibleMorning = showAllMorning ? morning : morning.slice(0, 6);
@@ -442,7 +465,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
 
       {view === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
       {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
-      {view === 'cases' && <CasesSection authHeaders={authHeaders} />}
+      {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
 
       {view === 'ledger' && <>

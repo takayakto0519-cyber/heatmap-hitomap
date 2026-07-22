@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as {
     org_name?: string; client_type?: string; stage?: string;
     evidence?: string | null; proposal_link?: string | null; next_action?: string | null;
-    lead_ref?: string | null;
+    lead_ref?: string | null; amount?: number | null; probability?: number | null;
+    expected_close_date?: string | null;
   };
   if (!body.org_name?.trim()) return NextResponse.json({ ok: false, error: '組織名は必須です' }, { status: 400 });
 
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
       proposal_link: body.proposal_link?.trim() || null,
       next_action: body.next_action?.trim() || null,
       lead_ref: body.lead_ref || null,
+      amount: body.amount ?? null,
+      probability: body.probability ?? 50,
+      expected_close_date: body.expected_close_date || null,
     })
     .select().single();
 

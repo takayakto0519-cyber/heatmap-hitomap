@@ -192,6 +192,25 @@ export default async function CompanySchoolPage() {
                   お問い合わせ
                 </a>
                 <a
+                  href="/schedule"
+                  className="hm-lift hm-btn"
+                  style={{
+                    display: 'inline-block',
+                    padding: '15px 32px',
+                    background: corpColor.white,
+                    color: corpColor.moss,
+                    textDecoration: 'none',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    fontFamily: corpFont.body,
+                    letterSpacing: '0.05em',
+                    borderRadius: corpRadius.sm,
+                    border: `1.5px solid ${corpColor.moss}`,
+                  }}
+                >
+                  🗓 初回相談（無料）を予約
+                </a>
+                <a
                   href="/company/works"
                   className="hm-ul"
                   style={{

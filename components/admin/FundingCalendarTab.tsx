@@ -180,6 +180,10 @@ export default function FundingCalendarTab({ authHeaders }: { authHeaders: () =>
         自治体のスタートアップ支援・補助金・ビジネスモデルコンテスト・資金調達/ピッチイベントの締切を一覧管理します。
         「応募する」と決めたら、具体的な案の中身は「ビジネスモデル案」タブへ（contestキーで紐付け）。
       </p>
+      <a href="/admin/makichalle" style={{
+        display: 'inline-block', fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 12,
+        border: '1px solid #4A69BD', borderRadius: 12, padding: '4px 12px', color: '#4A69BD',
+      }}>🏆 まきチャレ2026（牧之原市）専用ダッシュボード ↗</a>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {needsMigration && (
         <div style={{ ...cardStyle, marginBottom: 12, borderLeft: '4px solid #E5A139' }}>
