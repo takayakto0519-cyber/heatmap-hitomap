@@ -1,9 +1,9 @@
 'use client';
 
-// 🐢 営業メール送り先（sales_email_targets）の編集。
-// もともと AIOpsTab にあったが、同じテーブルを営業タブの「📮 便り」セクションでも
-// 編集できてしまい二重編集になっていた。表示（OutreachStatus）と編集を1箇所に揃えるため、
-// 営業タブの便りセクション内の折りたたみへ移設した。中身の挙動は移設前と同じ。
+// 🐢 営業メール送り先（client_leads）の編集。
+// 2026-07-23：sales_email_targetsはclient_leadsへ統合した（同一組織が両テーブルに重複登録され、
+// メール下書きが片方にしか無くなる事故が起きていたため）。UI・呼び名（会社名・便り）はそのまま、
+// 内部の保存先だけclient_leadsに一本化する。
 import { useEffect, useState } from 'react';
 
 const inputStyle: React.CSSProperties = {
@@ -20,8 +20,13 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
 
 type Headers = { jsonHeaders: () => HeadersInit; authHeaders: () => HeadersInit };
 
-// ---------- 営業メール送り先 ----------
+// ---------- 営業メール送り先（client_leads、client_type='business'） ----------
 interface EmailTarget { id: string; company: string; email: string | null; hook: string | null; drafted: boolean; sent: boolean; }
+interface ClientLeadRow { id: string; org_name: string; email: string | null; hook: string | null; drafted: boolean | null; sent: boolean | null; client_type: string; }
+
+function toEmailTarget(l: ClientLeadRow): EmailTarget {
+  return { id: l.id, company: l.org_name, email: l.email, hook: l.hook, drafted: Boolean(l.drafted), sent: Boolean(l.sent) };
+}
 
 function EmailSection({ jsonHeaders, authHeaders }: Headers) {
   const [items, setItems] = useState<EmailTarget[]>([]);
@@ -32,27 +37,32 @@ function EmailSection({ jsonHeaders, authHeaders }: Headers) {
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/admin/sales-email-targets', { headers: authHeaders() });
+    const res = await fetch('/api/admin/client-leads', { headers: authHeaders() });
     const data = await res.json();
-    if (data.ok) setItems(data.targets ?? []); else setMessage(data.error ?? '読み込みに失敗しました');
+    // 「便り」＝フックだけで軽く声をかける先。学校・法人台帳の中でも hook が入っている行だけをここに出す。
+    if (data.ok) setItems((data.leads ?? []).filter((l: ClientLeadRow) => l.hook).map(toEmailTarget));
+    else setMessage(data.error ?? '読み込みに失敗しました');
     setLoading(false);
   }
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   async function create() {
     if (!form.company.trim()) { setMessage('会社名を入力してください'); return; }
-    const res = await fetch('/api/admin/sales-email-targets', { method: 'POST', headers: jsonHeaders(), body: JSON.stringify(form) });
+    const res = await fetch('/api/admin/client-leads', {
+      method: 'POST', headers: jsonHeaders(),
+      body: JSON.stringify({ org_name: form.company, email: form.email || null, hook: form.hook || null, client_type: 'business' }),
+    });
     const data = await res.json();
-    if (data.ok) { setForm({ company: '', email: '', hook: '' }); setShowForm(false); await load(); }
-    else setMessage(data.error ?? '保存に失敗しました');
+    if (!data.ok) { setMessage(data.error ?? '保存に失敗しました'); return; }
+    setForm({ company: '', email: '', hook: '' }); setShowForm(false); await load();
   }
   async function patch(id: string, fields: Partial<EmailTarget>) {
-    await fetch(`/api/admin/sales-email-targets/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    await fetch(`/api/admin/client-leads/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
     await load();
   }
   async function remove(id: string) {
     if (!window.confirm('削除しますか？')) return;
-    await fetch(`/api/admin/sales-email-targets/${id}`, { method: 'DELETE', headers: authHeaders() });
+    await fetch(`/api/admin/client-leads/${id}`, { method: 'DELETE', headers: authHeaders() });
     await load();
   }
 

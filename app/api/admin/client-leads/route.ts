@@ -31,22 +31,27 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({})) as {
     client_type?: string; org_name?: string; contact_name?: string | null;
-    email?: string | null; phone?: string | null; memo?: string | null;
+    email?: string | null; phone?: string | null; memo?: string | null; hook?: string | null;
   };
   if (!body.org_name?.trim()) return NextResponse.json({ ok: false, error: '団体名は必須です' }, { status: 400 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
-    .from('client_leads')
-    .insert({
-      client_type: ['school', 'municipality'].includes(body.client_type ?? '') ? body.client_type : 'business',
-      org_name: body.org_name.trim(),
-      contact_name: body.contact_name?.trim() || null,
-      email: body.email?.trim() || null,
-      phone: body.phone?.trim() || null,
-      memo: body.memo?.trim() || null,
-    })
-    .select().single();
+  const insertRow: Record<string, unknown> = {
+    client_type: ['school', 'municipality'].includes(body.client_type ?? '') ? body.client_type : 'business',
+    org_name: body.org_name.trim(),
+    contact_name: body.contact_name?.trim() || null,
+    email: body.email?.trim() || null,
+    phone: body.phone?.trim() || null,
+    memo: body.memo?.trim() || null,
+  };
+  if (body.hook?.trim()) insertRow.hook = body.hook.trim();
+
+  let { data, error } = await supabaseServer.from('client_leads').insert(insertRow).select().single();
+  // hook列がマイグレーション未適用の環境でも「便り」追加が壊れないように、無ければ外して再試行する
+  if (error && /hook/.test(error.message) && 'hook' in insertRow) {
+    delete insertRow.hook;
+    ({ data, error } = await supabaseServer.from('client_leads').insert(insertRow).select().single());
+  }
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, lead: data });

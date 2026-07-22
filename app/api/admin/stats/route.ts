@@ -69,7 +69,6 @@ export async function GET(req: NextRequest) {
     proposalsUnread,
     marketingUnread,
     fundingSoon,
-    emailTargets,
     municipalityTargets,
   ] = await Promise.all([
     safeCount(() => supabaseServer.from('action_items').select('id', { count: 'exact', head: true }).neq('status', 'done')),
@@ -79,16 +78,15 @@ export async function GET(req: NextRequest) {
     safeCount(() => supabaseServer.from('funding_opportunities').select('id', { count: 'exact', head: true }).in('status', ['watching', 'preparing']).not('deadline', 'is', null).lte('deadline', in14Days)),
     // 「要フォロー」はSQLのcountでは表現できない（経過日数の判定が必要）ため、
     // 必要な列だけ取って lib/followUp.ts の純粋関数をサーバー側で回す。
-    safeRows<{ email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null }>(
-      () => supabaseServer.from('sales_email_targets').select('email_sent_at, email_reply, followed_up_at').not('email_sent_at', 'is', null),
-    ),
+    // 2026-07-23：sales_email_targetsはclient_leadsへ統合したため、ここでの個別集計は廃止
+    // （残すとバックフィル後に同一組織を二重カウントしてしまう）。
     safeRows<{ email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null }>(
       () => supabaseServer.from('municipality_profiles').select('email_sent_at, email_reply, followed_up_at').not('email_sent_at', 'is', null),
     ),
   ]);
 
-  // salesバッジ＝要フォロー件数。以前はメール便り＋自治体の2ソースのみだったが、
-  // 学校・法人（client_leads）と案件のフォローステージ（business_cases）も同じ基準で数える（lib/followQueue.ts）。
+  // salesバッジ＝要フォロー件数。学校・法人・便り（統合済みclient_leads）と自治体、
+  // 案件のフォローステージ（business_cases）を同じ基準で数える（lib/followQueue.ts）。
   const [leadsForFollow, casesForFollow] = await Promise.all([
     safeRows<{ id: string; org_name: string; email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null; status: string }>(
       () => supabaseServer.from('client_leads').select('id, org_name, email_sent_at, email_reply, followed_up_at, status').not('email_sent_at', 'is', null),
@@ -99,7 +97,7 @@ export async function GET(req: NextRequest) {
   ]);
   const overdueCount = buildUnifiedFollowQueue({
     leads: leadsForFollow,
-    emailTargets: emailTargets.map((r, i) => ({ id: String(i), company: '', ...r })),
+    emailTargets: [],
     municipalities: municipalityTargets.map((r, i) => ({ id: String(i), region_name: '', ...r })),
     cases: casesForFollow,
     dossiers: [],
@@ -113,14 +111,13 @@ export async function GET(req: NextRequest) {
   );
   const overdueUnpaidCount = computeCashflow(casesForCashflow).unpaid.filter(r => r.overdue).length;
 
-  // 返信あり・対応待ち件数（返信専用導線のバッジ）。3ソース横断で
-  // email_replyがありreply_handled_atが未設定のものを数える。
-  const [unhandledLeadReplies, unhandledEmailReplies, unhandledMunicipalityReplies] = await Promise.all([
+  // 返信あり・対応待ち件数（返信専用導線のバッジ）。2ソース横断で
+  // email_replyがありreply_handled_atが未設定のものを数える（sales_email_targetsは統合済み）。
+  const [unhandledLeadReplies, unhandledMunicipalityReplies] = await Promise.all([
     safeCount(() => supabaseServer.from('client_leads').select('id', { count: 'exact', head: true }).not('email_reply', 'is', null).is('reply_handled_at', null)),
-    safeCount(() => supabaseServer.from('sales_email_targets').select('id', { count: 'exact', head: true }).not('email_reply', 'is', null).is('reply_handled_at', null)),
     safeCount(() => supabaseServer.from('municipality_profiles').select('id', { count: 'exact', head: true }).not('email_reply', 'is', null).is('reply_handled_at', null)),
   ]);
-  const unhandledRepliesCount = unhandledLeadReplies + unhandledEmailReplies + unhandledMunicipalityReplies;
+  const unhandledRepliesCount = unhandledLeadReplies + unhandledMunicipalityReplies;
 
   // タブIDをキーにしたマップで返す。バッジを増やしたいときはここにキーを足すだけでよく、
   // 画面側（page.tsx の badgeFor / OverviewTab のクイックアクセス）は変更不要。

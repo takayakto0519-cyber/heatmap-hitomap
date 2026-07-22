@@ -36,6 +36,7 @@ interface ClientLead {
   updated_at: string;
   email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null; reply_handled_at?: string | null;
   email_draft?: string | null; contact_email_confidence?: 'high' | 'medium' | 'low' | null; fact_check_status?: 'verified' | 'unverified' | 'flagged' | null;
+  hook?: string | null; drafted?: boolean | null; sent?: boolean | null;
 }
 interface BusinessCase {
   id: string; org_name: string; client_type: string; stage: string;
@@ -158,7 +159,6 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [leads, setLeads] = useState<ClientLead[]>([]);
   const [records, setRecords] = useState<EnRecord[]>([]);
   const [cases, setCases] = useState<BusinessCase[]>([]);
-  const [emails, setEmails] = useState<EmailTarget[]>([]);
   const [dossiers, setDossiers] = useState<ClientDossier[]>([]);
   const [municipalityProfiles, setMunicipalityProfiles] = useState<MunicipalityProfile[]>([]);
   const [calendarToday, setCalendarToday] = useState<CalendarEvent[]>([]);
@@ -181,11 +181,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes, calendarRes, procurementRes] = await Promise.all([
+      const [leadsRes, recordsRes, casesRes, dossiersRes, profilesRes, calendarRes, procurementRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/en-records', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json()),
-        fetch('/api/admin/sales-email-targets', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/client-dossiers', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
         fetch('/api/admin/calendar', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false, connected: false, today: [] })),
@@ -197,7 +196,6 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         setNeedsMigration(Boolean(recordsRes.needsMigration));
       }
       if (casesRes.ok) setCases(casesRes.cases ?? []);
-      if (emailsRes.ok) setEmails(emailsRes.targets ?? []);
       if (dossiersRes.ok) setDossiers(dossiersRes.dossiers ?? []);
       if (profilesRes.ok) setMunicipalityProfiles(profilesRes.profiles ?? []);
       if (calendarRes.ok && calendarRes.connected) setCalendarToday(calendarRes.today ?? []);
@@ -205,7 +203,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         const digest = procurementRes.agents?.[0]?.result?.digest as Record<string, ProcurementItem[]> | undefined;
         setProcurementItems(digest ? Object.values(digest).flat() : []);
       }
-      const failed = [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes].find(r => !r.ok);
+      const failed = [leadsRes, recordsRes, casesRes, dossiersRes].find(r => !r.ok);
       if (failed) setError(failed.error ?? '一部のデータの取得に失敗しました');
     } catch {
       setError('通信エラー');
@@ -226,8 +224,9 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     await load();
     return true;
   }
+  // 「便り」（旧sales_email_targets）は2026-07-23にclient_leadsへ統合済み。idはclient_leadsの行を指す。
   async function patchEmail(id: string, fields: Partial<EmailTarget>) {
-    const res = await fetch(`/api/admin/sales-email-targets/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const res = await fetch(`/api/admin/client-leads/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
     const data = await res.json().catch(() => ({ ok: false }));
     if (!data.ok) { setError(data.error ?? '更新に失敗しました'); return false; }
     await load();
@@ -282,6 +281,17 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       en: computeEn(lead, byLead.get(lead.id) ?? []),
     }));
   }, [leads, records]);
+
+  // 「便り」（旧sales_email_targets）は2026-07-23にclient_leadsへ統合済み。hookが入っている行だけを
+  // 「便り」として扱う（会長が団体名＋フックだけで軽く声をかけたい先。学校・法人の本格リードと区別する）。
+  const emails: EmailTarget[] = useMemo(() => leads
+    .filter(l => l.hook)
+    .map(l => ({
+      id: l.id, company: l.org_name, email: l.email, hook: l.hook ?? null,
+      drafted: Boolean(l.drafted), sent: Boolean(l.sent),
+      updated_at: l.updated_at, email_sent_at: l.email_sent_at ?? null,
+      email_reply: l.email_reply ?? null, followed_up_at: l.followed_up_at ?? null,
+    })), [leads]);
 
   const activeLedger = ledger.filter(e => e.lead.status !== 'lost');
   const coldCount = activeLedger.filter(e => e.en.freshness <= 0.65).length;

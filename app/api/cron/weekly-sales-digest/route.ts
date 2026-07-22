@@ -31,11 +31,12 @@ export async function GET(req: NextRequest) {
   try {
     const { supabaseServer } = await import('@/lib/supabase/server');
 
-    const [casesRes, leadsRes, emailsRes, municipalitiesRes, dossiersRes] = await Promise.all([
+    // 2026-07-23：sales_email_targetsはclient_leadsへ統合したため、ここでの個別取得は廃止
+    // （残すとバックフィル済みの組織を二重カウントしてしまう）。
+    const [casesRes, leadsRes, municipalitiesRes, dossiersRes] = await Promise.all([
       supabaseServer.from('business_cases')
         .select('id, org_name, stage, amount, probability, expected_close_date, won_at, lost_reason, invoice_sent_at, payment_due, paid_at, last_contact_at'),
       supabaseServer.from('client_leads').select('id, org_name, email_sent_at, email_reply, followed_up_at, status').not('email_sent_at', 'is', null),
-      supabaseServer.from('sales_email_targets').select('id, company, email_sent_at, email_reply, followed_up_at').not('email_sent_at', 'is', null),
       supabaseServer.from('municipality_profiles').select('id, region_name, email_sent_at, email_reply, followed_up_at, on_hold').not('email_sent_at', 'is', null),
       supabaseServer.from('client_dossiers').select('id, org_name, next_meeting'),
     ]);
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
     const cashflow = computeCashflow(cases);
     const followQueue = buildUnifiedFollowQueue({
       leads: leadsRes.data ?? [],
-      emailTargets: emailsRes.data ?? [],
+      emailTargets: [],
       municipalities: municipalitiesRes.data ?? [],
       cases: cases.map(c => ({ id: c.id, org_name: c.org_name, stage: c.stage, last_contact_at: c.last_contact_at })),
       dossiers: dossiersRes.data ?? [],

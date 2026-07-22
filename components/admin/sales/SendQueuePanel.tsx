@@ -3,11 +3,11 @@
 // 📤 送信キュー — 下書き・宛先確定まで終わった営業メールを、会長が1クリックで送るための画面。
 // BookingRequestsPanel.tsxと同じ「AIが準備・会長が1クリックで確定」パターンを踏襲する。
 // 送信自体は必ずこの画面のボタン経由（サーバー側APIが確度lowや宛先未確定を拒否する二重ガード）。
-// 学校・法人（client_leads）／便り（sales_email_targets）／自治体（municipality_profiles）の
-// 3ソースを横断して1つのキューにする（返信あり導線・統合フォローキューと同じ思想）。
+// 学校・法人・便り（client_leads）／自治体（municipality_profiles）の2ソースを横断して1つのキューにする
+// （返信あり導線・統合フォローキューと同じ思想）。2026-07-23：sales_email_targetsはclient_leadsへ統合した。
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type Source = 'lead' | 'email_target' | 'municipality';
+type Source = 'lead' | 'municipality';
 type Confidence = 'high' | 'medium' | 'low' | null;
 type FactCheckStatus = 'verified' | 'unverified' | 'flagged' | null;
 
@@ -80,35 +80,21 @@ export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, emailsRes, muniRes] = await Promise.all([
+      const [leadsRes, muniRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then((r) => r.json()),
-        fetch('/api/admin/sales-email-targets', { headers: authHeaders() }).then((r) => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then((r) => r.json()).catch(() => ({ ok: false })),
       ]);
 
       const queue: QueueItem[] = [];
       if (leadsRes.ok) {
         for (const l of leadsRes.leads ?? []) {
-          if (l.email_draft?.trim() && !l.email_sent_at) {
+          if (l.email_draft?.trim() && !l.sent && !l.email_sent_at) {
             queue.push({
               source: 'lead', id: l.id, name: l.org_name, email: l.email,
               confidence: l.contact_email_confidence ?? null, sourceUrl: l.contact_email_source_url ?? null,
               factCheckStatus: l.fact_check_status ?? 'unverified', factCheckNote: l.fact_check_note ?? null,
               draft: l.email_draft, sendPath: `/api/admin/client-leads/${l.id}/send`,
               patchPath: `/api/admin/client-leads/${l.id}`, assignedTo: l.assigned_to ?? null,
-            });
-          }
-        }
-      }
-      if (emailsRes.ok) {
-        for (const e of emailsRes.targets ?? []) {
-          if (e.email_draft?.trim() && !e.sent && !e.email_sent_at) {
-            queue.push({
-              source: 'email_target', id: e.id, name: e.company, email: e.email,
-              confidence: e.contact_email_confidence ?? null, sourceUrl: e.contact_email_source_url ?? null,
-              factCheckStatus: e.fact_check_status ?? 'unverified', factCheckNote: e.fact_check_note ?? null,
-              draft: e.email_draft, sendPath: `/api/admin/sales-email-targets/${e.id}/send`,
-              patchPath: `/api/admin/sales-email-targets/${e.id}`, assignedTo: e.assigned_to ?? null,
             });
           }
         }

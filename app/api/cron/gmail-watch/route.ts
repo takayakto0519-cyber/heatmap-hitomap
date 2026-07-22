@@ -41,13 +41,14 @@ interface ContactRow {
 }
 
 // ①の返信チェック対象。municipality_profilesだけがemail_sent_content列を持つため、hasSentContentで分岐する。
+// 2026-07-23：sales_email_targetsはclient_leadsへ統合したため対象から除外（残すと同一組織の返信を
+// 両テーブルに別々に書き込んでしまい、片方だけ更新される事故が再発する）。
 const REPLY_CHECK_TABLES: { table: string; emailCol: string; nameCol: string; hasSentContent: boolean; label: string }[] = [
-  { table: 'client_leads', emailCol: 'email', nameCol: 'org_name', hasSentContent: false, label: '学校・法人' },
-  { table: 'sales_email_targets', emailCol: 'email', nameCol: 'company', hasSentContent: false, label: '便り' },
+  { table: 'client_leads', emailCol: 'email', nameCol: 'org_name', hasSentContent: false, label: '学校・法人・便り' },
   { table: 'municipality_profiles', emailCol: 'contact_email', nameCol: 'region_name', hasSentContent: true, label: '自治体' },
 ];
 
-// ②の受信箱スキャンで「登録済みの相手か」を突き合わせるテーブル一覧（①と同じ3テーブル）
+// ②の受信箱スキャンで「登録済みの相手か」を突き合わせるテーブル一覧（①と同じテーブル）
 const CONTACT_TABLES: { table: string; emailCol: string; nameCol: string }[] =
   REPLY_CHECK_TABLES.map(({ table, emailCol, nameCol }) => ({ table, emailCol, nameCol }));
 
