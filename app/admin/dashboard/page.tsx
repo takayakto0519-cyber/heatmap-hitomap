@@ -67,7 +67,9 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   minutes: { label: '議事録', icon: '🗒', group: '秘書', desc: '打ち合わせ・商談の記録を日記のように書き溜める' },
 };
 
-const TAB_GROUPS = ['秘書', 'サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '営業・自治体', '調査・研究', 'AIエージェント'];
+// 売上を最優先で見るため、営業・自治体（商流・お金）を秘書の次＝最上位に置く
+// （並び順の変更のみ。タブIDやコンテンツには手を入れない）
+const TAB_GROUPS = ['秘書', '営業・自治体', 'サイト編集', '投稿・安全', 'コミュニティ', '体験づくり', '調査・研究', 'AIエージェント'];
 
 // ホームからも本体サイトへ直接飛べるよう、主要ページへのリンクを集約
 const SITE_LINKS: { label: string; href: string; icon: string; desc: string }[] = [
