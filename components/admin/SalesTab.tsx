@@ -64,6 +64,7 @@ interface MunicipalityProfile {
 interface CalendarEvent {
   title: string; start: string | null; end: string | null; all_day: boolean; location: string; html_link: string;
 }
+interface ProcurementItem { title: string; link: string; source: string; query: string; pub: string }
 
 // 自治体プロファイルのスコア換算は lib/salesScore.ts に集約（縁スコアと同じ0-200の物差しだが
 // 「手動評価ベースの見立て」であり意味が違うため、ランキングでは種別バッジを付けて区別する）。
@@ -161,6 +162,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [dossiers, setDossiers] = useState<ClientDossier[]>([]);
   const [municipalityProfiles, setMunicipalityProfiles] = useState<MunicipalityProfile[]>([]);
   const [calendarToday, setCalendarToday] = useState<CalendarEvent[]>([]);
+  const [procurementItems, setProcurementItems] = useState<ProcurementItem[]>([]);
   const [needsMigration, setNeedsMigration] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -179,7 +181,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     setLoading(true);
     setError('');
     try {
-      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes, calendarRes] = await Promise.all([
+      const [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes, profilesRes, calendarRes, procurementRes] = await Promise.all([
         fetch('/api/admin/client-leads', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/en-records', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/business-cases', { headers: authHeaders() }).then(r => r.json()),
@@ -187,6 +189,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         fetch('/api/admin/client-dossiers', { headers: authHeaders() }).then(r => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false })),
         fetch('/api/admin/calendar', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false, connected: false, today: [] })),
+        fetch('/api/admin/agent-digest?ids=procurement_watch', { headers: authHeaders() }).then(r => r.json()).catch(() => ({ ok: false, agents: [] })),
       ]);
       if (leadsRes.ok) setLeads(leadsRes.leads ?? []);
       if (recordsRes.ok) {
@@ -198,6 +201,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       if (dossiersRes.ok) setDossiers(dossiersRes.dossiers ?? []);
       if (profilesRes.ok) setMunicipalityProfiles(profilesRes.profiles ?? []);
       if (calendarRes.ok && calendarRes.connected) setCalendarToday(calendarRes.today ?? []);
+      if (procurementRes.ok) {
+        const digest = procurementRes.agents?.[0]?.result?.digest as Record<string, ProcurementItem[]> | undefined;
+        setProcurementItems(digest ? Object.values(digest).flat() : []);
+      }
       const failed = [leadsRes, recordsRes, casesRes, emailsRes, dossiersRes].find(r => !r.ok);
       if (failed) setError(failed.error ?? '一部のデータの取得に失敗しました');
     } catch {
@@ -653,6 +660,12 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       )}
 
       {/* ---------- 🎯 今日送る10件 ---------- */}
+      {sendableToday.length === 0 && sentTodayCount > 0 && (
+        <div style={{ ...cardStyle, marginTop: 14, background: '#EAFBF3', border: '1.5px solid #27AE60', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#27AE60' }}>🎉 今日の営業ノルマ達成！（{sentTodayCount}件送信）</p>
+          <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#666' }}>送信可能な下書きは今日すべて送り切りました。ここから先は開発や新規開拓に時間を使って構いません。</p>
+        </div>
+      )}
       {sendableToday.length > 0 && (
         <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -675,6 +688,26 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                 <span style={{ fontSize: 11, color: '#999', alignSelf: 'center' }}>他{sendableToday.length - 10}件</span>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- 📋 公募・締切 ---------- */}
+      {procurementItems.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <h2 style={{ ...sectionTitleStyle, margin: '0 0 8px' }}>📋 公募・締切の動き（直近7日・procurement_watch）</h2>
+          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>
+            自治体は営業メールより公募・実証実験募集・少額随契が受注経路になりやすい、というリサーチに基づく監視です。見出し・リンクのみの機械収集で要約はしていません。締切・要件は必ずリンク先で確認してください。
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {procurementItems.slice(0, 8).map((item, i) => (
+              <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" style={{
+                ...cardStyle, padding: '9px 14px', display: 'block', textDecoration: 'none', color: 'inherit',
+              }}>
+                <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: '#333' }}>{item.title}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#999' }}>{item.source} ・ {item.query}</p>
+              </a>
+            ))}
           </div>
         </div>
       )}
