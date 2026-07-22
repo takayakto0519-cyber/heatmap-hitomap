@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import CalendarPanel from './CalendarPanel';
 import BookingRequestsPanel from './BookingRequestsPanel';
 import ActionItemsSection from './ActionItemsSection';
+import TeamMembersSection from './TeamMembersSection';
 import { MigrationNotice, type AttentionItem, ATTENTION_JUMP } from '@/components/admin/adminShared';
 
 interface ActionItem {
@@ -39,6 +40,7 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [migrationFile, setMigrationFile] = useState<string | null>(null);
   const [showManage, setShowManage] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
   // ホーム(OverviewTab)の「今日の要注意」と同じ統合司令室AIの結果。秘書タブでは読み取り専用で見せる
   // （完了操作は付けない＝会長の判断が必要な生の情報として置いておくだけ）。
   const [attention, setAttention] = useState<AttentionItem[] | null>(null);
@@ -218,6 +220,27 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
           <ActionItemsSection authHeaders={authHeaders} onChanged={load} />
         </div>
       )}
+
+      <div style={cardStyle}>
+        <div style={sectionTitleStyle}>👥 運営メンバー</div>
+        <p style={{ fontSize: 12, color: '#999', margin: '-4px 0 12px' }}>
+          To-Doの担当・カレンダーの予定担当者として選べる名簿です。「代表」に指定した1名が各一覧の先頭に表示されます。
+        </p>
+        {showTeam ? (
+          <>
+            <TeamMembersSection authHeaders={authHeaders} />
+            <button onClick={() => setShowTeam(false)} style={{
+              marginTop: 12, padding: '5px 12px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
+              color: '#38ADA9', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}>▴ 閉じる</button>
+          </>
+        ) : (
+          <button onClick={() => setShowTeam(true)} style={{
+            padding: '5px 12px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
+            color: '#38ADA9', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          }}>▾ メンバーを見る・追加する</button>
+        )}
+      </div>
     </div>
   );
 }
