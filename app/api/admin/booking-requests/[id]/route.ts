@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { action?: 'confirm' | 'decline' | 'cancel'; chosen_start?: string };
+  const body = await req.json().catch(() => ({})) as { action?: 'confirm' | 'decline' | 'cancel'; chosen_start?: string; assignee?: string };
   if (body.action !== 'confirm' && body.action !== 'decline' && body.action !== 'cancel') {
     return NextResponse.json({ ok: false, error: 'action は confirm・decline・cancel のいずれかを指定してください' }, { status: 400 });
   }
@@ -148,6 +148,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       endTime: chosen.end,
       attendeeEmail: reqRow.email,
       location: SCHEDULING_MEET_URL,
+      assignee: body.assignee?.trim() || undefined,
     });
     const { error } = await supabaseServer.from('booking_requests')
       .update({

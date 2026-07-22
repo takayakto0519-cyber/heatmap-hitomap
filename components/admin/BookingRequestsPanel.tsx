@@ -16,6 +16,7 @@ interface BookingRequest {
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled'; calendar_event_id: string | null;
   created_at: string; responded_at: string | null;
 }
+interface TeamMember { id: string; name: string; is_lead: boolean; is_active: boolean }
 
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' };
 
@@ -38,8 +39,13 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
   const [showResolved, setShowResolved] = useState(false);
   // 確定した直後だけ、その回のGoogleカレンダーイベントへのリンクを見せる（id→link）
   const [confirmedLinks, setConfirmedLinks] = useState<Record<string, string>>({});
-  // 未対応リクエストごとに、会長が候補の中から選んでいる1件（id→候補のstart）
+  // 未対応リクエストごとに、会長が候補の中から選んでいる1件（id→候補のstart）。
+  // 以前はここに「最も早い候補」を自動選択していたが、選び直さずそのまま確定すると
+  // 意図と違う時間で確定してしまう事故につながっていたため、必ず手動で選ばせる（自動選択なし）。
   const [chosenByRequest, setChosenByRequest] = useState<Record<string, string>>({});
+  // 未対応リクエストごとに、確定時にカレンダーへ付ける担当者名（id→team_membersのname）
+  const [assigneeByRequest, setAssigneeByRequest] = useState<Record<string, string>>({});
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,16 +56,6 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
       if (data.ok) {
         const list: BookingRequest[] = data.requests ?? [];
         setRequests(list);
-        // 未選択の未対応リクエストには、最も早い候補をデフォルトで選んでおく（会長がそのまま確定できるように）
-        setChosenByRequest((prev) => {
-          const next = { ...prev };
-          for (const r of list) {
-            if (r.status === 'pending' && !next[r.id] && r.candidate_slots?.length > 0) {
-              next[r.id] = [...r.candidate_slots].sort((a, b) => a.start.localeCompare(b.start))[0].start;
-            }
-          }
-          return next;
-        });
       } else {
         setError(data.error ?? '取得に失敗しました');
       }
@@ -72,6 +68,14 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    fetch('/api/admin/team-members', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setTeamMembers((d.members as TeamMember[]).filter(m => m.is_active)); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function respond(id: string, action: 'confirm' | 'decline' | 'cancel') {
     if (action === 'cancel' && !window.confirm('確定済みの予定をキャンセルします。Googleカレンダーから削除され、申込者にキャンセルメールが送られます。よろしいですか？')) {
       return;
@@ -79,8 +83,11 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
     setBusyId(id);
     setError('');
     try {
-      const body: { action: string; chosen_start?: string } = { action };
-      if (action === 'confirm') body.chosen_start = chosenByRequest[id];
+      const body: { action: string; chosen_start?: string; assignee?: string } = { action };
+      if (action === 'confirm') {
+        body.chosen_start = chosenByRequest[id];
+        if (assigneeByRequest[id]) body.assignee = assigneeByRequest[id];
+      }
       const res = await fetch(`/api/admin/booking-requests/${id}`, {
         method: 'PATCH',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -149,6 +156,20 @@ export default function BookingRequestsPanel({ authHeaders }: { authHeaders: () 
                     );
                   })}
                 </div>
+                {teamMembers.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#999' }}>
+                      担当者（カレンダーの予定タイトルに付きます）：{' '}
+                      <select value={assigneeByRequest[r.id] ?? ''} onChange={(e) => setAssigneeByRequest((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                        style={{ fontSize: 12, padding: '3px 6px', borderRadius: 6, border: '1px solid #ddd' }}>
+                        <option value="">未指定</option>
+                        {teamMembers.map((m) => (
+                          <option key={m.id} value={m.name}>{m.name}{m.is_lead ? '（代表）' : ''}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => respond(r.id, 'confirm')} disabled={busyId === r.id || !chosen} style={{
                     padding: '6px 14px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff',
