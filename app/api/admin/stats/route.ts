@@ -113,6 +113,15 @@ export async function GET(req: NextRequest) {
   );
   const overdueUnpaidCount = computeCashflow(casesForCashflow).unpaid.filter(r => r.overdue).length;
 
+  // 返信あり・対応待ち件数（返信専用導線のバッジ）。3ソース横断で
+  // email_replyがありreply_handled_atが未設定のものを数える。
+  const [unhandledLeadReplies, unhandledEmailReplies, unhandledMunicipalityReplies] = await Promise.all([
+    safeCount(() => supabaseServer.from('client_leads').select('id', { count: 'exact', head: true }).not('email_reply', 'is', null).is('reply_handled_at', null)),
+    safeCount(() => supabaseServer.from('sales_email_targets').select('id', { count: 'exact', head: true }).not('email_reply', 'is', null).is('reply_handled_at', null)),
+    safeCount(() => supabaseServer.from('municipality_profiles').select('id', { count: 'exact', head: true }).not('email_reply', 'is', null).is('reply_handled_at', null)),
+  ]);
+  const unhandledRepliesCount = unhandledLeadReplies + unhandledEmailReplies + unhandledMunicipalityReplies;
+
   // タブIDをキーにしたマップで返す。バッジを増やしたいときはここにキーを足すだけでよく、
   // 画面側（page.tsx の badgeFor / OverviewTab のクイックアクセス）は変更不要。
   const badges: Record<string, number> = {
@@ -124,6 +133,7 @@ export async function GET(req: NextRequest) {
     funding: fundingSoon,
     sales: overdueCount,
     money: overdueUnpaidCount,
+    replies: unhandledRepliesCount,
   };
 
   return NextResponse.json({

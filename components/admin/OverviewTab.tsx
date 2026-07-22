@@ -201,6 +201,7 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
               <Kpi label="今月の受注額" value={cashflow ? `${cashflow.wonThisMonth.toLocaleString()}円` : '—'} onClick={() => goTab('money')} />
               <Kpi label="未入金" value={cashflow ? `${cashflow.unpaidTotal.toLocaleString()}円` : '—'} urgent={(cashflow?.overdueTotal ?? 0) > 0} onClick={() => goTab('money')} />
               <Kpi label="要フォロー" value={`${followCount}件`} urgent={followCount > 0} onClick={() => goTab('sales')} />
+              <Kpi label="📬 返信あり" value={`${badgeCounts?.replies ?? 0}件`} urgent={(badgeCounts?.replies ?? 0) > 0} onClick={() => goTab('sales')} />
             </>
           );
         })()}

@@ -33,7 +33,7 @@ interface ClientLead {
   memo: string | null;
   created_at: string;
   updated_at: string;
-  email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null;
+  email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null; reply_handled_at?: string | null;
 }
 interface BusinessCase {
   id: string; org_name: string; client_type: string; stage: string;
@@ -43,7 +43,7 @@ interface BusinessCase {
 interface EmailTarget {
   id: string; company: string; email: string | null; hook: string | null; drafted: boolean; sent: boolean;
   updated_at?: string | null;
-  email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null;
+  email_sent_at?: string | null; email_reply?: string | null; followed_up_at?: string | null; reply_handled_at?: string | null;
 }
 interface ClientDossier {
   id: string; org_name: string; plan: string | null; monthly_fee: number | null;
@@ -53,6 +53,7 @@ interface MunicipalityProfile {
   id: string; region_name: string; opportunity_level: string; relation_population_initiative: string | null;
   engagement_stage: string; fit_assessment: string | null; opportunity_notes: string | null; evidence_summary: string | null;
   email_sent_at: string | null; email_reply: string | null; followed_up_at: string | null; on_hold: boolean;
+  reply_handled_at?: string | null;
 }
 interface CalendarEvent {
   title: string; start: string | null; end: string | null; all_day: boolean; location: string; html_link: string;
@@ -211,6 +212,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     await fetch(`/api/admin/sales-email-targets/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
     await load();
   }
+  async function patchMunicipality(id: string, fields: Partial<MunicipalityProfile>) {
+    await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    await load();
+  }
   async function addRecord(leadId: string, kind: EnKind, note: string, happenedAt: string) {
     const res = await fetch('/api/admin/en-records', {
       method: 'POST', headers: jsonHeaders(),
@@ -257,6 +262,44 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     dossiers: dossiers.map(d => ({ id: d.id, org_name: d.org_name, next_meeting: d.next_meeting })),
   }), [leads, emails, municipalityProfiles, cases, dossiers]);
   const overdueFollowUps = useMemo(() => followQueue.filter(i => i.status === 'overdue'), [followQueue]);
+
+  // ---------- 返信あり専用導線 ----------
+  // 返信は来ているのにダッシュボード上で「返信が来た案件だけ」を集めて見る場所が無く、
+  // Discord通知を流し見るだけになっていた。email_replyがあってreply_handled_atが未設定のものを
+  // 3ソース横断でここに集める。「対応済みにする」を押すと一覧から消える。
+  interface ReplyInboxItem {
+    source: 'lead' | 'email_target' | 'municipality';
+    id: string; name: string; reply: string; icon: string;
+    onHandle: () => void; switchView?: SalesView;
+  }
+  const replyInbox: ReplyInboxItem[] = useMemo(() => {
+    const items: ReplyInboxItem[] = [];
+    for (const l of leads) {
+      if (l.email_reply && !l.reply_handled_at) {
+        items.push({
+          source: 'lead', id: l.id, name: l.org_name, reply: l.email_reply, icon: '🎓',
+          onHandle: () => patchLead(l.id, { reply_handled_at: new Date().toISOString() }), switchView: 'leads',
+        });
+      }
+    }
+    for (const e of emails) {
+      if (e.email_reply && !e.reply_handled_at) {
+        items.push({
+          source: 'email_target', id: e.id, name: e.company, reply: e.email_reply, icon: '📮',
+          onHandle: () => patchEmail(e.id, { reply_handled_at: new Date().toISOString() }),
+        });
+      }
+    }
+    for (const p of municipalityProfiles) {
+      if (p.email_reply && !p.reply_handled_at) {
+        items.push({
+          source: 'municipality', id: p.id, name: p.region_name, reply: p.email_reply, icon: '🏛',
+          onHandle: () => patchMunicipality(p.id, { reply_handled_at: new Date().toISOString() }), switchView: 'relation',
+        });
+      }
+    }
+    return items;
+  }, [leads, emails, municipalityProfiles]);
 
   // ---------- 朝の一枚（今日の一手）の自動生成 ----------
   const morning = useMemo(() => {
@@ -478,6 +521,38 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
             <code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>supabase/migrations/20260719_add_en_records.sql</code> を
             SupabaseのSQL Editorで一度実行してください。それまでは証拠パック（メモ）とステータスだけでスコアを仮計算しています。
           </p>
+        </div>
+      )}
+
+      {/* ---------- 返信あり専用導線 ---------- */}
+      {replyInbox.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <h2 style={{ ...sectionTitleStyle, margin: '0 0 10px', color: '#8E44AD' }}>
+            📬 返信あり — 対応待ち（{replyInbox.length}件）
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {replyInbox.map(item => (
+              <div key={`${item.source}-${item.id}`} style={{ ...cardStyle, borderLeft: '4px solid #8E44AD' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <b style={{ fontSize: 13.5 }}>{item.icon} {item.name}</b>
+                    <p style={{ margin: '6px 0 0', fontSize: 12.5, color: '#555', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                      {item.reply.length > 220 ? `${item.reply.slice(0, 220)}…` : item.reply}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                    {item.switchView && (
+                      <button onClick={() => setView(item.switchView!)} style={jumpBtnStyle}>台帳を開く</button>
+                    )}
+                    <button onClick={item.onHandle} style={{
+                      padding: '4px 10px', borderRadius: 14, border: 'none', background: '#8E44AD',
+                      color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}>対応済みにする</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
