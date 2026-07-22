@@ -35,8 +35,8 @@ function requireEnv(name: string): string {
   return v;
 }
 
-async function getAccessToken(): Promise<string> {
-  if (tokenCache && tokenCache.expiresAt > Date.now() + 30_000) {
+async function getAccessToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && tokenCache && tokenCache.expiresAt > Date.now() + 30_000) {
     return tokenCache.accessToken;
   }
   const clientId = requireEnv('GOOGLE_CALENDAR_CLIENT_ID');
@@ -55,10 +55,28 @@ async function getAccessToken(): Promise<string> {
   });
   const data = await res.json();
   if (!res.ok || !data.access_token) {
+    tokenCache = null;
     throw new Error(`Googleカレンダーのトークン更新に失敗しました: ${data.error_description ?? data.error ?? res.status}`);
   }
   tokenCache = { accessToken: data.access_token, expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000 };
   return tokenCache.accessToken;
+}
+
+/**
+ * Calendar/freeBusy APIへの呼び出しを、期限内のはずのキャッシュ済みトークンが
+ * 実際にはGoogle側で無効化されていた場合でも自動復旧するようラップする。
+ * サーバープロセスが長生きするVercelのウォームインスタンスやローカルdevサーバーでは、
+ * 一度でも壊れた/失効したトークンがキャッシュされると、expiresAtの帳簿上は有効なままなので
+ * 自然な期限切れ（最大1時間）までずっと401を返し続け、「なぜか同期しない」状態が続いていた。
+ * 401を見たらキャッシュを破棄し、トークンを取り直して1回だけ再試行する。
+ */
+async function calendarFetch(url: string, init: RequestInit): Promise<Response> {
+  const accessToken = await getAccessToken();
+  const res = await fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${accessToken}` } });
+  if (res.status !== 401) return res;
+  tokenCache = null;
+  const freshToken = await getAccessToken(true);
+  return fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${freshToken}` } });
 }
 
 // JSTの「YYYY-MM-DD HH:mm」からISO8601（+09:00固定）を組み立てる。
@@ -83,10 +101,10 @@ function addDays(parts: JstDateParts, days: number): JstDateParts {
 
 interface BusyInterval { start: number; end: number } // epoch ms
 
-async function fetchBusyIntervals(accessToken: string, timeMinIso: string, timeMaxIso: string): Promise<BusyInterval[]> {
-  const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+async function fetchBusyIntervals(timeMinIso: string, timeMaxIso: string): Promise<BusyInterval[]> {
+  const res = await calendarFetch('https://www.googleapis.com/calendar/v3/freeBusy', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       timeMin: timeMinIso,
       timeMax: timeMaxIso,
@@ -109,8 +127,7 @@ async function fetchBusyIntervals(accessToken: string, timeMinIso: string, timeM
  * 別のリクエストが先に確定されて枠が埋まっていないかをチェックする（二重予約防止）。
  */
 export async function isSlotFree(startTime: string, endTime: string): Promise<boolean> {
-  const accessToken = await getAccessToken();
-  const busy = await fetchBusyIntervals(accessToken, startTime, endTime);
+  const busy = await fetchBusyIntervals(startTime, endTime);
   const startMs = new Date(startTime).getTime();
   const endMs = new Date(endTime).getTime();
   return !busy.some(b => startMs < b.end && endMs > b.start);
@@ -126,14 +143,13 @@ export async function isSlotFree(startTime: string, endTime: string): Promise<bo
  * （app/api/schedule/availability/route.ts）が表示中の月の範囲を渡す。
  */
 export async function getAvailability(fromDate: string, toDate: string, durationMinutes: number): Promise<AvailabilityDay[]> {
-  const accessToken = await getAccessToken();
   const now = new Date();
   const [fy, fm, fd] = fromDate.split('-').map(Number);
   const [ty, tm, td] = toDate.split('-').map(Number);
   const windowStart = jstIso(fy, fm, fd, 0, 0);
   const windowEnd = jstIso(ty, tm, td, 23, 59);
 
-  const busy = await fetchBusyIntervals(accessToken, windowStart, windowEnd);
+  const busy = await fetchBusyIntervals(windowStart, windowEnd);
 
   const result: AvailabilityDay[] = [];
   let cursor = addDays({ y: fy, m: fm, d: fd, weekday: 0 }, 0); // weekdayを正しく計算させるためaddDays(+0日)を通す
@@ -185,16 +201,15 @@ export interface CreateEventInput {
  * 申込者をattendeeに入れると、Google側の招待メール機能で本人にも自動で届く。
  */
 export async function createCalendarEvent(input: CreateEventInput): Promise<{ id: string; htmlLink: string }> {
-  const accessToken = await getAccessToken();
   const summary = input.assignee ? `[${input.assignee}] ${input.summary}` : input.summary;
   const description = input.location
     ? [input.description, `会議室URL: ${input.location}`].filter(Boolean).join('\n\n')
     : input.description;
-  const res = await fetch(
+  const res = await calendarFetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events?sendUpdates=all`,
     {
       method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         summary,
         description,
@@ -218,13 +233,12 @@ export async function createCalendarEvent(input: CreateEventInput): Promise<{ id
 export async function updateCalendarEventAssignee(
   eventId: string, cleanTitle: string, assignee: string | null,
 ): Promise<void> {
-  const accessToken = await getAccessToken();
   const summary = assignee ? `[${assignee}] ${cleanTitle}` : cleanTitle;
-  const res = await fetch(
+  const res = await calendarFetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(eventId)}`,
     {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ summary }),
     }
   );
@@ -239,10 +253,9 @@ export async function updateCalendarEventAssignee(
  * sendUpdates=allで、招待していた参加者にもGoogle側からキャンセル通知メールが届く。
  */
 export async function deleteCalendarEvent(eventId: string): Promise<void> {
-  const accessToken = await getAccessToken();
-  const res = await fetch(
+  const res = await calendarFetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
-    { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+    { method: 'DELETE', headers: {} }
   );
   // 204 No Content が成功。410 Gone（既に削除済み）は冪等に成功扱いにする。
   if (!res.ok && res.status !== 410) {
@@ -274,7 +287,6 @@ const CALENDAR_READ_RANGE_DAYS = 14;
  * こちらは書き込みスコープの環境変数を使うため、本番（Vercel）でもリアルタイムに読める。
  */
 export async function listUpcomingEventsGrouped(days: number = CALENDAR_READ_RANGE_DAYS): Promise<CalendarDayGroup[]> {
-  const accessToken = await getAccessToken();
   const todayParts = jstPartsFromDate(new Date());
   const timeMin = jstIso(todayParts.y, todayParts.m, todayParts.d, 0, 0);
   const endParts = addDays(todayParts, days);
@@ -290,7 +302,7 @@ export async function listUpcomingEventsGrouped(days: number = CALENDAR_READ_RAN
   // cache:'no-store' が必須。Next.jsのデータキャッシュはGETのfetchを既定でキャッシュするため、
   // これが無いと dynamic='force-dynamic' を付けていても古い予定一覧が返り続ける
   // （supabaseServerFreshで直した統合司令室の件と同根の問題）。
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' });
+  const res = await calendarFetch(url.toString(), { headers: {}, cache: 'no-store' });
   const data = await res.json();
   if (!res.ok) throw new Error(`カレンダー予定の取得に失敗しました: ${data.error?.message ?? res.status}`);
 

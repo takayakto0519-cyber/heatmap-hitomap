@@ -55,6 +55,11 @@ function toResponse(data: CalendarResult, extra: Record<string, unknown> = {}) {
 export async function GET(req: NextRequest) {
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
+  // ライブ取得が失敗してフォールバックに落ちても理由が画面から追えるように、
+  // 「なぜライブでないか」を最後まで持ち回って返す（以前はconsole.errorのみで、
+  // フォールバックが成功した場合はUIから原因が一切見えなかった）。
+  let liveFailureReason: string | null = null;
+
   if (process.env.GOOGLE_CALENDAR_REFRESH_TOKEN) {
     try {
       const { listUpcomingEventsGrouped } = await import('@/lib/googleCalendarServer');
@@ -67,16 +72,19 @@ export async function GET(req: NextRequest) {
         as_of: new Date().toISOString(),
       }, { live: true });
     } catch (e) {
-      // 環境変数はあってもトークン失効等で失敗することがある。下のフォールバックへ静かに続ける。
+      // 環境変数はあってもトークン失効等で失敗することがある。下のフォールバックへ続ける。
+      liveFailureReason = e instanceof Error ? e.message : String(e);
       console.error('[calendar] live fetch failed, falling back:', e);
     }
+  } else {
+    liveFailureReason = 'GOOGLE_CALENDAR_REFRESH_TOKEN が本番環境に未設定です（.env.localにあっても、Vercel側の環境変数には反映されません）';
   }
 
   const filePath = path.join(process.cwd(), 'agents', 'work', 'calendar_watch.json');
   if (fs.existsSync(filePath)) {
     try {
       const data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as CalendarResult;
-      return toResponse(data, { local: true });
+      return toResponse(data, { local: true, liveFailureReason });
     } catch {
       // 壊れたファイルは無視して下のフォールバックへ
     }
@@ -91,12 +99,12 @@ export async function GET(req: NextRequest) {
         .eq('agent_id', 'calendar_watch')
         .maybeSingle();
       if (!error && data?.result) {
-        return toResponse(data.result as CalendarResult, { local: false, syncedAt: data.synced_at });
+        return toResponse(data.result as CalendarResult, { local: false, syncedAt: data.synced_at, liveFailureReason });
       }
     } catch {
       // Supabase未設定・テーブル未作成でもエラーにはせず、下のconnected:falseにフォールバックする
     }
   }
 
-  return NextResponse.json({ ok: true, connected: false, days: [], today: [], tomorrow: [] });
+  return NextResponse.json({ ok: true, connected: false, days: [], today: [], tomorrow: [], error: liveFailureReason });
 }

@@ -33,6 +33,7 @@ interface CalendarData {
   local?: boolean;
   live?: boolean;
   syncedAt?: string | null;
+  liveFailureReason?: string | null;
 }
 
 const EMPTY: CalendarData = { ok: false, connected: false, days: [], today: [], tomorrow: [] };
@@ -66,6 +67,33 @@ function formatDateLabel(dateStr: string, todayStr: string): string {
   const label = `${d.getMonth() + 1}/${d.getDate()}(${weekday})`;
   if (dateStr === todayStr) return `${label} ・ 本日`;
   return label;
+}
+
+// 「連携中」の一律表示だと、実際のGoogleカレンダーからライブ取得できているのか、
+// それとも会長のPC側の番人（agents/calendar_watch.py）が最後に同期したスナップショットを
+// 見ているだけなのかが区別できず、「なぜか実際のカレンダーと同期していない」という
+// 混乱の原因になっていた。live=falseのときは同期時刻つきで正直に表示する。
+function ConnectionBadge({ data }: { data: CalendarData }) {
+  if (data.live) {
+    return (
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#27AE60', background: '#EAF7EE', padding: '2px 8px', borderRadius: 20 }}>
+        ● 連携中（ライブ）
+      </span>
+    );
+  }
+  const syncedAt = data.syncedAt ?? data.asOf ?? null;
+  const syncedLabel = syncedAt ? new Date(syncedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '不明';
+  const reason = data.liveFailureReason
+    ? `理由: ${data.liveFailureReason}`
+    : '会長のPCの番人（agents/calendar_watch.py）が最後に同期した時点のスナップショットを表示しています。';
+  return (
+    <span
+      title={`${reason} 今すぐライブ化するには本番環境にGOOGLE_CALENDAR_CLIENT_ID/SECRET/REFRESH_TOKENの設定が必要です。`}
+      style={{ fontSize: 10, fontWeight: 700, color: '#B7791F', background: '#FFF3D6', padding: '2px 8px', borderRadius: 20, cursor: 'help' }}
+    >
+      🕒 最終同期 {syncedLabel} 時点
+    </span>
+  );
 }
 
 function EventRow({
@@ -332,7 +360,7 @@ export default function CalendarPanel({
       <div>
         <div style={{ fontSize: compact ? 13 : 14, fontWeight: 800, color: '#444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
           今日の予定
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#27AE60', background: '#EAF7EE', padding: '2px 8px', borderRadius: 20 }}>● 連携中</span>
+          <ConnectionBadge data={data} />
         </div>
         <AddEventForm authHeaders={authHeaders} onCreated={load} isLive={Boolean(data.live)} />
         {assigneeDatalist}
@@ -355,7 +383,7 @@ export default function CalendarPanel({
     <div>
       <div style={{ fontSize: compact ? 13 : 14, fontWeight: 800, color: '#444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
         直近2週間の予定
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#27AE60', background: '#EAF7EE', padding: '2px 8px', borderRadius: 20 }}>● 連携中</span>
+        <ConnectionBadge data={data} />
       </div>
       <AddEventForm authHeaders={authHeaders} onCreated={load} isLive={Boolean(data.live)} />
       {assigneeDatalist}
