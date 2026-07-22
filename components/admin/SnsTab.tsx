@@ -25,6 +25,7 @@ export default function SnsTab({ authHeaders }: { authHeaders: () => HeadersInit
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -83,6 +84,21 @@ export default function SnsTab({ authHeaders }: { authHeaders: () => HeadersInit
     setTimeout(() => setCopiedId((v) => (v === draft.id ? null : v)), 2000);
   }
 
+  async function uploadImage(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setMessage('');
+    try {
+      const { uploadTracePhoto } = await import('@/lib/supabase/upload');
+      const url = await uploadTracePhoto(files[0]);
+      setForm((f) => ({ ...f, image_url: url }));
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : '画像のアップロードに失敗しました');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8,
     border: '1.5px solid #ddd', fontSize: 14, fontFamily: 'inherit',
@@ -114,7 +130,13 @@ export default function SnsTab({ authHeaders }: { authHeaders: () => HeadersInit
           <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} style={inputStyle} placeholder="例：煩悩オークション紹介" />
           <label style={labelStyle}>キャプション</label>
           <textarea value={form.caption} onChange={(e) => setForm((f) => ({ ...f, caption: e.target.value }))} rows={8} style={{ ...inputStyle, resize: 'vertical' }} />
-          <label style={labelStyle}>画像URL（任意）</label>
+          <label style={labelStyle}>画像（任意）</label>
+          <input type="file" accept="image/*" disabled={uploading} onChange={(e) => uploadImage(e.target.files)} />
+          {uploading && <p style={{ fontSize: 12, color: '#999', margin: '6px 0 0' }}>アップロード中…</p>}
+          {form.image_url && (
+            <img src={form.image_url} alt="" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, display: 'block', marginTop: 10 }} />
+          )}
+          <label style={{ ...labelStyle, fontWeight: 400, color: '#999' }}>または画像URLを直接貼り付け</label>
           <input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} style={inputStyle} placeholder="https://..." />
           <button onClick={createDraft} disabled={saving} style={{
             marginTop: 14, padding: '10px 20px', borderRadius: 8, border: 'none', background: '#38ADA9',
