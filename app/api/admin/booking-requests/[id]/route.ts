@@ -26,6 +26,12 @@ function formatCandidatesJst(candidateSlots: CandidateSlot[]): string {
   return candidateSlots.map((c) => formatJst(c.start)).join(' / ');
 }
 
+// 確定メールの「〜HH:MM」用（終了時刻だけを時刻表記で欲しい場合）
+function formatTimeOnlyJst(iso: string): string {
+  const jst = new Date(new Date(iso).getTime() + 9 * 3600_000);
+  return `${String(jst.getUTCHours()).padStart(2, '0')}:${String(jst.getUTCMinutes()).padStart(2, '0')}`;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
@@ -150,6 +156,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       })
       .eq('id', params.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    // Googleカレンダーのattendee招待メール（sendUpdates=all）だけに頼らず、確実に届くよう
+    // gmail.sendで明示的に確定メールも送る（招待メールが届かないケースがあったため）
+    try {
+      const { sendEmail } = await import('@/lib/gmailServer');
+      await sendEmail({
+        to: reqRow.email,
+        subject: '【ヒトマップ】ご予約が確定しました',
+        body: [
+          `${reqRow.name} 様`,
+          '',
+          `${formatJst(chosen.start)}〜${formatTimeOnlyJst(chosen.end)} のご予約が確定しました。`,
+          '',
+          `会議室（Google Meet）：${SCHEDULING_MEET_URL}`,
+          '',
+          '当日お待ちしております。',
+          '',
+          'ヒトマップ',
+        ].join('\n'),
+      });
+    } catch {
+      // メール送信失敗は確定処理自体を失敗させない（カレンダー登録・DB更新は既に完了しているため）
+    }
+
     return NextResponse.json({ ok: true, calendarEventLink: event.htmlLink });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'カレンダーへの登録に失敗しました';

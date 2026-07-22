@@ -83,5 +83,47 @@ export async function POST(req: NextRequest) {
     `運営ダッシュボードで候補から1つ選んで確定/却下してください`
   );
 
+  // メール通知（失敗しても送信リクエスト自体は既に保存済みなので、応答は失敗させない）
+  try {
+    const { sendEmail, OWN_ADDRESS } = await import('@/lib/gmailServer');
+
+    // ① 送信者本人へ：受付確認（この時点ではまだ確定していない旨を明記）
+    await sendEmail({
+      to: email,
+      subject: '【ヒトマップ】日程調整のリクエストを受け付けました',
+      body: [
+        `${name} 様`,
+        '',
+        '日程調整のリクエストを受け付けました。ありがとうございます。',
+        '',
+        `候補日時（${candidateSlots.length}件）：`,
+        whenList,
+        '',
+        'この中から担当者が1つを選び、確定いたします。確定まで今しばらくお待ちください。',
+        '確定後、Google Meet（オンライン会議）の招待メールを改めてお送りします。',
+        '',
+        'ヒトマップ',
+      ].join('\n'),
+    });
+
+    // ② 運営（hitomap.info@gmail.com）へ：新規リクエスト到着の通知
+    await sendEmail({
+      to: OWN_ADDRESS,
+      subject: `【ヒトマップ】日程調整の新規リクエスト（${name}様）`,
+      body: [
+        `${name} 様（${email}）${body.company ? ` ・ ${body.company}` : ''} から日程調整のリクエストが届きました。`,
+        '',
+        `候補日時（${candidateSlots.length}件・${duration}分）：`,
+        whenList,
+        body.purpose ? `\n用件：${body.purpose}` : '',
+        '',
+        '運営ダッシュボードの「日程調整」パネルで候補から1つ選んで確定/却下してください。',
+        'https://hitomap.com/admin/dashboard?tab=secretary',
+      ].filter(Boolean).join('\n'),
+    });
+  } catch {
+    // メール送信失敗はリクエスト受付自体を失敗させない（Discord通知は既に送信済み）
+  }
+
   return NextResponse.json({ ok: true, request: data });
 }
