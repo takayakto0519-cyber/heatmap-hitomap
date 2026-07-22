@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/gmail-watch",
       "schedule": "50 21 * * *"
+    },
+    {
+      "path": "/api/cron/todo-calendar-sync",
+      "schedule": "0 13 * * *"
     }
   ]
 }
