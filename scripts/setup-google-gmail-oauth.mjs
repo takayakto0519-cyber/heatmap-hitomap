@@ -33,7 +33,8 @@ const ENV_PATH = path.join(ROOT, '.env.local');
 
 const PORT = 8735; // calendarの8734と衝突しないよう別ポート
 const REDIRECT_URI = `http://127.0.0.1:${PORT}/oauth2callback`;
-// 読み取り(gmail_watch.pyと同じ)＋送信(日程調整サイトの却下/キャンセル通知メール用)。
+// 読み取り(gmail_watch.pyと同じ)＋送信(日程調整通知・お問い合わせ受付確認・
+// 会長が送信キューで承認した営業メール用。lib/gmailServer.ts参照)。
 // 削除・ラベル変更等の権限は持たせない。
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',

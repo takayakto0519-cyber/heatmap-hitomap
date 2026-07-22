@@ -128,8 +128,12 @@ export interface SendEmailInput {
 }
 
 /**
- * gmail.sendスコープでのメール送信（日程調整サイトの却下・キャンセル通知専用）。
- * 予定の作成・削除・返信の閲覧とは別の権限。送信専用の用途にだけ使うこと。
+ * gmail.sendスコープでのメール送信。
+ * 用途：①日程調整サイトの却下・キャンセル通知、②お問い合わせフォームの受付確認、
+ * ③会長がダッシュボードの送信キューで「送信」を押して明示的に承認した営業メール（2026-07-22〜）。
+ * ③はAIが自律的に呼ぶことは無い——必ず会長のクリックを起点にAPIルートから呼ばれる
+ * （lib/contactFinder.tsで確度を確認した宛先のみ。憲法の「AIは外部行動を自律的に行わない」原則を、
+ * 「送信ボタンは常に人間が押す」という設計で担保している）。
  */
 export async function sendEmail(input: SendEmailInput): Promise<void> {
   const accessToken = await getAccessToken();

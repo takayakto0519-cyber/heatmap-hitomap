@@ -18,6 +18,7 @@ import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
 import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
 import FlowBoard from '@/components/admin/sales/FlowBoard';
+import SendQueuePanel from '@/components/admin/sales/SendQueuePanel';
 import DossiersSection from '@/components/admin/sales/DossiersSection';
 import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
 
@@ -128,7 +129,7 @@ interface MorningItem {
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
 // 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
-const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers'] as const;
+const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'sendqueue'] as const;
 type SalesView = typeof SALES_VIEWS[number];
 
 // サブビューを「見る画面」と「書く画面（台帳）」に分けて並べる。
@@ -137,6 +138,7 @@ const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }
   { label: '見る', views: [
     { key: 'ledger', label: '🧭 営業' },
     { key: 'relation', label: '🔁 関係人口・自治体' },
+    { key: 'sendqueue', label: '📤 送信キュー' },
   ] },
   { label: '台帳', views: [
     { key: 'leads', label: '🎓 学校・法人' },
@@ -510,6 +512,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
+      {view === 'sendqueue' && <SendQueuePanel authHeaders={authHeaders} />}
 
       {view === 'ledger' && <>
       {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
