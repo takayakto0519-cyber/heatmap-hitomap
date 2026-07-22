@@ -4,6 +4,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Trace } from '@/lib/types';
 import { inputStyle, AuthorLine, ContentTags, useAuthorMap } from '@/components/admin/adminShared';
+import { STAGE_LABELS, BRANCH_META, EGG_EMOJI, SPROUT_EMOJI, type CharacterBranch } from '@/lib/character';
+
+const BRANCH_ORDER: CharacterBranch[] = ['hidamari', 'bouken', 'monogatari', 'machibito'];
 
 export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [q, setQ] = useState('');
@@ -13,6 +16,7 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showCharacterGuide, setShowCharacterGuide] = useState(false);
   // データ整合性QA・不正投稿検知（ホームの「今日の要注意」と同じ着眼点）をこの一覧側でも
   // 絞り込めるようにする。品質チェック目的なので通常より広い範囲（500件）を対象にする。
   const [emptyTitleOnly, setEmptyTitleOnly] = useState(false);
@@ -88,6 +92,40 @@ export default function TracesTab({ authHeaders }: { authHeaders: () => HeadersI
           <input type="checkbox" checked={duplicateOnly} onChange={e => setDuplicateOnly(e.target.checked)} />
           ⚠ 重複タイトル（3件以上）のみ（{duplicateTitles.size}種類）
         </label>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <button onClick={() => setShowCharacterGuide(v => !v)} style={{
+          padding: '5px 12px', borderRadius: 14, border: '1px solid #8A6B3F', background: '#fff',
+          color: '#8A6B3F', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+        }}>{showCharacterGuide ? '▴ キャラクター図鑑を閉じる' : '▾ 🎮 マップで育つキャラクター図鑑（参考資料）'}</button>
+        {showCharacterGuide && (
+          <div style={{ marginTop: 10, background: '#fff', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#777', lineHeight: 1.7 }}>
+              利用者が/mapで記録を積み重ねるほど育つ、その人だけのキャラクター（<code style={{ background: '#f4f4f4', padding: '1px 5px', borderRadius: 4 }}>lib/character.ts</code>）の一覧です。
+              投稿内容（感情タグ・地域の広さ・「こと/人」の別・同行者タグ等）から自動で分岐します。
+            </p>
+            <p style={{ margin: '0 0 14px', fontSize: 12.5, fontWeight: 700, color: '#444' }}>
+              成長段階：{EGG_EMOJI} {STAGE_LABELS[1]} → {SPROUT_EMOJI} {STAGE_LABELS[2]} → {STAGE_LABELS[3]}（分岐確定）→ {STAGE_LABELS[4]} → {STAGE_LABELS[5]}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {BRANCH_ORDER.map(key => {
+                const b = BRANCH_META[key];
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', background: '#FAF8F4', borderRadius: 8 }}>
+                    <span style={{ fontSize: 22, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {b.emojis[3]} → {b.emojis[4]} → {b.emojis[5]}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#8A6B3F' }}>{b.label}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 12, color: '#666', lineHeight: 1.6 }}>{b.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {(includeDemo || demoHiddenCount > 0) && (

@@ -27,7 +27,7 @@ export interface CharacterState {
   postCount: number;
 }
 
-const STAGE_LABELS: Record<CharacterStage, string> = {
+export const STAGE_LABELS: Record<CharacterStage, string> = {
   1: 'たまご',
   2: 'ふたば',
   3: 'こども',
@@ -37,12 +37,28 @@ const STAGE_LABELS: Record<CharacterStage, string> = {
 
 const EGG_EMOJI = '🥚';
 const SPROUT_EMOJI = '🐣';
+export { EGG_EMOJI, SPROUT_EMOJI };
 
-const BRANCH_META: Record<CharacterBranch, { label: string; emojis: Record<3 | 4 | 5, string> }> = {
-  hidamari: { label: 'ひだまり型', emojis: { 3: '🐰', 4: '🦢', 5: '🦄' } },
-  bouken: { label: 'ぼうけん型', emojis: { 3: '🦊', 4: '🐺', 5: '🦁' } },
-  monogatari: { label: 'ものがたり型', emojis: { 3: '🦉', 4: '🐲', 5: '🐉' } },
-  machibito: { label: 'まちびと型', emojis: { 3: '🐕', 4: '🐆', 5: '🦮' } },
+// 運営ダッシュボード（TracesTab）の「キャラクター図鑑」表示でも使う、各分岐タイプの
+// 判定基準の説明文。determineBranch()のスコアリング条件を運営向けに言語化したもの
+// （ロジック自体はdetermineBranchが唯一の正。ここは表示用の要約）。
+export const BRANCH_META: Record<CharacterBranch, { label: string; emojis: Record<3 | 4 | 5, string>; description: string }> = {
+  hidamari: {
+    label: 'ひだまり型', emojis: { 3: '🐰', 4: '🦢', 5: '🦄' },
+    description: '「あたたかさ」「安心」「なつかしさ」の感情タグが多い記録から育つ。',
+  },
+  bouken: {
+    label: 'ぼうけん型', emojis: { 3: '🦊', 4: '🐺', 5: '🦁' },
+    description: '「驚き」「ときめき」「楽しさ」の感情タグが多く、多くの地域を歩いた記録から育つ。',
+  },
+  monogatari: {
+    label: 'ものがたり型', emojis: { 3: '🦉', 4: '🐲', 5: '🐉' },
+    description: '「切なさ」「不思議」「感動」の感情タグ、「なぜ惹かれたか」をよく書き込む記録、「こと」の記録から育つ。',
+  },
+  machibito: {
+    label: 'まちびと型', emojis: { 3: '🐕', 4: '🐆', 5: '🦮' },
+    description: '「人」の記録や、同行者タグを付けた記録が多いと育つ。',
+  },
 };
 
 const PREFECTURES = [
