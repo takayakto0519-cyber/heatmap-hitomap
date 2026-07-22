@@ -851,7 +851,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
               <p style={{ margin: '10px 0 -2px', fontSize: 12, fontWeight: 700, color: '#666' }}>送信済み・返信待ち（{awaiting.length}）</p>
             )}
             {awaiting.map(e => row(e, effSentAt(e)))}
-            <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>※送信はご自身のメールソフトから。ここは記録だけ。返信が来たら「返信きた」を押すと一覧から下がります。</p>
+            <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>※下書き（email_draft）が入っているものは「📤 送信キュー」タブから宛先確認・事実確認のうえ送信できます。ここは進捗の記録用で、ダッシュボード外で送った分もここに反映してください。返信が来たら「返信きた」を押すと一覧から下がります。</p>
           </div>
         );
       })()}
