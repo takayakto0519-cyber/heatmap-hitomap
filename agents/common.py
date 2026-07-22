@@ -1,5 +1,7 @@
 """エージェント共通ユーティリティ — 実行中フラグと結果ファイルの管理"""
 import json
+import os
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +14,23 @@ ROOT = AGENTS_DIR.parent
 # 商談デモ用の合成データ（scripts/seed-demo-sales-data.mjs）のタグ。
 # 集計系の番人はこれを含む行を数字に混ぜないよう、フィルタしてから集計すること。
 DEMO_SESSION_CODE = "demo-sales-20260720"
+
+
+def _atomic_write_json(path: Path, data: dict):
+    """複数の番人が同時に同じファイルへ書き込んでも壊れないよう、
+    一時ファイルに書いてから os.replace() で置き換える（置き換え自体はOS側でアトミック）。
+    2026-07-22、xp.jsonが2つのJSONオブジェクトの連結という破損状態になっていた事故の再発防止。"""
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 @contextmanager
@@ -32,7 +51,10 @@ def _bump_xp(agent_id: str):
         xp_path = WORK_DIR / "xp.json"
         data = {}
         if xp_path.exists():
-            data = json.loads(xp_path.read_text(encoding="utf-8"))
+            try:
+                data = json.loads(xp_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data = {}  # 破損していた場合は諦めて空から作り直す（経験値が本業ではないため）
         month = datetime.now().strftime("%Y-%m")
         rec = data.get(agent_id) or {"total": 0, "monthly": {}}
         rec["total"] = int(rec.get("total", 0)) + 1
@@ -41,16 +63,14 @@ def _bump_xp(agent_id: str):
         rec["monthly"] = monthly
         rec["last_run"] = datetime.now().isoformat()
         data[agent_id] = rec
-        xp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(xp_path, data)
     except Exception:
         pass
 
 
 def write_result(agent_id: str, data: dict):
     payload = {**data, "generated_at": datetime.now().isoformat()}
-    (WORK_DIR / f"{agent_id}.json").write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    _atomic_write_json(WORK_DIR / f"{agent_id}.json", payload)
 
 
 def read_result(agent_id: str) -> dict | None:

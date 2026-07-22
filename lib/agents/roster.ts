@@ -77,6 +77,7 @@ export const SCRIPTS: AgentDef[] = [
   { id: 'academic_partnership_watch', name: '52. 産学連携リサーチAI', emoji: '🦉', floor: 'SALES', kind: 'script', schedule: '毎日 06:30' },
   { id: 'memorial_anniversary_watch', name: '53. 周年史アーカイブAI', emoji: '🕊️', floor: 'SALES', kind: 'script', schedule: '毎日 07:05' },
   { id: 'action_items_digest', name: '作業状況ダッシュボード番人', emoji: '🐭', floor: 'GA', kind: 'script', schedule: '毎日 08:20' },
+  { id: 'roster_health_watch', name: '番人稼働ヘルスチェックAI', emoji: '🩺', floor: 'GA', kind: 'script', schedule: '毎日 09:35' },
   { id: 'revisit_prompt', name: '「その後」通知番人', emoji: '🦝', floor: 'PRODUCT', kind: 'script', schedule: '毎日 09:00' },
   { id: 'gmail_watch', name: 'Gmail送受信番人', emoji: '📬', floor: 'SALES', kind: 'script', schedule: '毎日 07:10', reads: ['calendar_watch'] },
 ];

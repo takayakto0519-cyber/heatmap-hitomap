@@ -358,6 +358,14 @@
       "schedule": "毎日 08:20"
     },
     {
+      "id": "roster_health_watch",
+      "name": "番人稼働ヘルスチェックAI",
+      "emoji": "🩺",
+      "floor": "GA",
+      "kind": "script",
+      "schedule": "毎日 09:35"
+    },
+    {
       "id": "revisit_prompt",
       "name": "「その後」通知番人",
       "emoji": "🦝",
