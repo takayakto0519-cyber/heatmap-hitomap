@@ -61,7 +61,7 @@ function EmailSection({ jsonHeaders, authHeaders }: Headers) {
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: '#999', margin: '0 0 10px' }}>送信はここからは行いません。下書き作成後、ご自身のメールソフトから送信し、「送信済み」にチェックしてください。</p>
+      <p style={{ fontSize: 12, color: '#999', margin: '0 0 10px' }}>ここでは送り先の追加・下書き済みチェックのみ行います。実際の送信は「📤 送信キュー」タブで、宛先・事実確認を済ませたうえで行ってください。</p>
       <button style={btnStyle} onClick={() => setShowForm((v) => !v)}>{showForm ? 'キャンセル' : '+ 送り先を追加'}</button>
       {message && <p style={{ fontSize: 13, color: '#E74C3C' }}>{message}</p>}
       {showForm && (

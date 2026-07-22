@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const ALLOWED_FIELDS = ['company', 'email', 'hook', 'drafted', 'sent', 'email_sent_at', 'email_reply', 'followed_up_at', 'reply_handled_at', 'website_url', 'contact_email_confidence', 'contact_email_source_url', 'email_draft', 'fact_check_status', 'fact_check_note', 'fact_checked_at'];
+const ALLOWED_FIELDS = ['company', 'email', 'hook', 'drafted', 'sent', 'email_sent_at', 'email_reply', 'followed_up_at', 'reply_handled_at', 'website_url', 'contact_email_confidence', 'contact_email_source_url', 'email_draft', 'fact_check_status', 'fact_check_note', 'fact_checked_at', 'assigned_to'];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -16,10 +16,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { supabaseServer } = await import('@/lib/supabase/server');
   let { data, error } = await supabaseServer
     .from('sales_email_targets').update(patch).eq('id', params.id).select().single();
-  // 20260720_add_lead_outreach_fields.sql 未適用でも壊れないように、
-  // 新カラムが無いことによるエラー時は送信後3項目を外して再試行する。
-  if (error && /email_sent_at|email_reply|followed_up_at|column/.test(error.message)) {
-    for (const k of ['email_sent_at', 'email_reply', 'followed_up_at']) delete patch[k];
+  // マイグレーション未適用のカラムを指定した場合でも壊れないように、
+  // エラーメッセージから実際に存在しないカラム名を読み取ってその項目だけ外し再試行する。
+  for (let i = 0; error && i < ALLOWED_FIELDS.length; i++) {
+    const missing = error.message.match(/column ["']?(?:\w+\.)?([a-zA-Z_]+)["']?/)?.[1];
+    if (!missing || !(missing in patch)) break;
+    delete patch[missing];
     ({ data, error } = await supabaseServer
       .from('sales_email_targets').update(patch).eq('id', params.id).select().single());
   }

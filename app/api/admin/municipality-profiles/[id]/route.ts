@@ -9,7 +9,7 @@ const ALLOWED_FIELDS = [
   'contact_email', 'email_draft', 'email_sent_at', 'email_sent_content', 'email_reply', 'is_priority_pick',
   'followed_up_at', 'on_hold', 'smout_sent_at', 'smout_reply', 'municipality_code', 'reply_handled_at',
   'website_url', 'contact_email_confidence', 'contact_email_source_url',
-  'fact_check_status', 'fact_check_note', 'fact_checked_at',
+  'fact_check_status', 'fact_check_note', 'fact_checked_at', 'assigned_to',
 ];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -21,8 +21,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const key of ALLOWED_FIELDS) if (key in body) patch[key] = body[key];
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
+  let { data, error } = await supabaseServer
     .from('municipality_profiles').update(patch).eq('id', params.id).select().single();
+  // マイグレーション未適用のカラムを指定した場合でも壊れないように、
+  // エラーメッセージから実際に存在しないカラム名を読み取ってその項目だけ外し再試行する。
+  for (let i = 0; error && i < ALLOWED_FIELDS.length; i++) {
+    const missing = error.message.match(/column ["']?(?:\w+\.)?([a-zA-Z_]+)["']?/)?.[1];
+    if (!missing || !(missing in patch)) break;
+    delete patch[missing];
+    ({ data, error } = await supabaseServer
+      .from('municipality_profiles').update(patch).eq('id', params.id).select().single());
+  }
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, profile: data });
 }

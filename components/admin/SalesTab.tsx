@@ -207,16 +207,25 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     return { ...authHeaders(), 'Content-Type': 'application/json' };
   }
   async function patchLead(id: string, fields: Record<string, unknown>) {
-    await fetch(`/api/admin/client-leads/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const res = await fetch(`/api/admin/client-leads/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data.ok) { setError(data.error ?? '更新に失敗しました'); return false; }
     await load();
+    return true;
   }
   async function patchEmail(id: string, fields: Partial<EmailTarget>) {
-    await fetch(`/api/admin/sales-email-targets/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const res = await fetch(`/api/admin/sales-email-targets/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data.ok) { setError(data.error ?? '更新に失敗しました'); return false; }
     await load();
+    return true;
   }
   async function patchMunicipality(id: string, fields: Partial<MunicipalityProfile>) {
-    await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const res = await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data.ok) { setError(data.error ?? '更新に失敗しました'); return false; }
     await load();
+    return true;
   }
   async function addRecord(leadId: string, kind: EnKind, note: string, happenedAt: string) {
     const res = await fetch('/api/admin/en-records', {
