@@ -9,6 +9,7 @@ const ALLOWED_FIELDS = [
   'contact_email', 'email_draft', 'email_sent_at', 'email_sent_content', 'email_reply', 'is_priority_pick',
   'followed_up_at', 'on_hold', 'smout_sent_at', 'smout_reply', 'municipality_code', 'reply_handled_at',
   'website_url', 'contact_email_confidence', 'contact_email_source_url',
+  'fact_check_status', 'fact_check_note', 'fact_checked_at',
 ];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

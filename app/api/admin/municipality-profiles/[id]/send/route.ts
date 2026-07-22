@@ -13,10 +13,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data: row, error: fetchError } = await supabaseServer
+  let { data: row, error: fetchError } = await supabaseServer
     .from('municipality_profiles')
-    .select('id, region_name, contact_email, contact_email_confidence, email_draft, email_sent_at')
+    .select('id, region_name, contact_email, contact_email_confidence, email_draft, email_sent_at, fact_check_status')
     .eq('id', params.id).maybeSingle();
+  // 20260722_add_fact_check_status.sql 未適用の環境でも壊れないように、
+  // 列が無いことによるエラー時は fact_check_status 抜きで再取得し、未確認扱いとして送信をブロックする。
+  let factCheckColumnMissing = false;
+  if (fetchError && /fact_check_status|column/.test(fetchError.message)) {
+    factCheckColumnMissing = true;
+    ({ data: row, error: fetchError } = await supabaseServer
+      .from('municipality_profiles')
+      .select('id, region_name, contact_email, contact_email_confidence, email_draft, email_sent_at')
+      .eq('id', params.id).maybeSingle());
+  }
   if (fetchError) return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   if (!row) return NextResponse.json({ ok: false, error: '対象が見つかりません' }, { status: 404 });
 
@@ -24,6 +34,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!row.contact_email) return NextResponse.json({ ok: false, error: '宛先メールアドレスが未設定です' }, { status: 400 });
   if (row.contact_email_confidence === 'low' || !row.contact_email_confidence) {
     return NextResponse.json({ ok: false, error: '宛先の確度が低いため送信できません。手動で確認してから宛先を確定してください' }, { status: 400 });
+  }
+  if (factCheckColumnMissing) {
+    return NextResponse.json({ ok: false, error: '事実確認用のマイグレーション(20260722_add_fact_check_status.sql)が未適用です。Supabase SQL Editorで適用してから送信してください' }, { status: 400 });
+  }
+  if ((row as { fact_check_status?: string }).fact_check_status !== 'verified') {
+    return NextResponse.json({ ok: false, error: '下書きの事実確認が済んでいないため送信できません。出典と突き合わせてfact_check_statusをverifiedにしてください' }, { status: 400 });
   }
   if (!row.email_draft?.trim()) return NextResponse.json({ ok: false, error: '下書きが空です' }, { status: 400 });
 

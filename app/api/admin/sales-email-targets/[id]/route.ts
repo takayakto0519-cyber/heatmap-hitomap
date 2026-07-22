@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const ALLOWED_FIELDS = ['company', 'email', 'hook', 'drafted', 'sent', 'email_sent_at', 'email_reply', 'followed_up_at', 'reply_handled_at', 'website_url', 'contact_email_confidence', 'contact_email_source_url', 'email_draft'];
+const ALLOWED_FIELDS = ['company', 'email', 'hook', 'drafted', 'sent', 'email_sent_at', 'email_reply', 'followed_up_at', 'reply_handled_at', 'website_url', 'contact_email_confidence', 'contact_email_source_url', 'email_draft', 'fact_check_status', 'fact_check_note', 'fact_checked_at'];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
