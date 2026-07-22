@@ -114,7 +114,7 @@ export default function CorpHeader() {
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
                 padding: '6px 12px',
-                borderRadius: corpRadius.sm,
+                borderRadius: corpRadius.pill,
                 border: `1px solid ${corpColor.moss}`,
               }}
             >
@@ -131,7 +131,7 @@ export default function CorpHeader() {
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
                 padding: '6px 12px',
-                borderRadius: corpRadius.sm,
+                borderRadius: corpRadius.pill,
               }}
             >
               🗓 無料相談を予約
@@ -154,7 +154,7 @@ export default function CorpHeader() {
               fontSize: 13,
               letterSpacing: '0.03em',
               whiteSpace: 'nowrap',
-              borderRadius: corpRadius.sm,
+              borderRadius: corpRadius.pill,
               boxShadow: corpShadow.card,
             }}
           >

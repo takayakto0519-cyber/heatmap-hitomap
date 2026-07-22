@@ -118,11 +118,11 @@ export default async function CompanySchoolPage() {
               <h2
                 style={{
                   margin: '0 0 36px',
-                  fontFamily: corpFont.mincho,
+                  fontFamily: corpFont.body,
                   fontSize: 'clamp(20px, 2.8vw, 26px)',
                   lineHeight: 1.7,
                   color: corpColor.ink,
-                  fontWeight: 600,
+                  fontWeight: 700,
                 }}
               >
                 書けなくても、歩いて見つけられれば参加いただけます。
@@ -147,7 +147,7 @@ export default async function CompanySchoolPage() {
                       {v.n}
                     </span>
                     <div>
-                      <h3 style={{ margin: '0 0 8px', fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink, lineHeight: 1.6 }}>
+                      <h3 style={{ margin: '0 0 8px', fontFamily: corpFont.body, fontSize: 17, fontWeight: 700, color: corpColor.ink, lineHeight: 1.6 }}>
                         {v.title}
                       </h3>
                       <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.9, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
@@ -187,7 +187,7 @@ export default async function CompanySchoolPage() {
                     fontSize: 14,
                     fontFamily: corpFont.body,
                     letterSpacing: '0.05em',
-                    borderRadius: corpRadius.sm,
+                    borderRadius: corpRadius.pill,
                     boxShadow: corpShadow.card,
                   }}
                 >
@@ -206,7 +206,7 @@ export default async function CompanySchoolPage() {
                     fontSize: 14,
                     fontFamily: corpFont.body,
                     letterSpacing: '0.05em',
-                    borderRadius: corpRadius.sm,
+                    borderRadius: corpRadius.pill,
                     border: `1.5px solid ${corpColor.moss}`,
                   }}
                 >

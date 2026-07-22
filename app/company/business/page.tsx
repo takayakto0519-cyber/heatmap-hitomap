@@ -141,8 +141,13 @@ export default async function CompanyBusinessPage() {
               { Icon: IconChart, label: '表示するのは実データのみ', note: '捏造した数字を使わない' },
               { Icon: IconBuilding, label: '自治体ダッシュボード', note: '地図範囲で集計・発行できる' },
             ].map((t) => (
-              <div key={t.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, flex: '1 1 200px' }}>
-                <t.Icon size={22} color={corpColor.trust} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div key={t.label} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 200px' }}>
+                <span style={{
+                  width: 36, height: 36, borderRadius: corpRadius.pill, background: corpColor.surface,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <t.Icon size={20} color={corpColor.trust} />
+                </span>
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: corpColor.trustDeep, fontFamily: corpFont.body }}>{t.label}</span>
                   <span style={{ fontSize: 11.5, color: corpColor.gray, fontFamily: corpFont.body }}>{t.note}</span>
@@ -190,11 +195,11 @@ export default async function CompanyBusinessPage() {
               <h2
                 style={{
                   margin: '0 0 36px',
-                  fontFamily: corpFont.mincho,
+                  fontFamily: corpFont.body,
                   fontSize: 'clamp(20px, 2.8vw, 26px)',
                   lineHeight: 1.7,
                   color: corpColor.ink,
-                  fontWeight: 600,
+                  fontWeight: 700,
                 }}
               >
                 痕跡から、取り繕われていない組織の姿をお届けします。
@@ -227,7 +232,7 @@ export default async function CompanyBusinessPage() {
                       {v.n}
                     </span>
                     <div>
-                      <h3 style={{ margin: '0 0 8px', fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink, lineHeight: 1.6 }}>
+                      <h3 style={{ margin: '0 0 8px', fontFamily: corpFont.body, fontSize: 17, fontWeight: 700, color: corpColor.ink, lineHeight: 1.6 }}>
                         {v.title}
                       </h3>
                       <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.9, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
@@ -248,7 +253,7 @@ export default async function CompanyBusinessPage() {
               <p style={{ margin: '0 0 12px', fontSize: 12, letterSpacing: '0.2em', color: corpColor.trust, fontFamily: corpFont.body, fontWeight: 700 }}>
                 提供メニュー
               </p>
-              <h2 style={{ margin: '0 0 36px', fontFamily: corpFont.mincho, fontSize: 'clamp(20px, 2.8vw, 26px)', lineHeight: 1.7, color: corpColor.ink, fontWeight: 600 }}>
+              <h2 style={{ margin: '0 0 36px', fontFamily: corpFont.body, fontSize: 'clamp(20px, 2.8vw, 26px)', lineHeight: 1.7, color: corpColor.ink, fontWeight: 700 }}>
                 AI顧問業・導入キット・生成AI研修・デジタル観光大使AI。
               </h2>
             </Reveal>
@@ -259,9 +264,12 @@ export default async function CompanyBusinessPage() {
                     padding: 24, border: `1px solid ${corpColor.lineSoft}`, borderRadius: corpRadius.md,
                     boxShadow: corpShadow.card, background: corpColor.surface,
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-                      <span style={{ fontSize: 20 }}>{s.icon}</span>
-                      <h3 style={{ margin: 0, fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink }}>{s.title}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                      <span style={{
+                        width: 40, height: 40, borderRadius: corpRadius.pill, background: corpColor.moss,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0,
+                      }}>{s.icon}</span>
+                      <h3 style={{ margin: 0, fontFamily: corpFont.body, fontSize: 17, fontWeight: 700, color: corpColor.ink }}>{s.title}</h3>
                     </div>
                     <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: corpColor.trust, fontFamily: corpFont.body }}>{s.lead}</p>
                     <p style={{ margin: '0 0 14px', fontSize: 13.5, lineHeight: 1.9, color: corpColor.inkSoft, fontFamily: corpFont.body }}>{s.body}</p>
@@ -321,7 +329,7 @@ export default async function CompanyBusinessPage() {
                     fontSize: 14,
                     fontFamily: corpFont.body,
                     letterSpacing: '0.05em',
-                    borderRadius: corpRadius.sm,
+                    borderRadius: corpRadius.pill,
                     boxShadow: corpShadow.card,
                   }}
                 >
@@ -340,7 +348,7 @@ export default async function CompanyBusinessPage() {
                     fontSize: 14,
                     fontFamily: corpFont.body,
                     letterSpacing: '0.05em',
-                    borderRadius: corpRadius.sm,
+                    borderRadius: corpRadius.pill,
                     border: `1.5px solid ${corpColor.trust}`,
                   }}
                 >

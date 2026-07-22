@@ -41,10 +41,12 @@ export const corpColor = {
 } as const;
 
 // 角丸
+// 2026-07-22: SAGOJO（competitor）分析を踏まえ、苔・石の配色は変えずに角丸だけを拡張。
+// 静けさ（白基調・明朝見出し等）はそのまま、硬さだけを抜く方針。
 export const corpRadius = {
-  sm: 8,
-  md: 12,
-  lg: 18,
+  sm: 10,
+  md: 16,
+  lg: 24,
   pill: 999,
 } as const;
 

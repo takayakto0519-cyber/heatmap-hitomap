@@ -26,10 +26,12 @@ export const colors = {
   trackBg: '#E9E3D2',
 } as const;
 
+// 2026-07-22: SAGOJO分析を踏まえ、corpRadius（components/corp/tokens.ts）と同じ方針で拡張。
+// 配色は変えず、角丸だけをSAGOJO寄りの柔らかさに近づける。
 export const radii = {
-  sm: 8,
-  md: 10,
-  lg: 14,
+  sm: 10,
+  md: 14,
+  lg: 20,
   pill: 20,
 } as const;
 

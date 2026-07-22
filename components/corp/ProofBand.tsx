@@ -4,7 +4,7 @@
 // 視界に入った瞬間に0からカウントアップして見せる（中川政七商店の「300余年」の数字扱いを参考）。
 // 数字が取れない・0のときはバンドごと消す（空の飾りを残さない）。
 import { useEffect, useRef, useState } from 'react';
-import { corpColor, corpFont } from './tokens';
+import { corpColor, corpFont, corpRadius } from './tokens';
 
 function CountUp({ value, started }: { value: number; started: boolean }) {
   const [display, setDisplay] = useState(0);
@@ -81,13 +81,16 @@ export default function ProofBand() {
         }}
       >
         {items.map(item => (
-          <div key={item.label} style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <div key={item.label} className="hm-pop" style={{
+            display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 20px',
+            borderRadius: corpRadius.pill, background: corpColor.surfaceSoft,
+          }}>
             <span
               style={{
-                fontFamily: corpFont.mincho,
-                fontSize: 'clamp(34px, 5vw, 48px)',
-                fontWeight: 700,
-                color: corpColor.ink,
+                fontFamily: corpFont.body,
+                fontSize: 'clamp(30px, 4.4vw, 42px)',
+                fontWeight: 800,
+                color: corpColor.moss,
                 lineHeight: 1,
                 fontVariantNumeric: 'tabular-nums',
               }}

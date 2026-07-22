@@ -39,9 +39,9 @@ export default function RecentTraces() {
         <h2
           style={{
             margin: '0 0 32px',
-            fontFamily: corpFont.mincho,
+            fontFamily: corpFont.body,
             fontSize: 'clamp(20px, 2.8vw, 26px)',
-            fontWeight: 600,
+            fontWeight: 700,
             color: corpColor.ink,
           }}
         >
@@ -81,7 +81,7 @@ export default function RecentTraces() {
               }}
             >
               {t.photo_url && (
-                <div className="hm-photo-zoom" style={{ height: 130 }}>
+                <div className="hm-photo-zoom" style={{ height: 168 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={t.photo_url}

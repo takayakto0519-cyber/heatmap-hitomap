@@ -65,7 +65,7 @@ export default function MobileCTABar() {
             fontSize: 13.5,
             fontFamily: corpFont.body,
             letterSpacing: '0.03em',
-            borderRadius: corpRadius.sm,
+            borderRadius: corpRadius.pill,
           }}
         >
           地図をひらく — 無料

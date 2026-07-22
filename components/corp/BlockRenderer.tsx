@@ -68,7 +68,7 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
       return (
         <>
           <Eyebrow>{block.eyebrow}</Eyebrow>
-          <h2 style={{ margin: 0, fontFamily: corpFont.mincho, fontSize: 'clamp(22px,3.2vw,30px)', fontWeight: 600, color: corpColor.ink, lineHeight: 1.7 }}>
+          <h2 style={{ margin: 0, fontFamily: corpFont.body, fontSize: 'clamp(22px,3.2vw,30px)', fontWeight: 700, color: corpColor.ink, lineHeight: 1.7 }}>
             {block.heading}
           </h2>
         </>
@@ -79,7 +79,7 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
         <>
           <Eyebrow>{block.eyebrow}</Eyebrow>
           {block.heading && (
-            <h2 style={{ margin: '0 0 16px', fontFamily: corpFont.mincho, fontSize: 'clamp(20px,2.8vw,26px)', fontWeight: 600, color: corpColor.ink, lineHeight: 1.7 }}>
+            <h2 style={{ margin: '0 0 16px', fontFamily: corpFont.body, fontSize: 'clamp(20px,2.8vw,26px)', fontWeight: 700, color: corpColor.ink, lineHeight: 1.7 }}>
               {block.heading}
             </h2>
           )}
@@ -112,7 +112,7 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
         <>
           <Eyebrow>{block.eyebrow}</Eyebrow>
           {block.heading && (
-            <h2 style={{ margin: '0 0 28px', fontFamily: corpFont.mincho, fontSize: 22, fontWeight: 600, color: corpColor.ink }}>{block.heading}</h2>
+            <h2 style={{ margin: '0 0 28px', fontFamily: corpFont.body, fontSize: 22, fontWeight: 700, color: corpColor.ink }}>{block.heading}</h2>
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
             {items.map((item, i) => {
@@ -132,17 +132,18 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
                   {item.badge && (
                     <span style={{
                       display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-                      color: corpColor.moss, border: `1px solid ${corpColor.moss}`, padding: '2px 8px',
+                      color: corpColor.moss, background: corpColor.surfaceSoft,
+                      border: `1px solid ${corpColor.moss}`, padding: '3px 10px', borderRadius: corpRadius.pill,
                       marginBottom: 12, fontFamily: corpFont.body,
                     }}>{item.badge}</span>
                   )}
                   {item.image_url && (
-                    <div className="hm-photo-zoom" style={{ height: 130, marginBottom: 12 }}>
+                    <div className="hm-photo-zoom" style={{ height: 160, marginBottom: 12, borderRadius: corpRadius.sm, overflow: 'hidden' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={item.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     </div>
                   )}
-                  <span style={{ display: 'block', fontFamily: corpFont.mincho, fontSize: 17, fontWeight: 600, color: corpColor.ink, marginBottom: 8 }}>
+                  <span style={{ display: 'block', fontFamily: corpFont.body, fontSize: 17, fontWeight: 700, color: corpColor.ink, marginBottom: 8 }}>
                     {item.title}{item.href && ' →'}
                   </span>
                   <span style={{ display: 'block', fontSize: 13, color: corpColor.inkSoft, lineHeight: 1.8, fontFamily: corpFont.body }}>
@@ -211,7 +212,7 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
           <div>
             {block.heading && (
-              <h2 style={{ margin: '0 0 10px', fontFamily: corpFont.mincho, fontSize: 'clamp(22px,3.2vw,30px)', fontWeight: 600, color: headColor, lineHeight: 1.6 }}>
+              <h2 style={{ margin: '0 0 10px', fontFamily: corpFont.body, fontSize: 'clamp(22px,3.2vw,30px)', fontWeight: 700, color: headColor, lineHeight: 1.6 }}>
                 {block.heading}
               </h2>
             )}
@@ -223,7 +224,7 @@ function renderBlockBody(block: SiteBlock, ctaVariant = 0) {
             <a href={block.cta_href} className="hm-lift hm-btn" style={{
               display: 'inline-block', padding: '16px 40px', background: btnBg, color: btnColor,
               textDecoration: 'none', fontWeight: 700, fontSize: 14, fontFamily: corpFont.body, letterSpacing: '0.05em', flexShrink: 0,
-              borderRadius: corpRadius.sm, boxShadow: corpShadow.card,
+              borderRadius: corpRadius.pill, boxShadow: corpShadow.card,
             }}>
               {block.cta_label}
             </a>

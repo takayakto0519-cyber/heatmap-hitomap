@@ -162,7 +162,7 @@ export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settin
                   fontSize: 14.5,
                   fontFamily: corpFont.body,
                   letterSpacing: '0.04em',
-                  borderRadius: corpRadius.sm,
+                  borderRadius: corpRadius.pill,
                   boxShadow: corpShadow.card,
                 }}
               >
@@ -212,7 +212,7 @@ export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settin
                   fontWeight: 700,
                   fontFamily: corpFont.body,
                   border: `1px solid ${corpColor.trust}22`,
-                  borderRadius: corpRadius.sm,
+                  borderRadius: corpRadius.pill,
                 }}
               >
                 <IconBuilding size={16} color={corpColor.trustDeep} />
