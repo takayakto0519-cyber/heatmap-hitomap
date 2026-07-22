@@ -10,8 +10,11 @@
 //
 // 2026-07-22: 組織図（社長→部長→従業員）表示に再編。「動いている」ときはパルスドットで
 // 強調し、「直近3件の実行」パネルで部門をまたいだ最新の動きを1画面で追えるようにした。
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SKILLS, FLOORS as ROSTER_FLOORS } from '@/lib/agents/roster';
+// 部門カードを開くと配下の従業員がたこ足状（トランク→バス→各エージェントへの支線）に
+// 広がって直下に表示され、各エージェントが他のどのエージェントの結果を読んでいるか
+// （lib/agents/roster.ts の reads フィールド＝agents/*.py の実コードから抽出した実データ）も表示する。
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
+import { SKILLS, SCRIPTS, FLOORS as ROSTER_FLOORS } from '@/lib/agents/roster';
 
 interface Floor { id: string; name: string; emoji: string; order: number }
 interface AgentStatus {
@@ -29,6 +32,18 @@ const pillStyle = (active: boolean, color: string): React.CSSProperties => ({
   padding: '2px 9px', borderRadius: 12, fontSize: 10, fontWeight: 700,
   background: active ? color + '18' : '#f0f0f0', color: active ? color : '#999',
 });
+
+// 「どのエージェントがどのエージェントを読んでいるか」— roster.tsのreadsフィールドから
+// 静的に一度だけ計算する（agentsの実行結果に依存しないメタ情報なのでモジュール直下でOK）。
+const scriptById = new Map(SCRIPTS.map(s => [s.id, s]));
+const feedsIntoById = new Map<string, string[]>();
+for (const s of SCRIPTS) {
+  for (const r of s.reads ?? []) {
+    const arr = feedsIntoById.get(r) ?? [];
+    arr.push(s.id);
+    feedsIntoById.set(r, arr);
+  }
+}
 
 function relTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -127,23 +142,57 @@ function StatusBadge({ status }: { status: AgentStatus['status'] }) {
   );
 }
 
-function AgentRow({ a }: { a: AgentStatus }) {
+// エージェントidから「名前＋所属部門の絵文字」を引くための軽量ルックアップ。
+// 見つからなければscriptById（roster.ts静的データ）にフォールバックする。
+type NameLookup = (id: string) => { name: string; floorEmoji: string } | undefined;
+
+function ConnectionChips({ a, nameOf, ownFloor }: { a: AgentStatus; nameOf: NameLookup; ownFloor: string }) {
+  const meta = scriptById.get(a.id);
+  const reads = meta?.reads ?? [];
+  const feeds = feedsIntoById.get(a.id) ?? [];
+  if (reads.length === 0 && feeds.length === 0) return null;
+
+  const chip = (id: string, arrow: string, color: string) => {
+    const info = nameOf(id);
+    const crossFloor = info && scriptById.get(id)?.floor !== ownFloor;
+    return (
+      <span key={arrow + id} title={id} style={{
+        fontSize: 10, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap',
+        background: color + '14', color,
+      }}>
+        {arrow} {info ? info.name.replace(/^\d+\.\s*/, '') : id}{crossFloor && info ? ` ${info.floorEmoji}` : ''}
+      </span>
+    );
+  };
+
   return (
-    <div style={{ ...cardStyle, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: a.status === 'working' ? '1.5px solid #27AE60' : '1.5px solid transparent' }}>
-      <span style={{ fontSize: 18, flexShrink: 0 }}>{a.emoji}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
-          {a.name}
-          <StatusBadge status={a.status} />
-        </p>
-        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {summarize(a.id, a.result)}
-        </p>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+      {reads.map(id => chip(id, '📥 参照', '#4A69BD'))}
+      {feeds.map(id => chip(id, '📤 連携先', '#8E44AD'))}
+    </div>
+  );
+}
+
+function AgentRow({ a, nameOf }: { a: AgentStatus; nameOf: NameLookup }) {
+  return (
+    <div style={{ ...cardStyle, padding: '10px 14px', border: a.status === 'working' ? '1.5px solid #27AE60' : '1.5px solid transparent' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>{a.emoji}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#333' }}>
+            {a.name}
+            <StatusBadge status={a.status} />
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#777', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {summarize(a.id, a.result)}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <p style={{ margin: 0, fontSize: 10, color: '#bbb' }}>{a.schedule}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 10, color: '#ccc' }}>Lv.{a.level}（累計{a.xp}回）</p>
+        </div>
       </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <p style={{ margin: 0, fontSize: 10, color: '#bbb' }}>{a.schedule}</p>
-        <p style={{ margin: '2px 0 0', fontSize: 10, color: '#ccc' }}>Lv.{a.level}（累計{a.xp}回）</p>
-      </div>
+      <ConnectionChips a={a} nameOf={nameOf} ownFloor={a.floor} />
     </div>
   );
 }
@@ -154,6 +203,7 @@ function DeptCard({ floor, floorAgents, expanded, onToggle }: { floor: Floor; fl
     <button onClick={onToggle} style={{
       ...cardStyle, cursor: 'pointer', minWidth: 148, textAlign: 'left', position: 'relative',
       border: workingCount > 0 ? '2px solid #27AE60' : '1.5px solid transparent',
+      outline: expanded ? '2px solid #38ADA966' : 'none', outlineOffset: 2,
     }}>
       <span style={{ position: 'absolute', top: 10, right: 12, fontSize: 10, color: '#ccc' }}>{expanded ? '▲' : '▼'}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -169,6 +219,29 @@ function DeptCard({ floor, floorAgents, expanded, onToggle }: { floor: Floor; fl
         <p style={{ margin: '4px 0 0', fontSize: 11, color: '#bbb' }}>待機中</p>
       )}
     </button>
+  );
+}
+
+// たこ足ツリー：部門カードの真下に、トランク→バス（横線）→各従業員への支線、という
+// 見た目で配下のエージェントを展開する。何体になっても折り返しに対応できるよう
+// 個々の支線は各カードの真上に付ける（絶対座標計算をしない、崩れにくい構成）。
+function TentacleTree({ floor, floorAgents, nameOf }: { floor: Floor; floorAgents: AgentStatus[]; nameOf: NameLookup }) {
+  return (
+    <div style={{ width: '100%', marginTop: 4 }}>
+      <div style={{ width: 2, height: 14, background: '#cfd8dc', margin: '0 auto' }} />
+      <div style={{ height: 2, background: '#cfd8dc', margin: '0 6%' }} />
+      <p style={{ textAlign: 'center', fontSize: 11, color: '#999', margin: '4px 0 10px' }}>
+        {floor.emoji} {floor.name.replace('（部長）', '')}の従業員 {floorAgents.length}体
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px 12px' }}>
+        {floorAgents.map(a => (
+          <div key={a.id}>
+            <div style={{ width: 2, height: 12, background: '#cfd8dc', margin: '0 auto' }} />
+            <AgentRow a={a} nameOf={nameOf} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -239,6 +312,20 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
       .sort((a, b) => (b.generatedAt as string).localeCompare(a.generatedAt as string))
       .slice(0, 3);
   }, [agents]);
+
+  // 「どのエージェントと繋がっているか」の表示名解決。稼働状況(agents)を優先し、
+  // まだ実行履歴が無く一覧に出ていないエージェントはroster.tsの静的名で補う。
+  const nameOf: NameLookup = useCallback((id: string) => {
+    const live = agents.find(x => x.id === id);
+    if (live) {
+      const f = floors.find(fl => fl.id === live.floor);
+      return { name: live.name, floorEmoji: f?.emoji ?? '' };
+    }
+    const meta = scriptById.get(id);
+    if (!meta) return undefined;
+    const f = floors.find(fl => fl.id === meta.floor);
+    return { name: meta.name, floorEmoji: f?.emoji ?? '' };
+  }, [agents, floors]);
 
   const floorName = useCallback((id: string) => floors.find(f => f.id === id)?.name ?? id, [floors]);
 
@@ -374,55 +461,46 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
             </div>
           )}
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 18 }}>
-            {deptFloors.map(floor => {
-              const floorAgents = byFloor.get(floor.id) ?? [];
-              if (floorAgents.length === 0) return null;
-              return (
-                <DeptCard
-                  key={floor.id}
-                  floor={floor}
-                  floorAgents={floorAgents}
-                  expanded={expandedFloors.has(floor.id)}
-                  onToggle={() => toggleFloor(floor.id)}
-                />
-              );
-            })}
-          </div>
-
           {execAgents.length > 0 && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {execAgents.map(a => <AgentRow key={a.id} a={a} />)}
-              </div>
+            <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 420, margin: '0 auto 18px' }}>
+              {execAgents.map(a => <AgentRow key={a.id} a={a} nameOf={nameOf} />)}
             </div>
           )}
 
-          {deptFloors.map(floor => {
-            if (!expandedFloors.has(floor.id)) return null;
-            const floorAgents = byFloor.get(floor.id) ?? [];
-            const floorVacant = vacantByFloor.get(floor.id) ?? [];
-            if (floorAgents.length === 0 && floorVacant.length === 0) return null;
-            return (
-              <div key={floor.id} style={{ marginBottom: 18 }}>
-                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 800, color: '#444' }}>
-                  {floor.emoji} {floor.name}
-                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>
-                    実装{floorAgents.length}体・未着工{floorVacant.length}件
-                  </span>
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {floorAgents.map(a => <AgentRow key={a.id} a={a} />)}
-                  {showVacant && floorVacant.map(v => (
-                    <div key={`${v.floor}-${v.num}`} style={{ ...cardStyle, padding: '8px 14px', opacity: 0.55, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 16 }}>🚧</span>
-                      <p style={{ margin: 0, fontSize: 12, color: '#888' }}>{v.num}. {v.name}（未着工）</p>
+          {/* 部門カードの直下に、開いた部門だけたこ足状に従業員が広がる（flex-wrapのflexBasis:100%で強制改行） */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 8 }}>
+            {deptFloors.map(floor => {
+              const floorAgents = byFloor.get(floor.id) ?? [];
+              const floorVacant = vacantByFloor.get(floor.id) ?? [];
+              if (floorAgents.length === 0 && floorVacant.length === 0) return null;
+              const isExpanded = expandedFloors.has(floor.id);
+              return (
+                <Fragment key={floor.id}>
+                  <DeptCard
+                    floor={floor}
+                    floorAgents={floorAgents}
+                    expanded={isExpanded}
+                    onToggle={() => toggleFloor(floor.id)}
+                  />
+                  {isExpanded && (
+                    <div style={{ flexBasis: '100%', width: '100%' }}>
+                      <TentacleTree floor={floor} floorAgents={floorAgents} nameOf={nameOf} />
+                      {showVacant && floorVacant.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+                          {floorVacant.map(v => (
+                            <div key={`${v.floor}-${v.num}`} style={{ ...cardStyle, padding: '8px 14px', opacity: 0.55, display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 16 }}>🚧</span>
+                              <p style={{ margin: 0, fontSize: 12, color: '#888' }}>{v.num}. {v.name}（未着工）</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
 
           <button onClick={() => setShowVacant(v => !v)} style={{
             padding: '8px 0', width: '100%', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',

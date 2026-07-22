@@ -51,7 +51,10 @@
       "emoji": "🏛️",
       "floor": "exec",
       "kind": "script",
-      "schedule": "毎日 09:40"
+      "schedule": "毎日 09:40",
+      "reads": [
+        "command_center"
+      ]
     },
     {
       "id": "shacho_keiei_kaigi_weekly",
@@ -59,7 +62,12 @@
       "emoji": "🏛️",
       "floor": "exec",
       "kind": "script",
-      "schedule": "毎週月 09:45"
+      "schedule": "毎週月 09:45",
+      "reads": [
+        "command_center",
+        "case_pipeline_watch",
+        "financial_snapshot"
+      ]
     },
     {
       "id": "approval_watch",
@@ -139,7 +147,15 @@
       "emoji": "🐤",
       "floor": "GA",
       "kind": "script",
-      "schedule": "毎日 09:15"
+      "schedule": "毎日 09:15",
+      "reads": [
+        "approval_watch",
+        "case_pipeline_watch",
+        "revenue_initiative_watch",
+        "report_screen",
+        "deadline_watch",
+        "financial_snapshot"
+      ]
     },
     {
       "id": "lead_temperature",
@@ -179,7 +195,10 @@
       "emoji": "🐈",
       "floor": "GA",
       "kind": "script",
-      "schedule": "毎日 07:15"
+      "schedule": "毎日 07:15",
+      "reads": [
+        "deadline_watch"
+      ]
     },
     {
       "id": "line_mission",
@@ -235,7 +254,14 @@
       "emoji": "🦔",
       "floor": "PR",
       "kind": "script",
-      "schedule": "毎日 08:40"
+      "schedule": "毎日 08:40",
+      "reads": [
+        "competitor_market_research",
+        "competitor_feature_monitor",
+        "trace_pattern",
+        "relation_population",
+        "news_digest"
+      ]
     },
     {
       "id": "competitor_feature_monitor",
@@ -259,7 +285,37 @@
       "emoji": "🦅",
       "floor": "GA",
       "kind": "script",
-      "schedule": "毎日 09:30"
+      "schedule": "毎日 09:30",
+      "reads": [
+        "approval_watch",
+        "report_screen",
+        "trace_qa",
+        "deadline_watch",
+        "spam_detect",
+        "news_digest",
+        "financial_snapshot",
+        "case_pipeline_watch",
+        "revenue_initiative_watch",
+        "office_diary",
+        "lead_temperature",
+        "payment_watch",
+        "lost_deal_archive",
+        "schedule_watch",
+        "line_mission",
+        "email_queue",
+        "trace_pattern",
+        "relation_population",
+        "calendar_watch",
+        "competitor_market_research",
+        "marketing_digest",
+        "ab_test_summary_watch",
+        "competitor_feature_monitor",
+        "new_biz_signal_watch",
+        "global_market_watch",
+        "academic_partnership_watch",
+        "memorial_anniversary_watch",
+        "action_items_digest"
+      ]
     },
     {
       "id": "new_biz_signal_watch",
@@ -315,7 +371,10 @@
       "emoji": "📬",
       "floor": "SALES",
       "kind": "script",
-      "schedule": "毎日 07:10"
+      "schedule": "毎日 07:10",
+      "reads": [
+        "calendar_watch"
+      ]
     }
   ],
   "skills": [

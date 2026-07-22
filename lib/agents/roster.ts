@@ -23,6 +23,7 @@ export interface AgentDef {
   num?: number;        // ロードマップ番号（分かるもの）
   schedule?: string;   // script のみ
   invoke?: string;     // skill のみ（例 '/lead-scout'）
+  reads?: string[];    // このエージェントがcommon.read_result()で読んでいる他エージェントのid（agents/*.pyのgrep結果に基づく実データ）
 }
 
 // 7部門AI（旧13フロアを最小単位に統合）。会長はこの7人（＋社長）にだけ話しかければよい。
@@ -38,8 +39,8 @@ export const FLOORS: Floor[] = [
 
 // 番人（Pythonで自動実行・稼働状況に表示）
 export const SCRIPTS: AgentDef[] = [
-  { id: 'shacho_memo_daily', name: '👑 社長メモ（日次トリアージ）', emoji: '🏛️', floor: 'exec', kind: 'script', schedule: '毎日 09:40' },
-  { id: 'shacho_keiei_kaigi_weekly', name: '👑 経営会議メモ（週次）', emoji: '🏛️', floor: 'exec', kind: 'script', schedule: '毎週月 09:45' },
+  { id: 'shacho_memo_daily', name: '👑 社長メモ（日次トリアージ）', emoji: '🏛️', floor: 'exec', kind: 'script', schedule: '毎日 09:40', reads: ['command_center'] },
+  { id: 'shacho_keiei_kaigi_weekly', name: '👑 経営会議メモ（週次）', emoji: '🏛️', floor: 'exec', kind: 'script', schedule: '毎週月 09:45', reads: ['command_center', 'case_pipeline_watch', 'financial_snapshot'] },
   { id: 'approval_watch', name: '3. 送信待ちドラフトの監視', emoji: '🐹', floor: 'GA', kind: 'script', schedule: '毎日 08:00' },
   { id: 'report_screen', name: '19. 通報一次スクリーニングAI', emoji: '🦫', floor: 'PRODUCT', kind: 'script', schedule: '毎日 07:30' },
   { id: 'trace_qa', name: '22. データ整合性夜間QA番人', emoji: '🦔', floor: 'PRODUCT', kind: 'script', schedule: '毎日 02:00' },
@@ -49,29 +50,35 @@ export const SCRIPTS: AgentDef[] = [
   { id: 'financial_snapshot', name: '42. 財務・事業ダッシュボードAI要約', emoji: '🐷', floor: 'FINANCE', kind: 'script', schedule: '毎日 07:45' },
   { id: 'case_pipeline_watch', name: '8. 案件パイプライン番人', emoji: '🐿️', floor: 'SALES', kind: 'script', schedule: '毎日 08:15' },
   { id: 'revenue_initiative_watch', name: '収益化イニシアチブ番人', emoji: '🐸', floor: 'SALES', kind: 'script', schedule: '毎日 08:30' },
-  { id: 'office_diary', name: '101. ビル日報AI', emoji: '🐤', floor: 'GA', kind: 'script', schedule: '毎日 09:15' },
+  { id: 'office_diary', name: '101. ビル日報AI', emoji: '🐤', floor: 'GA', kind: 'script', schedule: '毎日 09:15', reads: ['approval_watch', 'case_pipeline_watch', 'revenue_initiative_watch', 'report_screen', 'deadline_watch', 'financial_snapshot'] },
   { id: 'lead_temperature', name: '4. リード温度感スコアリングAI', emoji: '🐧', floor: 'SALES', kind: 'script', schedule: '毎日 08:45' },
   { id: 'fact_check_watch', name: '営業メール下書きファクトチェック一次スクリーニングAI', emoji: '🦦', floor: 'SALES', kind: 'script', schedule: '毎日 08:55' },
   { id: 'payment_watch', name: '6. 入金照合番人', emoji: '🐮', floor: 'FINANCE', kind: 'script', schedule: '毎日 08:50' },
   { id: 'lost_deal_archive', name: '10. 失注理由アーカイブAI', emoji: '🐋', floor: 'SALES', kind: 'script', schedule: '毎週月 09:00' },
-  { id: 'schedule_watch', name: '25. スケジュール番人', emoji: '🐈', floor: 'GA', kind: 'script', schedule: '毎日 07:15' },
+  { id: 'schedule_watch', name: '25. スケジュール番人', emoji: '🐈', floor: 'GA', kind: 'script', schedule: '毎日 07:15', reads: ['deadline_watch'] },
   { id: 'line_mission', name: 'LINE縁ミッション生成', emoji: '🐇', floor: 'PRODUCT', kind: 'script', schedule: '毎日確認（2週に一度発火）' },
   { id: 'email_queue', name: '営業メール下書きキュー', emoji: '🐢', floor: 'SALES', kind: 'script', schedule: '毎日 08:35' },
   { id: 'trace_pattern', name: '62. 痕跡データパターン分析AI', emoji: '🦩', floor: 'GA', kind: 'script', schedule: '毎日 02:30' },
   { id: 'relation_population', name: '63. 関係人口ダッシュボードAI', emoji: '🦚', floor: 'SALES', kind: 'script', schedule: '毎日 02:40' },
   { id: 'calendar_watch', name: '29. カレンダー番人', emoji: '🦉', floor: 'GA', kind: 'script', schedule: '毎日 06:50' },
   { id: 'competitor_market_research', name: '9. 競合・市場調査エージェント', emoji: '🦫', floor: 'PR', kind: 'script', schedule: '毎日 06:00' },
-  { id: 'marketing_digest', name: 'マーケティング日報', emoji: '🦔', floor: 'PR', kind: 'script', schedule: '毎日 08:40' },
+  { id: 'marketing_digest', name: 'マーケティング日報', emoji: '🦔', floor: 'PR', kind: 'script', schedule: '毎日 08:40', reads: ['competitor_market_research', 'competitor_feature_monitor', 'trace_pattern', 'relation_population', 'news_digest'] },
   { id: 'competitor_feature_monitor', name: '42. 競合プロダクト機能差分モニタAI', emoji: '🦎', floor: 'GA', kind: 'script', schedule: '毎日 06:10' },
   { id: 'ab_test_summary_watch', name: '79. UI改善A/Bテスト自動集計AI', emoji: '🐁', floor: 'GA', kind: 'script', schedule: '毎日 03:10' },
-  { id: 'command_center', name: '80. 統合司令室AI', emoji: '🦅', floor: 'GA', kind: 'script', schedule: '毎日 09:30' },
+  { id: 'command_center', name: '80. 統合司令室AI', emoji: '🦅', floor: 'GA', kind: 'script', schedule: '毎日 09:30', reads: [
+    'approval_watch', 'report_screen', 'trace_qa', 'deadline_watch', 'spam_detect', 'news_digest', 'financial_snapshot',
+    'case_pipeline_watch', 'revenue_initiative_watch', 'office_diary', 'lead_temperature', 'payment_watch', 'lost_deal_archive',
+    'schedule_watch', 'line_mission', 'email_queue', 'trace_pattern', 'relation_population', 'calendar_watch',
+    'competitor_market_research', 'marketing_digest', 'ab_test_summary_watch', 'competitor_feature_monitor',
+    'new_biz_signal_watch', 'global_market_watch', 'academic_partnership_watch', 'memorial_anniversary_watch', 'action_items_digest',
+  ] },
   { id: 'new_biz_signal_watch', name: '50. 新規事業仮説の種探しAI', emoji: '🐣', floor: 'SALES', kind: 'script', schedule: '毎日 05:40' },
   { id: 'global_market_watch', name: '51. 海外展開リサーチAI', emoji: '🦜', floor: 'SALES', kind: 'script', schedule: '毎日 06:20' },
   { id: 'academic_partnership_watch', name: '52. 産学連携リサーチAI', emoji: '🦉', floor: 'SALES', kind: 'script', schedule: '毎日 06:30' },
   { id: 'memorial_anniversary_watch', name: '53. 周年史アーカイブAI', emoji: '🕊️', floor: 'SALES', kind: 'script', schedule: '毎日 07:05' },
   { id: 'action_items_digest', name: '作業状況ダッシュボード番人', emoji: '🐭', floor: 'GA', kind: 'script', schedule: '毎日 08:20' },
   { id: 'revisit_prompt', name: '「その後」通知番人', emoji: '🦝', floor: 'PRODUCT', kind: 'script', schedule: '毎日 09:00' },
-  { id: 'gmail_watch', name: 'Gmail送受信番人', emoji: '📬', floor: 'SALES', kind: 'script', schedule: '毎日 07:10' },
+  { id: 'gmail_watch', name: 'Gmail送受信番人', emoji: '📬', floor: 'SALES', kind: 'script', schedule: '毎日 07:10', reads: ['calendar_watch'] },
 ];
 
 // スキル（会話で起動・.claude/skills 配下）
