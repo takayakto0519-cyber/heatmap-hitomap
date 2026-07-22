@@ -5,7 +5,7 @@
 // 送信自体は必ずこの画面のボタン経由（サーバー側APIが確度lowや宛先未確定を拒否する二重ガード）。
 // 学校・法人（client_leads）／便り（sales_email_targets）／自治体（municipality_profiles）の
 // 3ソースを横断して1つのキューにする（返信あり導線・統合フォローキューと同じ思想）。
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Source = 'lead' | 'email_target' | 'municipality';
 type Confidence = 'high' | 'medium' | 'low' | null;
@@ -45,7 +45,12 @@ function subjectOf(draft: string): string {
   return line ? line.trim().replace(/^件名[：:]\s*/, '') : '（件名未設定）';
 }
 
-export default function SendQueuePanel({ authHeaders }: { authHeaders: () => HeadersInit }) {
+export default function SendQueuePanel({ authHeaders, onOpenMunicipality }: {
+  authHeaders: () => HeadersInit;
+  // 自治体の一次情報（調べた内容・情報源の全文）は「🔁 関係人口・自治体」のプロフィールカードの方が
+  // 詳しい。ここの「出典」リンク1本だけでは判断しづらいという声を受け、そちらへ直接ジャンプする。
+  onOpenMunicipality?: (id: string) => void;
+}) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -55,10 +60,13 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   // 「表示」フィルタ：''=全員 / '__unassigned'=未割当 / それ以外=team_members.name
   const [viewFilter, setViewFilter] = useState('');
-  // 一括割り当て用のチェック選択（`${source}-${id}`のSet）
+  // 一括割り当て・一括事実確認用のチェック選択（`${source}-${id}`のSet）
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [bulkAssignee, setBulkAssignee] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [bulkVerifying, setBulkVerifying] = useState(false);
+  // shift+クリックで「ここからここまで」範囲選択するための直前チェック位置
+  const lastCheckedIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/team-members', { headers: authHeaders() })
@@ -201,12 +209,47 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
     }
   }
 
-  function toggleChecked(key: string) {
+  function toggleChecked(key: string, index: number, rangeKeys: string[], shiftKey: boolean) {
+    // setCheckedのupdaterはReactが後で（コミット時に）実行するため、その中でrefを読むと
+    // 下の行で先に書き換えたindexを読んでしまい、範囲が1点に潰れるバグになる。
+    // 更新前の値を先にローカル変数へ退避してから使う。
+    const previousIndex = lastCheckedIndexRef.current;
+    lastCheckedIndexRef.current = index;
     setChecked((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (shiftKey && previousIndex !== null) {
+        // 「ここからここまで」一気にチェック：直前にクリックした行から今回の行までを全部選択する。
+        const [from, to] = [previousIndex, index].sort((a, b) => a - b);
+        for (let i = from; i <= to; i++) next.add(rangeKeys[i]);
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
       return next;
     });
+  }
+
+  async function bulkVerify() {
+    if (checked.size === 0) return;
+    setBulkVerifying(true);
+    setError('');
+    try {
+      const targets = items.filter((i) => checked.has(`${i.source}-${i.id}`));
+      const results = await Promise.all(targets.map((i) =>
+        fetch(i.patchPath, {
+          method: 'PATCH',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fact_check_status: 'verified', fact_checked_at: new Date().toISOString() }),
+        }).then((r) => r.json()).catch(() => ({ ok: false }))
+      ));
+      const failed = results.filter((r) => !r.ok).length;
+      if (failed > 0) setError(`${failed}件の事実確認済み反映に失敗しました`);
+      setChecked(new Set());
+      await load();
+    } finally {
+      setBulkVerifying(false);
+    }
   }
 
   async function bulkAssign() {
@@ -246,6 +289,7 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
         確度が🔴の宛先、または事実確認が済んでいない下書きは誤送信・誤情報を防ぐため送信できません。
         宛先はAIが見つけた「出典」リンクから一次情報を確認し、正しければ「事実確認済みにする」を押してください。
         宛先が未確定・誤りの場合はメールアドレス欄に直接入力すれば、その場で確度「高」として上書きされます（会長が確認・入力した宛先という扱いです）。
+        チェック欄はshiftを押しながらクリックすると、直前にチェックした行から今回の行までを一気に選択できます。
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 12, margin: '0 0 10px' }}>{error}</p>}
       {sentIds.size > 0 && (
@@ -253,7 +297,7 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
       )}
 
       {teamMembers.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 10px', background: '#F8F6FB', borderRadius: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 4, padding: '8px 10px', background: '#F8F6FB', borderRadius: 8 }}>
           <label style={{ fontSize: 11.5, color: '#666' }}>
             表示：{' '}
             <select value={viewFilter} onChange={(e) => setViewFilter(e.target.value)} style={{ fontSize: 12, padding: '3px 6px', borderRadius: 6, border: '1px solid #ddd' }}>
@@ -262,9 +306,17 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
               {teamMembers.map((m) => <option key={m.id} value={m.name}>{m.name}の担当分のみ</option>)}
             </select>
           </label>
-          {checked.size > 0 && (
+        </div>
+      )}
+      {checked.size > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 10px', background: '#F8F6FB', borderRadius: 8 }}>
+          <span style={{ fontSize: 11.5, color: '#8E44AD', fontWeight: 700 }}>{checked.size}件を選択中 →</span>
+          <button onClick={bulkVerify} disabled={bulkVerifying} style={{
+            padding: '4px 12px', borderRadius: 8, border: '1px solid #27AE60', background: '#fff', color: '#27AE60',
+            fontWeight: 700, fontSize: 11.5, cursor: bulkVerifying ? 'wait' : 'pointer',
+          }}>{bulkVerifying ? '反映中…' : 'まとめて事実確認済みにする'}</button>
+          {teamMembers.length > 0 && (
             <>
-              <span style={{ fontSize: 11.5, color: '#8E44AD', fontWeight: 700 }}>{checked.size}件を選択中 →</span>
               <select value={bulkAssignee} onChange={(e) => setBulkAssignee(e.target.value)} style={{ fontSize: 12, padding: '3px 6px', borderRadius: 6, border: '1px solid #ddd' }}>
                 <option value="">未割当にする</option>
                 {teamMembers.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
@@ -275,6 +327,9 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
               }}>{assigning ? '割り当て中…' : 'この範囲を割り当てる'}</button>
             </>
           )}
+          <button onClick={() => setChecked(new Set())} style={{
+            padding: '4px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#999', fontSize: 11.5, cursor: 'pointer',
+          }}>選択解除</button>
         </div>
       )}
 
@@ -286,9 +341,10 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
         if (visibleItems.length === 0) {
           return <p style={{ fontSize: 12, color: '#999', margin: 0 }}>{items.length === 0 ? '送信待ちの下書きはありません。' : 'このフィルタに該当する下書きはありません。'}</p>;
         }
+        const rangeKeys = visibleItems.map((i) => `${i.source}-${i.id}`);
         return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {visibleItems.map((item) => {
+          {visibleItems.map((item, idx) => {
             const badge = item.confidence ? CONFIDENCE_BADGE[item.confidence] : null;
             const factBadge = item.factCheckStatus === 'verified' || item.factCheckStatus === 'flagged'
               ? FACT_CHECK_BADGE[item.factCheckStatus] : null;
@@ -299,10 +355,13 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
             return (
               <div key={itemKey} style={{ padding: '10px 12px', borderRadius: 10, background: '#F4F6F5' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  {teamMembers.length > 0 && (
-                    <input type="checkbox" checked={isChecked} onChange={() => toggleChecked(itemKey)}
-                      style={{ marginTop: 3, flexShrink: 0 }} />
-                  )}
+                  <input
+                    type="checkbox" checked={isChecked}
+                    onClick={(e) => toggleChecked(itemKey, idx, rangeKeys, e.shiftKey)}
+                    onChange={() => {}}
+                    title="shiftを押しながらクリックで範囲選択"
+                    style={{ marginTop: 3, flexShrink: 0 }}
+                  />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#222' }}>{item.name}</p>
                     <p style={{ margin: '2px 0 0', fontSize: 11.5, color: '#666' }}>{subjectOf(item.draft)}</p>
@@ -331,6 +390,11 @@ export default function SendQueuePanel({ authHeaders }: { authHeaders: () => Hea
                       )}
                       {item.sourceUrl && (
                         <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10.5, color: '#38ADA9' }}>出典 ↗</a>
+                      )}
+                      {item.source === 'municipality' && onOpenMunicipality && (
+                        <button onClick={() => onOpenMunicipality(item.id)} style={{
+                          fontSize: 10.5, color: '#8E44AD', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline',
+                        }}>📋 調べた内容を台帳で見る</button>
                       )}
                     </div>
                     {item.factCheckNote && (

@@ -129,7 +129,13 @@ function LinkList({ text }: { text: string }) {
 
 type SortKey = 'rank_desc' | 'rank_asc' | 'name' | 'population_asc';
 
-export default function RelationPopulationTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
+export default function RelationPopulationTab({ authHeaders, focusProfileId, onFocusHandled }: {
+  authHeaders: () => HeadersInit;
+  // 送信キューの「調べた内容を台帳で見る」から飛んできたとき、絞り込み・並び順を無視して
+  // 該当の自治体プロファイルまでスクロールし、一瞬ハイライトする。
+  focusProfileId?: string | null;
+  onFocusHandled?: () => void;
+}) {
   const [overall, setOverall] = useState<OverallResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -144,6 +150,7 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   const [sortKey, setSortKey] = useState<SortKey>('rank_desc');
   const [nameFilter, setNameFilter] = useState('');
   const [levelFilter, setLevelFilter] = useState<'all' | '高' | '中' | '低'>('all');
+  const [justFocusedId, setJustFocusedId] = useState<string | null>(null);
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -249,6 +256,37 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
   const [viewMode, setViewMode] = useState<'unsent' | 'sent'>('unsent');
   const baseList = viewMode === 'unsent' ? unsent : sent;
 
+  useEffect(() => {
+    if (!focusProfileId || profilesLoading) return;
+    const target = profiles.find(p => p.id === focusProfileId);
+    if (!target) return;
+    // 絞り込み・並び替えの外に隠れていても必ず見えるように、フィルタを一旦解除する。
+    setNameFilter('');
+    setLevelFilter('all');
+    setViewMode(target.email_sent_at ? 'sent' : 'unsent');
+    setJustFocusedId(target.id);
+    const targetElId = `muni-card-${target.id}`;
+    const scrollIfFound = (): boolean => {
+      const el = document.getElementById(targetElId);
+      if (!el) return false;
+      // カード1枚が調べた内容・メール文案・人口統計まで含めて縦に長く、画面の高さを超えることが
+      // 多いため、'center'だと肝心の見出し（自治体名）が画面外に出てしまう。'start'で頭から見せる。
+      el.scrollIntoView({ behavior: 'auto', block: 'start' });
+      return true;
+    };
+    scrollIfFound();
+    // 直後の再スクロール1回だけでは、フィルタ切り替え後の残りのカード（100件超）の描画が
+    // まだ主スレッドで続いていて位置がずれることがあるため、少し待って再度合わせ直す。
+    const settle = setTimeout(() => { scrollIfFound(); }, 300);
+    const observer = new MutationObserver(() => { scrollIfFound(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const disconnectTimer = setTimeout(() => observer.disconnect(), 1500);
+    onFocusHandled?.();
+    const clearHighlight = setTimeout(() => setJustFocusedId(null), 4000);
+    return () => { clearTimeout(settle); clearTimeout(disconnectTimer); clearTimeout(clearHighlight); observer.disconnect(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusProfileId, profilesLoading]);
+
   const priorityPicks = useMemo(
     () => (viewMode === 'unsent' ? unsent.filter(p => p.is_priority_pick).sort((a, b) => a.region_name.localeCompare(b.region_name, 'ja')) : []),
     [unsent, viewMode]
@@ -292,11 +330,13 @@ export default function RelationPopulationTab({ authHeaders }: { authHeaders: ()
     // gmail_watch.pyの日程調整検知（直近5日以内なら強調表示）
     const schedulingDetected = p.scheduling_request_detected_at
       && (Date.now() - new Date(p.scheduling_request_detected_at).getTime()) < 5 * 86400000;
+    const justFocused = justFocusedId === p.id;
     return (
-      <div style={{
+      <div id={`muni-card-${p.id}`} style={{
         padding: 14, borderRadius: 10,
-        border: highlight ? '2px solid #E5A139' : '1px solid #eee',
-        background: highlight ? '#FFFBF2' : '#fff',
+        border: justFocused ? '2px solid #8E44AD' : highlight ? '2px solid #E5A139' : '1px solid #eee',
+        background: justFocused ? '#F8F0FC' : highlight ? '#FFFBF2' : '#fff',
+        transition: 'background 0.6s, border-color 0.6s',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
           <b style={{ fontSize: 14 }}>

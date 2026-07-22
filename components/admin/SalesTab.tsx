@@ -523,6 +523,14 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     setTimeout(() => observer.disconnect(), 8000); // 保険：8秒で監視終了
   }
 
+  // 送信キューの「出典」だけでは調べた内容が分かりにくいという声を受け、
+  // 自治体プロファイル（調べた内容・情報源全文）へワンクリックで飛べるようにする。
+  const [focusMunicipalityId, setFocusMunicipalityId] = useState<string | null>(null);
+  function openMunicipalityProfile(id: string) {
+    setView('relation');
+    setFocusMunicipalityId(id);
+  }
+
   const ledgerById = useMemo(() => {
     const map = new Map<string, typeof activeLedger[number]>();
     for (const entry of ledger) map.set(entry.lead.id, entry);
@@ -601,11 +609,13 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         ))}
       </div>
 
-      {view === 'relation' && <RelationPopulationTab authHeaders={authHeaders} />}
+      {view === 'relation' && (
+        <RelationPopulationTab authHeaders={authHeaders} focusProfileId={focusMunicipalityId} onFocusHandled={() => setFocusMunicipalityId(null)} />
+      )}
       {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
-      {view === 'sendqueue' && <SendQueuePanel authHeaders={authHeaders} />}
+      {view === 'sendqueue' && <SendQueuePanel authHeaders={authHeaders} onOpenMunicipality={openMunicipalityProfile} />}
 
       {view === 'ledger' && <>
       {error && <p style={{ fontSize: 13, color: '#E74C3C', margin: '10px 0 0' }}>{error}</p>}
