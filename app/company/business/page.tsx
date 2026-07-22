@@ -273,6 +273,27 @@ export default async function CompanyBusinessPage() {
           </div>
         </section>
 
+        {/* すでに取り組みがある自治体様への一言（標茶町からの返信を踏まえ追加。営業メールの
+            ペルソナC方針（営業メール/自治体向け初回接触メール方針.md）と表現を揃えている） */}
+        <section style={{ padding: '48px 24px 0' }}>
+          <div style={{ maxWidth: 720, margin: '0 auto' }}>
+            <Reveal>
+              <div style={{
+                padding: 24, borderRadius: corpRadius.md, background: corpColor.trustSoft,
+                border: `1px solid ${corpColor.trust}22`,
+              }}>
+                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: corpColor.trustDeep, fontFamily: corpFont.body }}>
+                  すでに関係人口・観光施策に取り組んでいる自治体様へ
+                </p>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.9, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
+                  今ある取り組みを置き換える必要はありません。ヒトマップは、すでにある入口の先——一度きりの来訪を
+                  「もう一度関わりたい」に育てる部分に、痕跡という新しいレイヤーを重ねるだけです。
+                </p>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
         {/* 以下は運営ダッシュボード（サイトCMS）から自由に編集・追加・並び替えできる */}
         <BlockRenderer blocks={blocks} />
 
@@ -280,8 +301,11 @@ export default async function CompanyBusinessPage() {
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal>
               <p style={{ margin: '0 0 20px', fontSize: 13, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
-                この支援は始まったばかりで、導入実績はまだありません。だからこそ、最初の一社・一自治体と一緒に、
-                手探りで作っていきたいと考えています。まずは、お話を聞かせてください。
+                栃木県那珂川町・千葉県茂原市では、地域の方々と交流イベントを重ねてきました（
+                <a href="/company/works" style={{ color: corpColor.trust, fontWeight: 700 }}>実績はこちら</a>
+                ）。栃木県佐野市とは、痕跡データを使った実証実験にも取り組んでいます。法人・自治体向けの導入実績は、
+                まだこれからです。だからこそ、最初の一社・一自治体と一緒に、手探りで作っていきたいと考えています。
+                早く始める分、条件面でも一緒に相談しながら進められます。まずは、お話を聞かせてください。
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                 <a

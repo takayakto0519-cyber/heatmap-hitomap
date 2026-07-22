@@ -168,8 +168,10 @@ export default async function CompanySchoolPage() {
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <Reveal>
               <p style={{ margin: '0 0 20px', fontSize: 13, lineHeight: 2, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
-                この取り組みは始まったばかりで、導入実績はまだありません。授業時間・生徒の人数・お題の作り方など、
-                まずは気軽にご相談ください。
+                栃木県那珂川町・千葉県茂原市では、地域の方々と交流イベントを重ねてきました（
+                <a href="/company/works" style={{ color: corpColor.moss, fontWeight: 700 }}>実績はこちら</a>
+                ）。学校向けの導入実績は、まだこれからです。授業時間・生徒の人数・お題の作り方など、
+                最初の一校と一緒に手探りで作っていきたいと考えています。まずは気軽にご相談ください。
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                 <a
