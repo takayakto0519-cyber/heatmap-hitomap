@@ -148,14 +148,21 @@ function Wanderer({ a, isSkill }: { a: AgentStatus; isSkill: boolean }) {
 
 const RECENT_DESK_LIMIT = 3; // 1部屋あたり「直近稼働」で机に残す人数（多すぎると全員居座って不自然なので絞る）
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24時間以内の実行を「直近稼働」の対象にする
+const CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000; // 動作確認等でgenerated_atが数分先にずれることがあるための許容幅
 
 function Room({ floor, agents, skills }: { floor: Floor; agents: AgentStatus[]; skills: AgentStatus[] }) {
   const liveWorking = agents.filter(a => a.status === 'working');
   const rest = agents.filter(a => a.status !== 'working');
 
   const now = Date.now();
+  // generated_atが未来（動作確認時の実行やクロックのずれ）のものは「直近稼働」扱いしない。
+  // 未来日時を弾かないと "たった今"（diff<1分）が常にトップに来て、本当の最終実行時刻が埋もれる。
   const recentSorted = rest
-    .filter(a => a.generatedAt && now - new Date(a.generatedAt).getTime() < RECENT_WINDOW_MS)
+    .filter(a => {
+      if (!a.generatedAt) return false;
+      const diff = now - new Date(a.generatedAt).getTime();
+      return diff > -CLOCK_SKEW_TOLERANCE_MS && diff < RECENT_WINDOW_MS;
+    })
     .sort((a, b) => new Date(b.generatedAt as string).getTime() - new Date(a.generatedAt as string).getTime());
   const recentIds = new Set(recentSorted.slice(0, RECENT_DESK_LIMIT).map(a => a.id));
   const recent = rest.filter(a => recentIds.has(a.id));
