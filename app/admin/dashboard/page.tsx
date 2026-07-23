@@ -29,9 +29,10 @@ import MarketingProposalsTab from '@/components/admin/MarketingProposalsTab';
 import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 import MinutesTab from '@/components/admin/MinutesTab';
 import OrgDocsTab from '@/components/admin/OrgDocsTab';
+import DedicatedDashboardsTab from '@/components/admin/DedicatedDashboardsTab';
 import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs' | 'dashboards';
 
 // 旧タブIDからの後方互換：
 // - ?tab=aiops / ?tab=agentstatus → agents（AIエージェント2タブ統合）
@@ -60,6 +61,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   marketing: { label: 'マーケティング', icon: '📈', group: '調査・研究', desc: 'マーケティング施策のAI提案を一覧・ステータス管理する' },
   proposals: { label: '競合・価格インサイト', icon: '🔍', group: '調査・研究', desc: '競合・市場調査・価格に関するAI提案を一覧・ステータス管理する' },
   funding: { label: 'コンテスト・助成金', icon: '🏆', group: '営業・自治体', desc: '自治体支援・補助金・ビジネスコンテスト・資金調達イベントの締切を一覧管理' },
+  dashboards: { label: '専用ダッシュボード', icon: '📊', group: '営業・自治体', desc: 'コンテスト・事業ライン・商談中の案件ごとの専用ダッシュボードへの入口をまとめて見る' },
   sales: { label: '営業', icon: '🧭', group: '営業・自治体', desc: '営業を縁の方程式（事実×共感＋行動×恩返し）で見立てる。学校・法人／関係人口／案件／顧問先の台帳も統合' },
   money: { label: '収益・損益', icon: '💰', group: '営業・自治体', desc: '収益化イニシアチブの進み具合と、事業別の月次損益(P&L)' },
   attachment: { label: '愛着の見える化', icon: '🌀', group: '調査・研究', desc: '地域別ファネルとイベント前後の感情変化' },
@@ -307,6 +309,7 @@ export default function AdminDashboardPage() {
           {tab === 'marketing' && <MarketingProposalsTab authHeaders={authHeaders} />}
           {tab === 'proposals' && <StrategyProposalsTab authHeaders={authHeaders} />}
           {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} goTab={goTab} />}
+          {tab === 'dashboards' && <DedicatedDashboardsTab authHeaders={authHeaders} />}
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={goTab} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
