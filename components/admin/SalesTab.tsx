@@ -19,7 +19,6 @@ import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
 import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
 import FlowBoard from '@/components/admin/sales/FlowBoard';
-import SendQueuePanel from '@/components/admin/sales/SendQueuePanel';
 import IntegratedView from '@/components/admin/sales/IntegratedView';
 import DossiersSection from '@/components/admin/sales/DossiersSection';
 import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
@@ -139,7 +138,7 @@ interface MorningItem {
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
 // 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
-const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'sendqueue', 'guided', 'integrated'] as const;
+const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'guided', 'integrated'] as const;
 type SalesView = typeof SALES_VIEWS[number];
 // 受注後の伴走支援の対象ステージ（商流ボードのWON_STAGESと同じ）
 const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
@@ -149,9 +148,8 @@ const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
 const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }[] = [
   { label: '見る', views: [
     { key: 'ledger', label: '🧭 営業' },
-    { key: 'integrated', label: '🧾 統合ビュー' },
+    { key: 'integrated', label: '🧾 送信キュー（統合）' },
     { key: 'relation', label: '🔁 関係人口・自治体' },
-    { key: 'sendqueue', label: '📤 送信キュー' },
     { key: 'guided', label: '🚚 伴走中' },
   ] },
   { label: '台帳', views: [
@@ -494,7 +492,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const visibleMorning = showAllMorning ? morning : morning.slice(0, 6);
 
   // ---------- 🎯 今日送る10件（送信キューの確度high/medium×事実確認verifiedを1画面に要約） ----------
-  // 実際の送信ボタン・二重ガードはSendQueuePanel側の実装をそのまま使う（安全装置を2箇所に複製しない）。
+  // 実際の送信ボタン・二重ガードは統合ビュー（IntegratedView）側の実装をそのまま使う（安全装置を2箇所に複製しない）。
   // ここでは「今日これだけ送れば良い」を一目で分かるようにするだけ。
   interface SendableItem { key: string; name: string; confidence: 'high' | 'medium'; icon: string }
   const sendableToday = useMemo<SendableItem[]>(() => {
@@ -666,7 +664,6 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
-      {view === 'sendqueue' && <SendQueuePanel authHeaders={authHeaders} onOpenMunicipality={openMunicipalityProfile} />}
       {view === 'integrated' && (
         <IntegratedView
           authHeaders={authHeaders}
@@ -743,7 +740,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0, color: '#38ADA9' }}>🎯 今日送る{sendableTop10.length}件</h2>
-            <button onClick={() => setView('sendqueue')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>送信キューを開く →</button>
+            <button onClick={() => setView('integrated')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>送信キューを開く →</button>
           </div>
           <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>
             宛先確度・事実確認の両方が済んでいる下書きです。100通で商談1〜2件が実務の目安——送らない限り検証できません。実際の送信ボタンは送信キューにあります。
