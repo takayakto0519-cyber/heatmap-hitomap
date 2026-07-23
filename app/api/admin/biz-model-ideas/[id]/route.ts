@@ -4,7 +4,7 @@ import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-const ALLOWED_FIELDS = ['title', 'memo', 'status', 'contest', 'idea_no', 'report_md'];
+const ALLOWED_FIELDS = ['title', 'memo', 'status', 'contest', 'idea_no', 'report_md', 'phase'];
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });
@@ -18,8 +18,16 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
   }
 
   const { supabaseServer } = await import('@/lib/supabase/server');
-  const { data, error } = await supabaseServer
+  let { data, error } = await supabaseServer
     .from('biz_model_ideas').update(updates).eq('id', id).select().single();
+  for (let i = 0; error && i < ALLOWED_FIELDS.length; i++) {
+    const missing = error.message.match(/['"]([a-zA-Z_]+)['"] column/)?.[1]
+      ?? error.message.match(/column ["']([a-zA-Z_]+)["']/)?.[1];
+    if (!missing || !(missing in updates)) break;
+    delete updates[missing];
+    ({ data, error } = await supabaseServer
+      .from('biz_model_ideas').update(updates).eq('id', id).select().single());
+  }
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, idea: data });
