@@ -154,7 +154,9 @@
         "revenue_initiative_watch",
         "report_screen",
         "deadline_watch",
-        "financial_snapshot"
+        "financial_snapshot",
+        "autopilot",
+        "proposal_queue_watch"
       ]
     },
     {

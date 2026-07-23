@@ -55,6 +55,18 @@ def main():
             if p:
                 lines.append(f"・財務番人：痕跡投稿は累計{p.get('total_traces','?')}件（今週+{p.get('new_this_week','?')}）。")
 
+        ap2 = _read("autopilot")
+        if ap2 and not ap2.get("error"):
+            n_ok, n_ng = len(ap2.get("processed") or []), len(ap2.get("failed") or [])
+            if n_ok or n_ng:
+                lines.append(f"・AIオートパイロット：今日は{n_ok}件の提案を作りました。" + (f"{n_ng}件は失敗（要再実行）。" if n_ng else "") + "秘書タブで確認をお願いします。")
+
+        pq = _read("proposal_queue_watch")
+        if pq and not pq.get("error"):
+            n_flag = len(pq.get("fact_check_flags") or [])
+            if n_flag:
+                lines.append(f"・ファクトチェック番人：出典と食い違う可能性がある下書きが{n_flag}件あります。")
+
         # XPトップを一言
         xp = common.read_result  # noqa
         try:

@@ -33,7 +33,7 @@ const btn = (color: string, filled = false): React.CSSProperties => ({
 });
 
 export default function DeliverableCard({
-  deliverable: d, subjectName, onApprove, onRevise, onArchive,
+  deliverable: d, subjectName, onApprove, onRevise, onArchive, onSaveEdit,
 }: {
   deliverable: Deliverable;
   /** 誰に向けた成果物か（自治体名など）。一覧に複数対象が混ざるときに表示する。 */
@@ -41,12 +41,17 @@ export default function DeliverableCard({
   onApprove: () => void | Promise<void>;
   onRevise: (feedback: string, rebuild: boolean) => void | Promise<void>;
   onArchive: () => void | Promise<void>;
+  /** AIに戻さず会長が直接書き換えるとき。渡さなければ「編集する」ボタン自体を出さない。 */
+  onSaveEdit?: (title: string, body: string) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [rebuild, setRebuild] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState(d.title);
+  const [editBody, setEditBody] = useState(d.body);
 
   const kindLabel = isKind(d.kind) ? KIND_LABEL[d.kind] : d.kind;
   const reflect = isKind(d.kind) ? REFLECT_TO[d.kind] : undefined;
@@ -81,16 +86,38 @@ export default function DeliverableCard({
         </p>
       )}
 
-      <button onClick={() => setOpen(o => !o)} style={{ marginTop: 8, fontSize: 11.5, color: TEAL, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>
-        {open ? '▲ 本文を閉じる' : '▼ 本文を読む'}
-      </button>
-      {open && (
+      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+        <button onClick={() => setOpen(o => !o)} style={{ fontSize: 11.5, color: TEAL, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>
+          {open ? '▲ 本文を閉じる' : '▼ 本文を読む'}
+        </button>
+        {onSaveEdit && (
+          <button onClick={() => { setEditTitle(d.title); setEditBody(d.body); setEditOpen(o => !o); setOpen(true); }}
+            style={{ fontSize: 11.5, color: '#4A69BD', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>
+            {editOpen ? '編集をやめる' : '✏️ 自分で書き直す'}
+          </button>
+        )}
+      </div>
+      {open && !editOpen && (
         <>
           <pre style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.8, whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: '#333', background: '#FAFAFA', padding: 10, borderRadius: 8, maxHeight: 340, overflowY: 'auto' }}>{d.body}</pre>
           {d.sources && (
             <p style={{ margin: '6px 0 0', fontSize: 11, color: '#888', whiteSpace: 'pre-wrap' }}>出典：{d.sources}</p>
           )}
         </>
+      )}
+      {open && editOpen && onSaveEdit && (
+        <div style={{ marginTop: 6 }}>
+          <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 12.5, fontFamily: 'inherit', marginBottom: 6, fontWeight: 700 }} />
+          <textarea rows={10} value={editBody} onChange={e => setEditBody(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 12.5, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.7 }} />
+          <button
+            disabled={busy || !editBody.trim()}
+            onClick={() => run(async () => { await onSaveEdit(editTitle.trim() || d.title, editBody); setEditOpen(false); })}
+            style={{ ...btn('#4A69BD', true), marginTop: 8 }}
+          >この内容で保存する</button>
+          <span style={{ marginLeft: 8, fontSize: 10.5, color: '#aaa' }}>保存後に「承認する」を押すと、この書き直した内容が反映されます</span>
+        </div>
       )}
 
       {d.status !== 'revise' && (

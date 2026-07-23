@@ -167,6 +167,14 @@ export default function BizModelDashboardPage() {
     });
     await load(password);
   }
+  async function patchDeliverableContent(id: string, title: string, body: string) {
+    const res = await fetch(`/api/admin/ai-deliverables/${id}`, {
+      method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify({ title, body }),
+    });
+    const data = await res.json();
+    if (!data.ok) { setError(data.error ?? '保存に失敗しました'); return; }
+    await load(password);
+  }
 
   async function addEvent() {
     if (!eventForm.title.trim()) return;
@@ -264,6 +272,7 @@ export default function BizModelDashboardPage() {
                 onApprove={() => approveDeliverable(d)}
                 onRevise={(feedback, rebuild) => reviseDeliverable(d, feedback, rebuild)}
                 onArchive={() => archiveDeliverable(d)}
+                onSaveEdit={(title, body) => patchDeliverableContent(d.id, title, body)}
               />
             ))}
           </div>

@@ -178,6 +178,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
                 onApprove={() => patchHypothesis(h.id, { status: 'approved' })}
                 onRevise={(feedback, rebuild) => patchHypothesis(h.id, { status: 'revise', feedback, rebuild })}
                 onArchive={() => patchHypothesis(h.id, { status: 'archived' })}
+                onSaveEdit={(title, body) => patchHypothesis(h.id, { title, body })}
               />
             ))}
           </div>

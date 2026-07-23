@@ -1,8 +1,11 @@
-// PATCH/DELETE /api/admin/ai-deliverables/[id] — 会長の承認・差し戻し・却下。
+// PATCH/DELETE /api/admin/ai-deliverables/[id] — 会長の承認・差し戻し・却下・直接編集。
 //
 // 承認（status='approved'）のときだけ、成果物の本体を実体テーブルへ書き戻す（lib/deliverables.ts の REFLECT_TO）。
 // 差し戻し（status='revise'）は feedback と rebuild を保存するだけ。次の朝、番人がこの行を
 // 最優先でキューに載せ、オートパイロットが feedback を読んで作り直す。
+// title/bodyは会長が直接書き換えられる（AIに戻さず自分で直して即承認したいときのため）。
+// 同じリクエストでtitle/bodyの変更とstatus='approved'を同時に送った場合、反映されるのは
+// 編集後の内容（下のpatch.body ?? current.bodyの通り）。
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 import { REFLECT_TO, CREATE_IN, isKind, isStatus } from '@/lib/deliverables';
@@ -14,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!checkAdmin(req)) return NextResponse.json({ ok: false, error: 'パスワードが違います' }, { status: 401 });
 
   const body = await req.json().catch(() => ({})) as {
-    status?: string; feedback?: string | null; rebuild?: boolean;
+    status?: string; feedback?: string | null; rebuild?: boolean; title?: string; body?: string;
   };
   if (body.status !== undefined && !isStatus(body.status)) {
     return NextResponse.json({ ok: false, error: 'statusが不正です' }, { status: 400 });
@@ -31,6 +34,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.status !== undefined) patch.status = body.status;
   if (body.feedback !== undefined) patch.feedback = body.feedback?.trim() || null;
   if (body.rebuild !== undefined) patch.rebuild = Boolean(body.rebuild);
+  if (body.title !== undefined && body.title.trim()) patch.title = body.title.trim();
+  if (body.body !== undefined) patch.body = body.body;
+
+  // 反映・作成には「会長が今回のリクエストで編集した内容」を使う（編集して即承認のケースがあるため）。
+  const effectiveTitle = (patch.title as string | undefined) ?? current.title;
+  const effectiveBody = (patch.body as string | undefined) ?? current.body;
 
   // 承認 → 実体テーブルへ反映。反映に失敗したら承認自体を成立させない
   // （画面上は承認済みなのに実体が古いまま、という食い違いを作らないため）。
@@ -43,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (target) {
         const { error: reflectError } = await supabaseServer
           .from(target.table)
-          .update({ [target.column]: current.body, updated_at: new Date().toISOString() })
+          .update({ [target.column]: effectiveBody, updated_at: new Date().toISOString() })
           .eq('id', current.entity_id);
         if (reflectError) {
           return NextResponse.json({ ok: false, error: `反映に失敗しました: ${reflectError.message}` }, { status: 500 });
@@ -56,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (creator) {
         const { error: createError } = await supabaseServer
           .from(creator.table)
-          .insert(creator.build({ title: current.title, body: current.body }));
+          .insert(creator.build({ title: effectiveTitle, body: effectiveBody }));
         if (createError) {
           return NextResponse.json({ ok: false, error: `反映に失敗しました: ${createError.message}` }, { status: 500 });
         }

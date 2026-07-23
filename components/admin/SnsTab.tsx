@@ -153,6 +153,7 @@ export default function SnsTab({ authHeaders }: { authHeaders: () => HeadersInit
                 onApprove={() => patchProposal(p.id, { status: 'approved' })}
                 onRevise={(feedback, rebuild) => patchProposal(p.id, { status: 'revise', feedback, rebuild })}
                 onArchive={() => patchProposal(p.id, { status: 'archived' })}
+                onSaveEdit={(title, body) => patchProposal(p.id, { title, body })}
               />
             ))}
           </div>

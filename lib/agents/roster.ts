@@ -50,7 +50,7 @@ export const SCRIPTS: AgentDef[] = [
   { id: 'financial_snapshot', name: '42. 財務・事業ダッシュボードAI要約', emoji: '🐷', floor: 'FINANCE', kind: 'script', schedule: '毎日 07:45' },
   { id: 'case_pipeline_watch', name: '8. 案件パイプライン番人', emoji: '🐿️', floor: 'SALES', kind: 'script', schedule: '毎日 08:15' },
   { id: 'revenue_initiative_watch', name: '収益化イニシアチブ番人', emoji: '🐸', floor: 'SALES', kind: 'script', schedule: '毎日 08:30' },
-  { id: 'office_diary', name: '101. ビル日報AI', emoji: '🐤', floor: 'GA', kind: 'script', schedule: '毎日 09:15', reads: ['approval_watch', 'case_pipeline_watch', 'revenue_initiative_watch', 'report_screen', 'deadline_watch', 'financial_snapshot'] },
+  { id: 'office_diary', name: '101. ビル日報AI', emoji: '🐤', floor: 'GA', kind: 'script', schedule: '毎日 09:15', reads: ['approval_watch', 'case_pipeline_watch', 'revenue_initiative_watch', 'report_screen', 'deadline_watch', 'financial_snapshot', 'autopilot', 'proposal_queue_watch'] },
   { id: 'lead_temperature', name: '4. リード温度感スコアリングAI', emoji: '🐧', floor: 'SALES', kind: 'script', schedule: '毎日 08:45' },
   { id: 'fact_check_watch', name: '営業メール下書きファクトチェック一次スクリーニングAI', emoji: '🦦', floor: 'SALES', kind: 'script', schedule: '毎日 08:10' },
   { id: 'proposal_queue_watch', name: 'AI提案キュー検知番人（自治体営業11段トラック）', emoji: '📋', floor: 'SALES', kind: 'script', schedule: '毎日 08:25', reads: ['fact_check_watch'] },

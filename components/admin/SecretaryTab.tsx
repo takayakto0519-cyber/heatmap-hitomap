@@ -10,6 +10,7 @@ import BookingRequestsPanel from './BookingRequestsPanel';
 import ActionItemsSection from './ActionItemsSection';
 import TeamMembersSection from './TeamMembersSection';
 import { MigrationNotice, type AttentionItem, ATTENTION_JUMP } from '@/components/admin/adminShared';
+import DeliverableCard, { type Deliverable } from '@/components/admin/DeliverableCard';
 
 interface ActionItem {
   id: string; title: string; category: string; status: string; owner: string;
@@ -61,6 +62,32 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   // is_lead=trueにした1名が入る。メンバー未登録でも動くよう既定はnull（誰も先頭固定にしない）。
   const [leadName, setLeadName] = useState<string | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+  // 🤖 AIが今日やったこと — proposal_queue_watch/autopilotが積んだ確認待ち提案を、
+  // 自治体営業・新規事業・マーケの区別なく1箇所に集約する（それぞれの持ち場タブに散っているのを見なくて済むように）。
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [regionNameById, setRegionNameById] = useState<Map<string, string>>(new Map());
+
+  function jsonHeaders(): HeadersInit {
+    return { ...authHeaders(), 'Content-Type': 'application/json' };
+  }
+  const loadDeliverables = useCallback(() => {
+    fetch('/api/admin/ai-deliverables?status=proposed', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setDeliverables(d.deliverables ?? []); })
+      .catch(() => {});
+  }, [authHeaders]);
+  useEffect(() => {
+    loadDeliverables();
+    fetch('/api/admin/municipality-profiles', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setRegionNameById(new Map((d.profiles ?? []).map((p: { id: string; region_name: string }) => [p.id, p.region_name]))); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadDeliverables]);
+  async function patchDeliverable(id: string, fields: Record<string, unknown>) {
+    await fetch(`/api/admin/ai-deliverables/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    loadDeliverables();
+  }
 
   useEffect(() => {
     fetch('/api/admin/command-center', { headers: authHeaders() })
@@ -127,6 +154,31 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {migrationFile && <MigrationNotice title="To-Do（作業状況）のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
+
+      {/* 🤖 AIが今日やったこと — 自治体営業・新規事業・マーケの提案を1箇所で確認・承認できる。
+          承認/差し戻し/却下/自分で書き直す、の操作は各持ち場タブ（事業ラインダッシュボード・
+          ビジネスモデル案・SNS投稿）と共通のDeliverableCardを使う。承認するとそれぞれの実データに反映される。 */}
+      {deliverables.length > 0 && (
+        <div style={{ ...cardStyle, borderLeft: '4px solid #38ADA9', background: '#F4FBFA' }}>
+          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14, color: '#2C7A76' }}>
+            🤖 AIが今日やったこと（確認待ち {deliverables.length}件）
+            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: '#999' }}>営業・新規事業・マーケの提案をまとめて確認できます</span>
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {deliverables.map(dv => (
+              <DeliverableCard
+                key={dv.id}
+                deliverable={dv}
+                subjectName={dv.entity_id ? regionNameById.get(dv.entity_id) : undefined}
+                onApprove={() => patchDeliverable(dv.id, { status: 'approved' })}
+                onRevise={(feedback, rebuild) => patchDeliverable(dv.id, { status: 'revise', feedback, rebuild })}
+                onArchive={() => patchDeliverable(dv.id, { status: 'archived' })}
+                onSaveEdit={(title, body) => patchDeliverable(dv.id, { title, body })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 今日の要注意（統合司令室AIが全AIエージェントの結果から抽出、ホームと同じ内容を読み取り専用で表示） */}
       {attention && attention.length > 0 && (
