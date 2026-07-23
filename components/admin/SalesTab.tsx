@@ -20,6 +20,7 @@ import OutreachStatus from '@/components/admin/OutreachStatus';
 import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
 import FlowBoard from '@/components/admin/sales/FlowBoard';
 import SendQueuePanel from '@/components/admin/sales/SendQueuePanel';
+import IntegratedView from '@/components/admin/sales/IntegratedView';
 import DossiersSection from '@/components/admin/sales/DossiersSection';
 import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
 
@@ -138,7 +139,7 @@ interface MorningItem {
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
 // 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
-const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'sendqueue', 'guided'] as const;
+const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'sendqueue', 'guided', 'integrated'] as const;
 type SalesView = typeof SALES_VIEWS[number];
 // 受注後の伴走支援の対象ステージ（商流ボードのWON_STAGESと同じ）
 const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
@@ -148,6 +149,7 @@ const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
 const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }[] = [
   { label: '見る', views: [
     { key: 'ledger', label: '🧭 営業' },
+    { key: 'integrated', label: '🧾 統合ビュー' },
     { key: 'relation', label: '🔁 関係人口・自治体' },
     { key: 'sendqueue', label: '📤 送信キュー' },
     { key: 'guided', label: '🚚 伴走中' },
@@ -665,6 +667,13 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
       {view === 'sendqueue' && <SendQueuePanel authHeaders={authHeaders} onOpenMunicipality={openMunicipalityProfile} />}
+      {view === 'integrated' && (
+        <IntegratedView
+          authHeaders={authHeaders}
+          onOpenMunicipality={openMunicipalityProfile}
+          onOpenLead={(leadId) => { setView('ledger'); requestAnimationFrame(() => scrollToLead(leadId)); }}
+        />
+      )}
       {view === 'guided' && <GuidedView cases={cases} goTab={goTabOrSwitchView} />}
 
       {view === 'ledger' && <>
