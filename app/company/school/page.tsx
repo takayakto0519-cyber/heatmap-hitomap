@@ -59,7 +59,7 @@ export default async function CompanySchoolPage() {
               </p>
             </Reveal>
             <CharReveal
-              lines={['言葉には、伝えきれないことがあります。', 'しかし、モノに残った痕跡は嘘をつきません。']}
+              lines={['言葉には、伝えきれないことがあります。', 'しかし、モノに残った痕跡は、そのままの姿をしています。']}
               baseDelay={150}
               charDelay={18}
               style={{
