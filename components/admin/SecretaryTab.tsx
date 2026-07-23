@@ -31,6 +31,19 @@ function isOverdue(due: string | null): boolean {
   return new Date(due + 'T23:59:59').getTime() < Date.now();
 }
 
+// file_refの "jump:<tabId>|<経営資料でのタイトル>" 形式を解析する。
+// AIがドラフトを作った際、実体は経営資料ボード（strategy_proposals）に登録し、
+// ここには「どのタブに、何という資料があるか」のジャンプ先だけを埋め込む運用（20260723〜）。
+function parseJumpRef(fileRef: string | null): { tab: string; label: string } | null {
+  if (!fileRef || !fileRef.startsWith('jump:')) return null;
+  const rest = fileRef.slice('jump:'.length);
+  const sep = rest.indexOf('|');
+  if (sep < 0) return null;
+  return { tab: rest.slice(0, sep), label: rest.slice(sep + 1) };
+}
+
+const TAB_JUMP_LABEL: Record<string, string> = { orgdocs: '📁 経営資料で開く', sales: '🧭 営業で開く' };
+
 export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () => HeadersInit; goTab?: (id: string) => void }) {
   const [items, setItems] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +60,7 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   // To-Doの並び順で先頭に出す「代表」の名前。運営メンバー名簿（サイト設定タブ）で
   // is_lead=trueにした1名が入る。メンバー未登録でも動くよう既定はnull（誰も先頭固定にしない）。
   const [leadName, setLeadName] = useState<string | null>(null);
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetch('/api/admin/command-center', { headers: authHeaders() })
@@ -183,23 +197,51 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
                   {ownerItems.map(it => {
                     const meta = STATUS_META[it.status] ?? STATUS_META.todo;
                     const overdue = isOverdue(it.due_date);
+                    const jump = parseJumpRef(it.file_ref);
+                    const notesOpen = !!expandedNotes[it.id];
                     return (
                       <div key={it.id} style={{
-                        display: 'flex', gap: 12, alignItems: 'center', padding: '10px 12px',
-                        borderRadius: 10, background: overdue ? '#FDEDEC' : '#F4F6F5',
+                        padding: '10px 12px', borderRadius: 10, background: overdue ? '#FDEDEC' : '#F4F6F5',
                       }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#222' }}>{it.title}</div>
-                          <div style={{ fontSize: 11, color: '#999', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <span>{it.category}</span>
-                            <span style={{ color: meta.color, fontWeight: 700 }}>{meta.label}</span>
-                            {it.due_date && <span style={{ color: overdue ? '#c0392b' : '#999', fontWeight: overdue ? 700 : 400 }}>期限: {it.due_date}{overdue ? '（超過）' : ''}</span>}
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#222' }}>{it.title}</div>
+                            <div style={{ fontSize: 11, color: '#999', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <span>{it.category}</span>
+                              <span style={{ color: meta.color, fontWeight: 700 }}>{meta.label}</span>
+                              {it.due_date && <span style={{ color: overdue ? '#c0392b' : '#999', fontWeight: overdue ? 700 : 400 }}>期限: {it.due_date}{overdue ? '（超過）' : ''}</span>}
+                            </div>
                           </div>
+                          <button
+                            onClick={() => markDone(it.id)}
+                            style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >完了</button>
                         </div>
-                        <button
-                          onClick={() => markDone(it.id)}
-                          style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                        >完了</button>
+
+                        {(it.notes || jump) && (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                              {it.notes && (
+                                <button onClick={() => setExpandedNotes(prev => ({ ...prev, [it.id]: !prev[it.id] }))} style={{
+                                  fontSize: 11.5, color: '#38ADA9', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700,
+                                }}>{notesOpen ? '▲ AIの作業内容を閉じる' : '▼ AIの作業内容を見る'}</button>
+                              )}
+                              {jump && goTab && (
+                                <button onClick={() => goTab(jump.tab)} style={{
+                                  fontSize: 11.5, color: '#4A69BD', background: '#EDF1FB', border: 'none', borderRadius: 12,
+                                  padding: '3px 10px', cursor: 'pointer', fontWeight: 700,
+                                }}>{TAB_JUMP_LABEL[jump.tab] ?? `→ ${jump.tab}`}（{jump.label}）</button>
+                              )}
+                            </div>
+                            {notesOpen && it.notes && (
+                              <pre style={{
+                                margin: '8px 0 0', padding: '10px 12px', background: '#fff', borderRadius: 8,
+                                fontSize: 12, lineHeight: 1.6, color: '#444', whiteSpace: 'pre-wrap',
+                                fontFamily: 'inherit', maxHeight: 400, overflowY: 'auto', border: '1px solid #eee',
+                              }}>{it.notes}</pre>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
