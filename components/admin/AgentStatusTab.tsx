@@ -15,6 +15,7 @@
 // （lib/agents/roster.ts の reads フィールド＝agents/*.py の実コードから抽出した実データ）も表示する。
 import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
 import { SKILLS, SCRIPTS, FLOORS as ROSTER_FLOORS } from '@/lib/agents/roster';
+import OfficeView from './OfficeView';
 
 interface Floor { id: string; name: string; emoji: string; order: number }
 interface AgentStatus {
@@ -255,6 +256,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
   const [error, setError] = useState('');
   const [showVacant, setShowVacant] = useState(false);
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'office' | 'org'>('office');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -433,13 +435,25 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
             )}
           </div>
 
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={load} style={{
               padding: '4px 10px', borderRadius: 14, border: '1px solid #38ADA9', background: '#fff',
               color: '#38ADA9', fontSize: 11, fontWeight: 700, cursor: 'pointer',
             }}>↻ 最新に更新</button>
+            <div style={{ display: 'flex', border: '1px solid #ddd', borderRadius: 14, overflow: 'hidden' }}>
+              {(['office', 'org'] as const).map(mode => (
+                <button key={mode} onClick={() => setViewMode(mode)} style={{
+                  padding: '4px 12px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                  background: viewMode === mode ? '#38ADA9' : '#fff', color: viewMode === mode ? '#fff' : '#888',
+                }}>{mode === 'office' ? '🏢 オフィス表示' : '🌳 組織図表示'}</button>
+              ))}
+            </div>
           </div>
 
+          {viewMode === 'office' && <OfficeView floors={floors} agents={agents} />}
+
+          {viewMode === 'org' && (
+          <>
           {/* 🏛️ 組織図：社長 → 部長（部門） → 従業員 */}
           {execFloor && (
             <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -506,6 +520,8 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
             padding: '8px 0', width: '100%', borderRadius: 10, border: '1.5px dashed #ccc', background: 'none',
             color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 4,
           }}>{showVacant ? '空きオフィスを隠す' : `空きオフィス（未着工 ${vacant.length}件）を表示`}</button>
+          </>
+          )}
         </>
       )}
 
