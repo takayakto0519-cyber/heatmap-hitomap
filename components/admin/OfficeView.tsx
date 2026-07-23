@@ -64,14 +64,26 @@ function statusLabel(a: AgentStatus, isSkill: boolean): string {
   return a.status === 'working' ? '実行中（デスクで作業中）' : a.status === 'synced' ? '同期済み（フロアを巡回中）' : '待機中（フロアを巡回中）';
 }
 
-// 🖥️ 稼働中：机についてPC画面が回る
-function DeskWorker({ a }: { a: AgentStatus }) {
+function relTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'たった今';
+  if (min < 60) return `${min}分前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}時間前`;
+  return `${Math.floor(hr / 24)}日前`;
+}
+
+// 🖥️ 稼働中／直近稼働：机についてPC画面が動く。
+// 実行中(live)はスピナーが回り緑ラベル、直近稼働(recent)は静止画面に「◯分前」の青ラベル
+// —— cronの実行は数秒で終わるため、動いた瞬間を見られなくても「最近ここで何かが起きた」ことが分かるようにする。
+function DeskWorker({ a, recent }: { a: AgentStatus; recent: boolean }) {
   const skin = SKINS[hashSkin(a.id)];
   const attention = isAttention(a.result);
   return (
     <div title={`${a.name}（${statusLabel(a, false)}）`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: FRAME + 10 }}>
       <div
-        className="office-monitor-working"
+        className={recent ? undefined : 'office-monitor-working'}
         style={{
           width: FRAME, height: FRAME, flexShrink: 0,
           backgroundImage: 'url(/assets/office/ComputerSheet.png)',
@@ -81,7 +93,7 @@ function DeskWorker({ a }: { a: AgentStatus }) {
         }}
       />
       <div
-        className="office-worker-working"
+        className={recent ? 'office-worker-idle' : 'office-worker-working'}
         style={{
           width: FRAME, height: FRAME, flexShrink: 0, marginTop: -6,
           backgroundImage: `url(${skin})`,
@@ -91,6 +103,12 @@ function DeskWorker({ a }: { a: AgentStatus }) {
       />
       <span style={{ fontSize: 9, color: '#777', marginTop: 2, maxWidth: FRAME + 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
         {a.emoji}{a.name.replace(/^\d+\.\s*/, '').replace(/^👑\s*/, '')}
+      </span>
+      <span style={{
+        fontSize: 8, fontWeight: 800, marginTop: 1, padding: '0 5px', borderRadius: 8,
+        background: recent ? '#4A69BD18' : '#27AE6022', color: recent ? '#4A69BD' : '#1E8449',
+      }}>
+        {recent ? `🕘 ${a.generatedAt ? relTime(a.generatedAt) : '直近稼働'}` : '⚡実行中'}
       </span>
     </div>
   );
@@ -128,9 +146,21 @@ function Wanderer({ a, isSkill }: { a: AgentStatus; isSkill: boolean }) {
   );
 }
 
+const RECENT_DESK_LIMIT = 3; // 1部屋あたり「直近稼働」で机に残す人数（多すぎると全員居座って不自然なので絞る）
+const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24時間以内の実行を「直近稼働」の対象にする
+
 function Room({ floor, agents, skills }: { floor: Floor; agents: AgentStatus[]; skills: AgentStatus[] }) {
-  const working = agents.filter(a => a.status === 'working');
-  const wandering = agents.filter(a => a.status !== 'working');
+  const liveWorking = agents.filter(a => a.status === 'working');
+  const rest = agents.filter(a => a.status !== 'working');
+
+  const now = Date.now();
+  const recentSorted = rest
+    .filter(a => a.generatedAt && now - new Date(a.generatedAt).getTime() < RECENT_WINDOW_MS)
+    .sort((a, b) => new Date(b.generatedAt as string).getTime() - new Date(a.generatedAt as string).getTime());
+  const recentIds = new Set(recentSorted.slice(0, RECENT_DESK_LIMIT).map(a => a.id));
+  const recent = rest.filter(a => recentIds.has(a.id));
+  const wandering = rest.filter(a => !recentIds.has(a.id));
+
   const idx = hash(floor.id, 'decor');
   const picture = PICTURES[idx % PICTURES.length];
   const picture2 = PICTURES[(idx + 1) % PICTURES.length];
@@ -152,8 +182,13 @@ function Room({ floor, agents, skills }: { floor: Floor; agents: AgentStatus[]; 
           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#00000010', color: '#665' }}>🪑 全員{total}名</span>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-            background: working.length > 0 ? '#27AE6022' : '#00000010', color: working.length > 0 ? '#1E8449' : '#887',
-          }}>⚡ 稼働中 {working.length}</span>
+            background: liveWorking.length > 0 ? '#27AE6022' : '#00000010', color: liveWorking.length > 0 ? '#1E8449' : '#887',
+          }}>⚡ 実行中 {liveWorking.length}</span>
+          {recent.length > 0 && (
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#4A69BD18', color: '#4A69BD' }}>
+              🕘 直近稼働 {recent.length}
+            </span>
+          )}
         </div>
         <img src={picture2} alt="" width={DECOR} height={DECOR} style={{ imageRendering: 'pixelated', marginLeft: 'auto' }} />
         <img src="/assets/office/room/window.png" alt="" width={DECOR} height={DECOR} style={{ imageRendering: 'pixelated' }} />
@@ -169,12 +204,13 @@ function Room({ floor, agents, skills }: { floor: Floor; agents: AgentStatus[]; 
         <img src={bush} alt="" width={DECOR} height={DECOR} style={{ imageRendering: 'pixelated', position: 'absolute', top: 8, left: 8, opacity: 0.9 }} />
         <img src={cabinet} alt="" width={DECOR} height={DECOR} style={{ imageRendering: 'pixelated', position: 'absolute', top: 8, right: 8, opacity: 0.9 }} />
 
-        {working.length > 0 && (
+        {(liveWorking.length > 0 || recent.length > 0) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px 8px', marginBottom: 14, paddingBottom: 12, borderBottom: '2px dashed #d3ccb5', marginTop: 6, paddingLeft: DECOR + 6 }}>
-            {working.map(a => <DeskWorker key={a.id} a={a} />)}
+            {liveWorking.map(a => <DeskWorker key={a.id} a={a} recent={false} />)}
+            {recent.map(a => <DeskWorker key={a.id} a={a} recent />)}
           </div>
         )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingLeft: DECOR + 6, paddingTop: working.length > 0 ? 0 : 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingLeft: DECOR + 6, paddingTop: (liveWorking.length > 0 || recent.length > 0) ? 0 : 6 }}>
           {wandering.map(a => <Wanderer key={a.id} a={a} isSkill={false} />)}
           {skills.map(a => <Wanderer key={a.id} a={a} isSkill />)}
         </div>
@@ -243,12 +279,15 @@ export default function OfficeView({ floors, agents }: { floors: Floor[]; agents
         .office-wander { animation-name: officeWanderWalk; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
       `}</style>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#444' }}>🏢 ヒトマップビル（オフィス表示）</span>
         <span style={{ fontSize: 11, color: totalWorking > 0 ? '#1E8449' : '#999', fontWeight: 700 }}>
-          全社員{totalHeadcount}名（自動稼働{agents.length}名＋スキル{SKILLS.length}名）・稼働中{totalWorking}名
+          全社員{totalHeadcount}名（自動稼働{agents.length}名＋スキル{SKILLS.length}名）・実行中{totalWorking}名
         </span>
       </div>
+      <p style={{ fontSize: 10, color: '#aaa', margin: '0 0 12px' }}>
+        番人（自動実行）は数秒で処理が終わるため「実行中」を見られる瞬間は稀です。青い「🕘 直近稼働」は過去24時間以内に実際に動いた形跡があるエージェントです。
+      </p>
 
       {orderedFloors.map(floor => (
         <Room key={floor.id} floor={floor} agents={byFloor.get(floor.id) ?? []} skills={skillsByFloor.get(floor.id) ?? []} />
