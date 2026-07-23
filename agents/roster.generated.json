@@ -171,7 +171,29 @@
       "emoji": "🦦",
       "floor": "SALES",
       "kind": "script",
-      "schedule": "毎日 08:55"
+      "schedule": "毎日 08:10"
+    },
+    {
+      "id": "proposal_queue_watch",
+      "name": "AI提案キュー検知番人（自治体営業11段トラック）",
+      "emoji": "📋",
+      "floor": "SALES",
+      "kind": "script",
+      "schedule": "毎日 08:25",
+      "reads": [
+        "fact_check_watch"
+      ]
+    },
+    {
+      "id": "autopilot",
+      "name": "AIオートパイロット（提案の自動生成）",
+      "emoji": "🤖",
+      "floor": "SALES",
+      "kind": "script",
+      "schedule": "毎日 09:20",
+      "reads": [
+        "proposal_queue_watch"
+      ]
     },
     {
       "id": "payment_watch",
@@ -444,14 +466,6 @@
       "floor": "PR",
       "kind": "skill",
       "invoke": "/achievement-blog"
-    },
-    {
-      "id": "affiliate-pipeline",
-      "name": "アフィリエイト候補提案・生成・note投稿",
-      "emoji": "🧩",
-      "floor": "PR",
-      "kind": "skill",
-      "invoke": "/affiliate-pipeline"
     },
     {
       "id": "agent-status",

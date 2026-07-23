@@ -5,13 +5,19 @@
 // フェーズ進行・営業先（自治体台帳のうちこの事業から生まれたもの）・伴走ログを1画面に集約する。
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import MilestoneTrack from '@/components/admin/MilestoneTrack';
+import OutreachStatus from '@/components/admin/OutreachStatus';
+import DeliverableCard, { type Deliverable } from '@/components/admin/DeliverableCard';
+import { deriveMilestone, isReadyToSend, type OutreachTarget } from '@/lib/tracks/govOutreach';
 
 interface BizModelIdea {
   id: string; title: string; memo: string | null; status: string; report_md: string | null; phase: number;
 }
-interface MunicipalityProfile {
+// OutreachTarget を継承しているので、deriveMilestone() にそのまま渡せる。
+// 未適用のマイグレーションのカラム（hearing_at 等）は undefined のまま届くが、
+// deriveMilestone は空文字と同じ扱いをするので画面は壊れない。
+interface MunicipalityProfile extends OutreachTarget {
   id: string; region_name: string; opportunity_level: string; is_priority_pick: boolean;
-  email_draft: string | null; email_sent_at: string | null; fact_check_status: string | null;
 }
 interface BizModelEvent {
   id: string; biz_model_idea_id: string; event_type: string; title: string; body: string | null; occurred_at: string;
@@ -46,9 +52,14 @@ export default function BizModelDashboardPage() {
   const [idea, setIdea] = useState<BizModelIdea | null>(null);
   const [targets, setTargets] = useState<MunicipalityProfile[]>([]);
   const [events, setEvents] = useState<BizModelEvent[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [needsMigration, setNeedsMigration] = useState(false);
+  const [needsDeliverableMigration, setNeedsDeliverableMigration] = useState(false);
+  // fact_check_watch.py（出典の機械的突合）→ proposal_queue_watch.py が転記した「要目視確認」フラグ。
+  // agent-status APIはローカルでは agents/work/*.json、本番ではSupabaseの同期スナップショットを読むので両方で表示できる。
+  const [factCheckFlagIds, setFactCheckFlagIds] = useState<Set<string>>(new Set());
 
   const [eventForm, setEventForm] = useState({ event_type: 'note', title: '', body: '' });
   const [savingEvent, setSavingEvent] = useState(false);
@@ -63,10 +74,12 @@ export default function BizModelDashboardPage() {
   const load = useCallback(async (pw: string) => {
     setLoading(true);
     try {
-      const [ideasRes, profilesRes, eventsRes] = await Promise.all([
+      const [ideasRes, profilesRes, eventsRes, delivRes, agentStatusRes] = await Promise.all([
         fetch('/api/admin/biz-model-ideas', { headers: authHeaders(pw) }).then(r => r.json()),
         fetch('/api/admin/municipality-profiles', { headers: authHeaders(pw) }).then(r => r.json()),
         fetch(`/api/admin/biz-model-events?biz_model_idea_id=${ideaId}`, { headers: authHeaders(pw) }).then(r => r.json()),
+        fetch('/api/admin/ai-deliverables?entity_type=municipality_profile', { headers: authHeaders(pw) }).then(r => r.json()),
+        fetch('/api/admin/agent-status', { headers: authHeaders(pw) }).then(r => r.json()).catch(() => null),
       ]);
       if (!ideasRes.ok) throw new Error(ideasRes.error ?? '取得に失敗しました');
       const found = (ideasRes.ideas ?? []).find((i: BizModelIdea) => i.id === ideaId) ?? null;
@@ -78,6 +91,13 @@ export default function BizModelDashboardPage() {
         setEvents(eventsRes.events ?? []);
         setNeedsMigration(Boolean(eventsRes.needsMigration));
       }
+      if (delivRes.ok) {
+        setDeliverables(delivRes.deliverables ?? []);
+        setNeedsDeliverableMigration(Boolean(delivRes.needsMigration));
+      }
+      const pqw = agentStatusRes?.agents?.find((a: { id: string }) => a.id === 'proposal_queue_watch');
+      const flags = (pqw?.result?.fact_check_flags ?? []) as Array<{ id: string }>;
+      setFactCheckFlagIds(new Set(flags.map(f => f.id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : '通信エラー');
     } finally {
@@ -113,6 +133,39 @@ export default function BizModelDashboardPage() {
     if (!idea) return;
     setIdea({ ...idea, ...fields });
     await fetch(`/api/admin/biz-model-ideas/${idea.id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+  }
+
+  // 営業先1行の更新。この画面は承認ビューなので、会長が押すのは「送った」「フォローした」
+  // 「返信きた」といった記録操作だけ。詳細な編集は「🔁関係人口・自治体」タブ側で行う。
+  async function patchTarget(id: string, fields: Record<string, unknown>) {
+    setTargets(ts => ts.map(t => (t.id === id ? { ...t, ...fields } : t)));
+    await fetch(`/api/admin/municipality-profiles/${id}`, {
+      method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields),
+    });
+  }
+
+  // AI成果物（ai_deliverables）の3ボタン。承認はサーバー側で実体テーブルへの反映まで行う。
+  async function approveDeliverable(d: Deliverable) {
+    const res = await fetch(`/api/admin/ai-deliverables/${d.id}`, {
+      method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify({ status: 'approved' }),
+    });
+    const data = await res.json();
+    if (!data.ok) { setError(data.error ?? '承認に失敗しました'); return; }
+    await load(password);
+  }
+  async function reviseDeliverable(d: Deliverable, feedback: string, rebuild: boolean) {
+    const res = await fetch(`/api/admin/ai-deliverables/${d.id}`, {
+      method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify({ status: 'revise', feedback, rebuild }),
+    });
+    const data = await res.json();
+    if (!data.ok) { setError(data.error ?? '差し戻しに失敗しました'); return; }
+    await load(password);
+  }
+  async function archiveDeliverable(d: Deliverable) {
+    await fetch(`/api/admin/ai-deliverables/${d.id}`, {
+      method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify({ status: 'archived' }),
+    });
+    await load(password);
   }
 
   async function addEvent() {
@@ -158,6 +211,15 @@ export default function BizModelDashboardPage() {
   if (loading) return <p style={{ padding: 24, color: '#999' }}>読み込み中…</p>;
   if (!idea) return <p style={{ padding: 24, color: '#E74C3C' }}>{error || 'この事業案が見つかりませんでした。'}</p>;
 
+  // 会長の手番（今すぐ送れる）とAIの手番の件数。オートパイロットが拾う対象と同じ判定を使う。
+  const readyToSend = targets.filter(isReadyToSend);
+  const aiTurnCount = targets.filter(t => deriveMilestone(t).owner === 'ai').length;
+  const regionNameById = new Map(targets.map(t => [t.id, t.region_name]));
+  // 会長がまだ見ていないもの（提案中）を先頭に、差し戻し済み（作り直し待ち）はAIの作業待ちなので後ろに回す。
+  const pendingDeliverables = deliverables
+    .filter(d => d.status === 'proposed' || d.status === 'revise')
+    .sort((a, b) => (a.status === b.status ? 0 : a.status === 'proposed' ? -1 : 1));
+
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 16px 80px', fontFamily: 'inherit' }}>
       <p style={{ fontSize: 12, color: '#999', margin: '0 0 4px' }}>事業ライン専用ダッシュボード（伴走支援基盤）</p>
@@ -180,30 +242,89 @@ export default function BizModelDashboardPage() {
         </div>
       </div>
 
+      {/* ---- AI提案（会長が今日チェックするもの） ---- */}
+      <div style={cardStyle}>
+        <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>
+          🤖 AI提案（{pendingDeliverables.filter(d => d.status === 'proposed').length}件・確認待ち）
+        </p>
+        {needsDeliverableMigration && (
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#B7791F', background: '#FFF8E8', padding: 8, borderRadius: 8 }}>
+            ⚠ AI成果物のテーブルが未作成です。<code>supabase/migrations/20260816_add_ai_deliverables.sql</code> をSQL Editorで実行してください。
+          </p>
+        )}
+        {pendingDeliverables.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>いま確認待ちのAI提案はありません。</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pendingDeliverables.map(d => (
+              <DeliverableCard
+                key={d.id}
+                deliverable={d}
+                subjectName={d.entity_id ? regionNameById.get(d.entity_id) : undefined}
+                onApprove={() => approveDeliverable(d)}
+                onRevise={(feedback, rebuild) => reviseDeliverable(d, feedback, rebuild)}
+                onArchive={() => archiveDeliverable(d)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ---- 営業先（この事業から生まれたリード） ---- */}
       <div style={cardStyle}>
         <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🎯 営業先（{targets.length}件）</p>
+
+        {/* 会長が今日やることを最上部に集約する。ここが空なら営業先について会長の手番はない。 */}
+        {targets.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            <span style={{
+              fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12,
+              background: readyToSend.length ? '#27AE6018' : '#f2f2f2',
+              color: readyToSend.length ? '#27AE60' : '#aaa',
+            }}>
+              ✉️ 今すぐ送信可能 {readyToSend.length}件
+              {readyToSend.length > 0 && `（${readyToSend.map(t => t.region_name).join('・')}）`}
+            </span>
+            <span style={{
+              fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12,
+              background: '#38ADA918', color: '#38ADA9',
+            }}>🤖 AIの手番 {aiTurnCount}件</span>
+          </div>
+        )}
+
         {targets.length === 0 ? (
           <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>まだこの事業に紐づく営業先がありません。自治体台帳側でlinked_biz_model_idea_idを設定してください。</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {targets.map(t => (
-              <div key={t.id} style={{ padding: '8px 12px', borderRadius: 8, background: '#F4F6F5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <div>
-                  <b style={{ fontSize: 13 }}>{t.is_priority_pick && '★ '}{t.region_name}</b>
-                  <span style={{ marginLeft: 8, fontSize: 11, color: '#999' }}>提案余地{t.opportunity_level}</span>
+            {targets.map(t => {
+              const ms = deriveMilestone(t);
+              return (
+                <div key={t.id} style={{ padding: '10px 12px', borderRadius: 8, background: '#F4F6F5' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div>
+                      <b style={{ fontSize: 13 }}>{t.is_priority_pick && '★ '}{t.region_name}</b>
+                      <span style={{ marginLeft: 8, fontSize: 11, color: '#999' }}>提案余地{t.opportunity_level}</span>
+                      {isReadyToSend(t) && (
+                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#27AE60' }}>事実確認済み・未送信</span>
+                      )}
+                      {factCheckFlagIds.has(t.id) && (
+                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#E74C3C' }}>⚠ 出典に要確認あり</span>
+                      )}
+                    </div>
+                    {/* 送信後ライフサイクルの表示・記録は既存の共通部品に任せる（二重に作らない） */}
+                    <OutreachStatus
+                      state={{ email_sent_at: t.email_sent_at ?? null, email_reply: t.email_reply ?? null, followed_up_at: t.followed_up_at ?? null }}
+                      onMarkSent={t.email_draft ? () => patchTarget(t.id, { email_sent_at: new Date().toISOString() }) : undefined}
+                      onMarkFollowedUp={() => patchTarget(t.id, { followed_up_at: new Date().toISOString() })}
+                      onMarkReplied={() => patchTarget(t.id, { email_reply: '（返信あり・内容は自治体タブで記録）' })}
+                    />
+                  </div>
+                  <div style={{ marginTop: 7 }}>
+                    <MilestoneTrack state={ms} />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, fontSize: 11 }}>
-                  {t.email_draft ? (
-                    <span style={{ color: t.email_sent_at ? '#27AE60' : '#B7791F', fontWeight: 700 }}>
-                      {t.email_sent_at ? '✓ 送信済み' : `下書きあり（${t.fact_check_status === 'verified' ? '事実確認済み' : '未確認'}）`}
-                    </span>
-                  ) : (
-                    <span style={{ color: '#ccc' }}>下書きなし</span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <p style={{ margin: '8px 0 0', fontSize: 11, color: '#aaa' }}>詳細な編集・メール確認は「🔁関係人口・自治体」タブから行ってください。</p>

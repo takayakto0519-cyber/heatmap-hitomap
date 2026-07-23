@@ -11,6 +11,8 @@ const ALLOWED_FIELDS = [
   'website_url', 'contact_email_confidence', 'contact_email_source_url',
   'fact_check_status', 'fact_check_note', 'fact_checked_at', 'assigned_to',
   'origin_proposal_id', 'origin_note', 'linked_biz_model_idea_id',
+  // 営業トラック（lib/tracks/govOutreach.ts）のM7〜M10。既存カラムから導出できない事実。
+  'hearing_at', 'requirements_memo', 'mvp_shown_at', 'quoted_at',
 ];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
+import DeliverableCard, { type Deliverable } from '@/components/admin/DeliverableCard';
 
 // 案件ごとに折りたたみ、開いた案件だけ詳細（メモ・ロードマップ）を表示することで
 // 縦スクロール量を大きく減らす。ヘッダー行はタイトル・ステータス・件数目安のみ。
@@ -75,6 +76,25 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
   const [editingReport, setEditingReport] = useState<Record<string, string>>({});
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
   const [migrationFile, setMigrationFile] = useState<string | null>(null);
+  // AIが自動で作った新規事業仮説（agents/autopilot.py が entity_type='new_biz' で積む）の確認待ち。
+  const [hypotheses, setHypotheses] = useState<Deliverable[]>([]);
+
+  const loadHypotheses = useCallback(() => {
+    fetch('/api/admin/ai-deliverables?entity_type=new_biz', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setHypotheses((d.deliverables ?? []).filter((x: Deliverable) => x.status === 'proposed' || x.status === 'revise')); })
+      .catch(() => {});
+  }, [authHeaders]);
+  useEffect(() => { loadHypotheses(); }, [loadHypotheses]);
+
+  function jsonHeaders(): HeadersInit {
+    return { ...authHeaders(), 'Content-Type': 'application/json' };
+  }
+  async function patchHypothesis(id: string, fields: Record<string, unknown>) {
+    await fetch(`/api/admin/ai-deliverables/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    loadHypotheses();
+    load();
+  }
 
   function toggleOpen(id: string) {
     setOpenIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -144,6 +164,25 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
       </p>
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {migrationFile && <MigrationNotice title="ビジネスモデル案のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
+
+      {/* AIオートパイロット（agents/autopilot.py）が数日おきに自動生成する新規事業仮説の確認待ち。
+          承認するとそのままこの下の一覧（biz_model_ideasではなくstrategy_proposals）に新規登録される。 */}
+      {hypotheses.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14 }}>🤖 AI提案（新規事業の仮説・確認待ち {hypotheses.length}件）</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {hypotheses.map(h => (
+              <DeliverableCard
+                key={h.id}
+                deliverable={h}
+                onApprove={() => patchHypothesis(h.id, { status: 'approved' })}
+                onRevise={(feedback, rebuild) => patchHypothesis(h.id, { status: 'revise', feedback, rebuild })}
+                onArchive={() => patchHypothesis(h.id, { status: 'archived' })}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       <AgentDigestPanel
         authHeaders={authHeaders}

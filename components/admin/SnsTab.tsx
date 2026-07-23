@@ -2,7 +2,8 @@
 
 // 運営ダッシュボードのSNS投稿タブ。Instagram等への自動投稿が使えない場合に、
 // キャプション・画像をすぐコピペして手動投稿できるようにする置き場所。
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import DeliverableCard, { type Deliverable } from '@/components/admin/DeliverableCard';
 
 interface SnsDraft {
   id: string;
@@ -26,9 +27,24 @@ export default function SnsTab({ authHeaders }: { authHeaders: () => HeadersInit
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // AIが自動で作ったSNS投稿案（agents/autopilot.py が entity_type='sns' で積む）の確認待ち。
+  const [proposals, setProposals] = useState<Deliverable[]>([]);
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
+  }
+
+  const loadProposals = useCallback(() => {
+    fetch('/api/admin/ai-deliverables?entity_type=sns', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setProposals((d.deliverables ?? []).filter((x: Deliverable) => x.status === 'proposed' || x.status === 'revise')); })
+      .catch(() => {});
+  }, [authHeaders]);
+  useEffect(() => { loadProposals(); }, [loadProposals]);
+  async function patchProposal(id: string, fields: Record<string, unknown>) {
+    await fetch(`/api/admin/ai-deliverables/${id}`, { method: 'PATCH', headers: jsonHeaders(), body: JSON.stringify(fields) });
+    loadProposals();
+    load();
   }
 
   async function load() {
@@ -123,6 +139,25 @@ export default function SnsTab({ authHeaders }: { authHeaders: () => HeadersInit
         自動投稿（Zapier）が使えないときに、キャプションと画像をここからすぐコピペして手動投稿する。
       </p>
       {message && <p style={{ fontSize: 13, color: '#E74C3C', margin: '0 0 12px' }}>{message}</p>}
+
+      {/* AIオートパイロット（agents/autopilot.py）が数日おきに自動生成するSNS投稿案の確認待ち。
+          承認すると上の「未投稿」一覧（sns_drafts）にそのまま追加される。 */}
+      {proposals.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#555', margin: '0 0 10px' }}>🤖 AI提案（確認待ち {proposals.length}件）</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {proposals.map(p => (
+              <DeliverableCard
+                key={p.id}
+                deliverable={p}
+                onApprove={() => patchProposal(p.id, { status: 'approved' })}
+                onRevise={(feedback, rebuild) => patchProposal(p.id, { status: 'revise', feedback, rebuild })}
+                onArchive={() => patchProposal(p.id, { status: 'archived' })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div style={{ background: '#fff', borderRadius: 12, padding: 18, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
