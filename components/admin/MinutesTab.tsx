@@ -83,6 +83,19 @@ function MinutesSummaryCard({ authHeaders }: { authHeaders: () => HeadersInit })
   );
 }
 
+// タイトル未入力の議事録は本文の先頭行を仮タイトルとして表示する（Gemini自動生成メモはtitleがnullのことが多い）
+function deriveTitle(entry: MeetingMinute): string {
+  if (entry.title) return entry.title;
+  const firstLine = entry.body.split('\n').map(l => l.trim()).find(l => l.length > 0);
+  if (!firstLine) return '（無題）';
+  return firstLine.length > 40 ? firstLine.slice(0, 40) + '…' : firstLine;
+}
+
+function derivePreview(entry: MeetingMinute): string {
+  const flat = entry.body.replace(/\s+/g, ' ').trim();
+  return flat.length > 70 ? flat.slice(0, 70) + '…' : flat;
+}
+
 export default function MinutesTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [entries, setEntries] = useState<MeetingMinute[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +108,7 @@ export default function MinutesTab({ authHeaders }: { authHeaders: () => Headers
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Record<string, { title: string; participants: string; body: string }>>({});
   const [migrationFile, setMigrationFile] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -212,39 +226,70 @@ export default function MinutesTab({ authHeaders }: { authHeaders: () => Headers
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {group.map(e => {
                 const edit = editing[e.id] ?? { title: '', participants: '', body: '' };
+                const isOpen = !!expanded[e.id];
                 return (
-                  <Card key={e.id}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <button onClick={() => deleteEntry(e.id)} style={{
-                        padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
-                      }}>削除</button>
+                  <Card key={e.id} style={{ padding: isOpen ? undefined : '10px 14px' }}>
+                    <div
+                      onClick={() => setExpanded(prev => ({ ...prev, [e.id]: !prev[e.id] }))}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}
+                    >
+                      <span style={{ fontSize: 11, color: '#38ADA9', marginTop: 2, flexShrink: 0, width: 12 }}>{isOpen ? '▾' : '▸'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 13.5, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {deriveTitle(e)}
+                        </p>
+                        {e.participants && (
+                          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#38ADA9', fontWeight: 600 }}>👤 {e.participants}</p>
+                        )}
+                        {!isOpen && (
+                          <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {derivePreview(e)}
+                          </p>
+                        )}
+                      </div>
+                      {!isOpen && (
+                        <button
+                          onClick={ev => { ev.stopPropagation(); deleteEntry(e.id); }}
+                          style={{ padding: '2px 6px', borderRadius: 8, border: 'none', background: 'none', color: '#ddd', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                        >削除</button>
+                      )}
                     </div>
 
-                    <input
-                      value={edit.title}
-                      onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, title: ev.target.value } }))}
-                      onBlur={() => { if (edit.title !== (e.title ?? '')) updateEntry(e.id, { title: edit.title || null }); }}
-                      placeholder="タイトル"
-                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontWeight: 700, margin: '0 0 6px' }}
-                    />
-                    <input
-                      value={edit.participants}
-                      onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, participants: ev.target.value } }))}
-                      onBlur={() => { if (edit.participants !== (e.participants ?? '')) updateEntry(e.id, { participants: edit.participants || null }); }}
-                      placeholder="参加者"
-                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 12, color: '#888', marginBottom: 6 }}
-                    />
-                    <textarea
-                      value={edit.body}
-                      onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, body: ev.target.value } }))}
-                      onBlur={() => { if (edit.body !== (e.body ?? '')) updateEntry(e.id, { body: edit.body }); }}
-                      placeholder="内容・決定事項・宿題など自由に書く"
-                      rows={6}
-                      style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                    <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
-                      最終更新: {new Date(e.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
-                    </p>
+                    {isOpen && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button onClick={() => deleteEntry(e.id)} style={{
+                            padding: '4px 8px', borderRadius: 8, border: 'none', background: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer',
+                          }}>削除</button>
+                        </div>
+
+                        <input
+                          value={edit.title}
+                          onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, title: ev.target.value } }))}
+                          onBlur={() => { if (edit.title !== (e.title ?? '')) updateEntry(e.id, { title: edit.title || null }); }}
+                          placeholder="タイトル"
+                          style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontWeight: 700, margin: '0 0 6px' }}
+                        />
+                        <input
+                          value={edit.participants}
+                          onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, participants: ev.target.value } }))}
+                          onBlur={() => { if (edit.participants !== (e.participants ?? '')) updateEntry(e.id, { participants: edit.participants || null }); }}
+                          placeholder="参加者"
+                          style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 12, color: '#888', marginBottom: 6 }}
+                        />
+                        <textarea
+                          value={edit.body}
+                          onChange={ev => setEditing(prev => ({ ...prev, [e.id]: { ...edit, body: ev.target.value } }))}
+                          onBlur={() => { if (edit.body !== (e.body ?? '')) updateEntry(e.id, { body: edit.body }); }}
+                          placeholder="内容・決定事項・宿題など自由に書く"
+                          rows={12}
+                          style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                        />
+                        <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
+                          最終更新: {new Date(e.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
+                        </p>
+                      </div>
+                    )}
                   </Card>
                 );
               })}
