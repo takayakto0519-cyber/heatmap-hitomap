@@ -15,11 +15,9 @@ import { promoteToCase, type PromoteSource } from '@/lib/promoteToCase';
 import { coreRegionName, smoutSearchUrl } from '@/lib/smout';
 import { computeMrr, computePipelineSummary } from '@/lib/dealMetrics';
 import { buildUnifiedFollowQueue, type FollowQueueItem } from '@/lib/followQueue';
-import RelationPopulationTab from '@/components/admin/RelationPopulationTab';
 import OutreachStatus from '@/components/admin/OutreachStatus';
-import ClientLeadsTab from '@/components/admin/ClientLeadsTab';
 import FlowBoard from '@/components/admin/sales/FlowBoard';
-import IntegratedView from '@/components/admin/sales/IntegratedView';
+import UnifiedTargetsTab from '@/components/admin/sales/UnifiedTargetsTab';
 import DossiersSection from '@/components/admin/sales/DossiersSection';
 import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
 
@@ -138,7 +136,7 @@ interface MorningItem {
 
 // 営業タブ内のサブビュー。いずれも独立タブではないので、ページのタブ切替（page.tsxのgoTab）に
 // 流してはいけない（TAB_METAに存在せず、コンテンツ領域が空になる）。goTabOrSwitchViewで横取りする。
-const SALES_VIEWS = ['ledger', 'relation', 'leads', 'cases', 'dossiers', 'guided', 'integrated'] as const;
+const SALES_VIEWS = ['ledger', 'targets', 'cases', 'dossiers', 'guided'] as const;
 type SalesView = typeof SALES_VIEWS[number];
 // 受注後の伴走支援の対象ステージ（商流ボードのWON_STAGESと同じ）
 const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
@@ -148,12 +146,10 @@ const GUIDED_STAGES = ['受注', '制作', '納品', '請求', 'フォロー'];
 const VIEW_GROUPS: { label: string; views: { key: SalesView; label: string }[] }[] = [
   { label: '見る', views: [
     { key: 'ledger', label: '🧭 営業' },
-    { key: 'integrated', label: '🧾 送信キュー（統合）' },
-    { key: 'relation', label: '🔁 関係人口・自治体' },
     { key: 'guided', label: '🚚 伴走中' },
   ] },
   { label: '台帳', views: [
-    { key: 'leads', label: '🎓 学校・法人' },
+    { key: 'targets', label: '🧾 営業台帳' },
     { key: 'cases', label: '📇 商流ボード' },
     { key: 'dossiers', label: '🤝 顧問先' },
   ] },
@@ -176,7 +172,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   // EnCard内の「学校・法人へ」「関係人口へ」ボタン用：これらは独立タブではなくこのタブのサブビューなので、
   // ページ遷移ではなくローカルのview切替に差し替える（他の宛先はそのままpage.tsxのgoTabへ）。
-  // 'relation' を横取りし損ねると page.tsx 側に該当タブが無く画面が真っ白になるため、配列で一括判定する。
+  // 'targets' を横取りし損ねると page.tsx 側に該当タブが無く画面が真っ白になるため、配列で一括判定する。
   const goTabOrSwitchView = useCallback((target: string) => {
     if ((SALES_VIEWS as readonly string[]).includes(target)) { setView(target as SalesView); return; }
     goTab(target);
@@ -188,7 +184,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     const jumpId = sessionStorage.getItem('jump_focus_profile_id');
     if (jumpId) {
       sessionStorage.removeItem('jump_focus_profile_id');
-      setView('relation');
+      setView('targets');
       setFocusMunicipalityIdFromJump(jumpId);
     }
   }, []);
@@ -357,7 +353,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       if (l.email_reply && !l.reply_handled_at) {
         items.push({
           source: 'lead', id: l.id, name: l.org_name, reply: l.email_reply, icon: '🎓',
-          onHandle: () => patchLead(l.id, { reply_handled_at: new Date().toISOString() }), switchView: 'leads',
+          onHandle: () => patchLead(l.id, { reply_handled_at: new Date().toISOString() }), switchView: 'targets',
           replyTaskKey: `reply-lead-${l.id}`,
           replyTaskNotes: `${l.org_name}様からの返信：\n${l.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
           promoteSource: { orgName: l.org_name, clientType: 'business', leadRef: l.id },
@@ -379,7 +375,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       if (p.email_reply && !p.reply_handled_at) {
         items.push({
           source: 'municipality', id: p.id, name: p.region_name, reply: p.email_reply, icon: '🏛',
-          onHandle: () => patchMunicipality(p.id, { reply_handled_at: new Date().toISOString() }), switchView: 'relation',
+          onHandle: () => patchMunicipality(p.id, { reply_handled_at: new Date().toISOString() }), switchView: 'targets',
           replyTaskKey: `reply-muni-${p.id}`,
           replyTaskNotes: `${p.region_name}様からの返信：\n${p.email_reply}\n\n営業メール/返信対応プレイブック.md を参照し、自治体向けの型（課題解決の情報提供トーン）で返信ドラフトを作成して06_実行待機_Approvalへ保存してください。`,
           promoteSource: { orgName: p.region_name, clientType: 'municipality', municipalityProfileId: p.id, evidence: p.evidence_summary },
@@ -421,8 +417,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         priority: 0.7, icon: '⏰', org: p.region_name,
         title: `返信が無いまま${fu.daysSince}日経っています`,
         why: '送った後のフォローがないと、せっかくの出会いが冷めてしまいます',
-        how: '電話・再送などでフォローし、関係人口タブで「フォロー済みにする」を押す',
-        switchView: 'relation',
+        how: '電話・再送などでフォローし、営業台帳で「フォロー済みにする」を押す',
+        switchView: 'targets',
       });
     }
     // 統合フォローキューのうち、自治体・顧問先以外（学校・法人／便り／案件のフォロー段階）は
@@ -435,7 +431,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         title: item.label,
         why: '送った後のフォローがないと、せっかくの出会いが冷めてしまいます',
         how: item.suggestedAction,
-        switchView: item.source === 'client_lead' ? 'leads' : item.source === 'case' ? 'cases' : undefined,
+        switchView: item.source === 'client_lead' ? 'targets' : item.source === 'case' ? 'cases' : undefined,
         aiTask: { label: 'フォロー文を作る', title: `フォロー文を作る：${item.name}`, category: '営業',
           notes: `${item.name}（${item.label}）へのフォロー文を作成してください。営業メール/返信対応プレイブック.md のフォロー間隔（7〜21日、2〜4通）を参考に、06_実行待機_Approvalへ保存してください。` },
       });
@@ -566,13 +562,8 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     setTimeout(() => observer.disconnect(), 8000); // 保険：8秒で監視終了
   }
 
-  // 送信キューの「出典」だけでは調べた内容が分かりにくいという声を受け、
-  // 自治体プロファイル（調べた内容・情報源全文）へワンクリックで飛べるようにする。
+  // 締切台帳など他タブから自治体プロファイルへワンクリックで飛べるようにする（sessionStorage経由）。
   const [focusMunicipalityId, setFocusMunicipalityId] = useState<string | null>(null);
-  function openMunicipalityProfile(id: string) {
-    setView('relation');
-    setFocusMunicipalityId(id);
-  }
   useEffect(() => {
     if (focusMunicipalityIdFromJump) setFocusMunicipalityId(focusMunicipalityIdFromJump);
   }, [focusMunicipalityIdFromJump]);
@@ -658,19 +649,11 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         ))}
       </div>
 
-      {view === 'relation' && (
-        <RelationPopulationTab authHeaders={authHeaders} focusProfileId={focusMunicipalityId} onFocusHandled={() => setFocusMunicipalityId(null)} />
+      {view === 'targets' && (
+        <UnifiedTargetsTab authHeaders={authHeaders} focusMunicipalityId={focusMunicipalityId} onFocusMunicipalityHandled={() => setFocusMunicipalityId(null)} />
       )}
-      {view === 'leads' && <ClientLeadsTab authHeaders={authHeaders} />}
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
-      {view === 'integrated' && (
-        <IntegratedView
-          authHeaders={authHeaders}
-          onOpenMunicipality={openMunicipalityProfile}
-          onOpenLead={(leadId) => { setView('ledger'); requestAnimationFrame(() => scrollToLead(leadId)); }}
-        />
-      )}
       {view === 'guided' && <GuidedView cases={cases} goTab={goTabOrSwitchView} />}
 
       {view === 'ledger' && <>
@@ -740,10 +723,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0, color: '#38ADA9' }}>🎯 今日送る{sendableTop10.length}件</h2>
-            <button onClick={() => setView('integrated')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>送信キューを開く →</button>
+            <button onClick={() => setView('targets')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>営業台帳を開く →</button>
           </div>
           <p style={{ margin: '0 0 8px', fontSize: 11, color: '#999' }}>
-            宛先確度・事実確認の両方が済んでいる下書きです。100通で商談1〜2件が実務の目安——送らない限り検証できません。実際の送信ボタンは送信キューにあります。
+            宛先確度・事実確認の両方が済んでいる下書きです。100通で商談1〜2件が実務の目安——送らない限り検証できません。実際の送信ボタンは営業台帳にあります。
           </p>
           <div style={{ ...cardStyle, padding: '10px 14px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -823,7 +806,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
           <p style={{ margin: '4px 0 2px', fontSize: 17, fontWeight: 800, color: '#333' }}>{sentRankedFeed.length}件</p>
           <p style={{ margin: 0, fontSize: 11, color: '#38ADA9', fontWeight: 700 }}>{sentRankedFeed.length > 0 ? 'クリックで表示 ↓' : '一覧の下に表示されます'}</p>
         </button>
-        <button onClick={() => setView('relation')} style={{
+        <button onClick={() => setView('targets')} style={{
           ...cardStyle, padding: '12px 14px', borderTop: '3px solid #E74C3C', textAlign: 'left',
           border: 'none', cursor: 'pointer', fontFamily: 'inherit',
         }}>
@@ -925,7 +908,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                   ) : (
                     <>
                       <a href={smoutSearchUrl(item.name)} target="_blank" rel="noopener noreferrer" style={{ ...jumpBtnStyle, textDecoration: 'none', display: 'inline-block' }}>SMOUT ↗</a>
-                      <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+                      <button onClick={() => setView('targets')} style={jumpBtnStyle}>詳細へ →</button>
                     </>
                   )}
                 </div>
@@ -1021,7 +1004,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#B7791F', background: '#B7791F14', padding: '1px 5px', borderRadius: 8 }}>手動評価</span>
                 </div>
                 <a href={smoutSearchUrl(item.name)} target="_blank" rel="noopener noreferrer" style={{ ...jumpBtnStyle, textDecoration: 'none', display: 'inline-block' }}>SMOUT ↗</a>
-                <button onClick={() => setView('relation')} style={jumpBtnStyle}>詳細へ →</button>
+                <button onClick={() => setView('targets')} style={jumpBtnStyle}>詳細へ →</button>
               </div>
             );
           })}
@@ -1208,7 +1191,7 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
         {municipalityProfile && (
           <span
             title={municipalityProfile.relation_population_initiative ?? '関係人口ダッシュボードで詳細を見る'}
-            onClick={() => goTab('relation')}
+            onClick={() => goTab('targets')}
             style={{
               padding: '2px 9px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
               background: (OPPORTUNITY_COLORS[municipalityProfile.opportunity_level] ?? '#999') + '18',
@@ -1316,7 +1299,7 @@ function EnCard({ lead, records, en, onAddRecord, onRemoveRecord, onStatusChange
                 color: lead.status === s.key ? s.color : '#999', fontWeight: lead.status === s.key ? 700 : 400,
               }}>{s.label}</button>
             ))}
-            <button onClick={() => goTab('leads')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>証拠パック・提案書は「🎓 学校・法人（台帳）」へ →</button>
+            <button onClick={() => goTab('targets')} style={{ ...jumpBtnStyle, marginLeft: 'auto' }}>証拠パック・提案書は「🧾 営業台帳」へ →</button>
           </div>
         </div>
       )}

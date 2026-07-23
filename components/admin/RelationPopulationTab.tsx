@@ -9,6 +9,7 @@ import { computeFollowUp } from '@/lib/followUp';
 import { smoutSearchUrl } from '@/lib/smout';
 import { rfpBonus } from '@/lib/salesScore';
 import { promoteToCase } from '@/lib/promoteToCase';
+import { CONFIDENCE_BADGE, FACT_CHECK_BADGE, canSendDraft, type Confidence, type FactCheckStatus } from '@/components/admin/sales/factCheckUi';
 
 interface RelationStats {
   totalContributors: number;
@@ -54,6 +55,12 @@ interface MunicipalityProfile {
   smout_reply: string | null;
   on_hold: boolean;
   is_priority_pick: boolean;
+  contact_email_confidence?: Confidence;
+  contact_email_source_url?: string | null;
+  fact_check_status?: FactCheckStatus;
+  fact_check_note?: string | null;
+  fact_checked_at?: string | null;
+  assigned_to?: string | null;
   scheduling_request_detected_at?: string | null;
   municipality_code?: string | null;
   population_stats?: { dayNightRatio?: number; statsYear?: string; statsDataId?: string; fetchedAt?: string } | null;
@@ -168,6 +175,7 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
   const [sortKey, setSortKey] = useState<SortKey>('rank_desc');
   const [nameFilter, setNameFilter] = useState('');
   const [levelFilter, setLevelFilter] = useState<'all' | '高' | '中' | '低'>('all');
+  const [newFrontierOnly, setNewFrontierOnly] = useState(false);
   const [justFocusedId, setJustFocusedId] = useState<string | null>(null);
   const [opps, setOpps] = useState<FundingOpp[]>([]);
   const [cases, setCases] = useState<BusinessCaseLite[]>([]);
@@ -257,11 +265,40 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
     await fetch(`/api/admin/municipality-profiles/${id}`, { method: 'DELETE', headers: authHeaders() });
     await loadProfiles();
   }
-  async function markSent(id: string) {
-    await patchProfile(id, { email_sent_at: new Date().toISOString() });
-  }
   async function unmarkSent(id: string) {
     await patchProfile(id, { email_sent_at: null });
+  }
+  const [sendBusy, setSendBusy] = useState<Record<string, boolean>>({});
+  const [sendError, setSendError] = useState<Record<string, string>>({});
+  async function toggleFactCheck(p: MunicipalityProfile, status: 'verified' | 'unverified') {
+    setSendBusy(prev => ({ ...prev, [p.id]: true }));
+    try {
+      await patchProfile(p.id, { fact_check_status: status, fact_checked_at: new Date().toISOString() });
+    } finally {
+      setSendBusy(prev => ({ ...prev, [p.id]: false }));
+    }
+  }
+  async function saveContactEmail(p: MunicipalityProfile, rawValue: string) {
+    const trimmed = rawValue.trim();
+    if (trimmed === (p.contact_email ?? '')) return;
+    const body: Partial<MunicipalityProfile> = { contact_email: trimmed || null };
+    // 会長が手入力した宛先＝目視確認済みとみなし、確度を「高」に引き上げる（フォームのみ🔴のまま残さない）。
+    if (trimmed) body.contact_email_confidence = 'high';
+    await patchProfile(p.id, body);
+  }
+  async function sendEmailNow(p: MunicipalityProfile) {
+    if (!window.confirm(`${p.region_name} 様（${p.contact_email}）へ、このメールを送信します。取り消せません。よろしいですか？`)) return;
+    setSendBusy(prev => ({ ...prev, [p.id]: true }));
+    setSendError(prev => ({ ...prev, [p.id]: '' }));
+    try {
+      const res = await fetch(`/api/admin/municipality-profiles/${p.id}/send`, { method: 'POST', headers: authHeaders() });
+      const data = await res.json();
+      if (data.ok) await loadProfiles(); else setSendError(prev => ({ ...prev, [p.id]: data.error ?? '送信に失敗しました' }));
+    } catch {
+      setSendError(prev => ({ ...prev, [p.id]: '通信エラー' }));
+    } finally {
+      setSendBusy(prev => ({ ...prev, [p.id]: false }));
+    }
   }
   async function markFollowedUp(id: string) {
     await patchProfile(id, { followed_up_at: new Date().toISOString() });
@@ -359,6 +396,7 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
   const visibleProfiles = useMemo(() => {
     let list = viewMode === 'unsent' ? baseList.filter(p => !p.is_priority_pick) : baseList;
     if (levelFilter !== 'all') list = list.filter(p => p.opportunity_level === levelFilter);
+    if (newFrontierOnly) list = list.filter(p => !p.relation_population_initiative?.trim());
     if (nameFilter.trim()) {
       const q = nameFilter.trim();
       list = list.filter(p => p.region_name.includes(q));
@@ -382,13 +420,14 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
       sorted.sort((a, b) => dir * ((OPPORTUNITY_RANK[a.opportunity_level] ?? 9) - (OPPORTUNITY_RANK[b.opportunity_level] ?? 9)));
     }
     return sorted;
-  }, [baseList, viewMode, sortKey, nameFilter, levelFilter]);
+  }, [baseList, viewMode, sortKey, nameFilter, levelFilter, newFrontierOnly]);
 
   const levelCounts = {
     高: baseList.filter(p => p.opportunity_level === '高').length,
     中: baseList.filter(p => p.opportunity_level === '中').length,
     低: baseList.filter(p => p.opportunity_level === '低').length,
   };
+  const newFrontierCount = baseList.filter(p => !p.relation_population_initiative?.trim()).length;
 
   function ProfileCard({ p, highlight }: { p: MunicipalityProfile; highlight?: boolean }) {
     // gmail_watch.pyの日程調整検知（直近5日以内なら強調表示）
@@ -428,6 +467,15 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
                 background: (p.population_stats.dayNightRatio < 100 ? '#E5A139' : '#2E5FA3') + '18',
                 padding: '1px 8px', borderRadius: 10,
               }}>🏙 昼夜{p.population_stats.dayNightRatio}%</span>
+            )}
+            {p.relation_population_initiative?.trim() ? (
+              <span title="既存の関係人口・移住定住施策あり" style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#4A69BD', background: '#4A69BD18', padding: '1px 8px', borderRadius: 10,
+              }}>🏛 相乗り型（既存施策あり）</span>
+            ) : (
+              <span title="先行事例が見当たらない自治体。既存の関係人口予算枠が無い分、提案の切り口を変える必要がある" style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#8E44AD', background: '#8E44AD18', padding: '1px 8px', borderRadius: 10,
+              }}>🆕 新規開拓（先行事例なし）</span>
             )}
           </b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -528,16 +576,55 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
           placeholder="URLを1行に1つ貼り付け"
           onBlur={e => { if (e.target.value !== (p.source_links ?? '')) patchProfile(p.id, { source_links: e.target.value || null }); }} />
 
+        {/* 🔍 根拠・出典：事実確認する時に「何を調べて」「どこで裏取りしたか」を1箇所で見比べられるように、
+            証拠パック(evidence_summary)・情報源リンク・事実確認メモをここへ集約表示する（読む用の要約。編集は上のtextarea側で行う）。 */}
+        {(p.evidence_summary?.trim() || p.source_links?.trim() || p.fact_check_note?.trim()) && (
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#FBF9F3', border: '1px solid #F0EAD6' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#8A6D3B' }}>🔍 根拠・出典（事実確認用まとめ）</p>
+            {p.evidence_summary?.trim() && (
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: '#555', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{p.evidence_summary}</p>
+            )}
+            {p.source_links?.trim() && <LinkList text={p.source_links} />}
+            {p.fact_check_note?.trim() && (
+              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E5A139' }}>📝 {p.fact_check_note}</p>
+            )}
+          </div>
+        )}
+
         <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#F4FAF9', border: '1px solid #DDF0EE' }}>
           <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#2A8580' }}>📮 営業メール</p>
           <label style={labelStyle}>宛先メールアドレス</label>
-          <input defaultValue={p.contact_email ?? ''} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+          <input
+            key={`contact-email-${p.id}-${p.contact_email ?? ''}`} defaultValue={p.contact_email ?? ''}
+            style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
             placeholder="判明していれば入力"
-            onBlur={e => { if (e.target.value !== (p.contact_email ?? '')) patchProfile(p.id, { contact_email: e.target.value || null }); }} />
+            onBlur={e => saveContactEmail(p, e.target.value)} />
           <label style={labelStyle}>メール文案（下書き・編集可）</label>
           <textarea defaultValue={p.email_draft ?? ''} rows={6} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
             onBlur={e => { if (e.target.value !== (p.email_draft ?? '')) patchProfile(p.id, { email_draft: e.target.value || null }); }} />
+
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0 4px', flexWrap: 'wrap' }}>
+            {p.contact_email_confidence && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: CONFIDENCE_BADGE[p.contact_email_confidence].color }}>
+                {CONFIDENCE_BADGE[p.contact_email_confidence].label}
+              </span>
+            )}
+            {p.fact_check_status === 'verified' || p.fact_check_status === 'flagged' ? (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: FACT_CHECK_BADGE[p.fact_check_status].color }}>
+                {FACT_CHECK_BADGE[p.fact_check_status].label}
+              </span>
+            ) : (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#999' }}>○ 事実確認: 未実施</span>
+            )}
+            {p.contact_email_source_url && (
+              <a href={p.contact_email_source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10.5, color: '#38ADA9' }}>出典 ↗</a>
+            )}
+            {p.assigned_to && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8E44AD', background: '#F3E9FA', padding: '1px 7px', borderRadius: 20 }}>👤 {p.assigned_to}</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0', flexWrap: 'wrap' }}>
             {p.email_sent_at ? (
               <>
                 <span style={{ fontSize: 11.5, color: '#27AE60', fontWeight: 700 }}>✓ 送信済み（{new Date(p.email_sent_at).toLocaleDateString('ja-JP')}）</span>
@@ -556,11 +643,25 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
                 <button onClick={() => unmarkSent(p.id)} style={{ fontSize: 11, background: 'none', border: '1px solid #ccc', borderRadius: 999, padding: '3px 10px', cursor: 'pointer' }}>取り消す</button>
               </>
             ) : (
-              <button onClick={() => markSent(p.id)} style={{ fontSize: 11.5, fontWeight: 700, background: '#38ADA9', color: '#fff', border: 'none', borderRadius: 999, padding: '5px 12px', cursor: 'pointer' }}>
-                送信済みにする
-              </button>
+              <>
+                {p.fact_check_status === 'verified' ? (
+                  <button onClick={() => toggleFactCheck(p, 'unverified')} disabled={sendBusy[p.id]} style={{
+                    padding: '4px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#999', fontSize: 11, cursor: 'pointer',
+                  }}>未確認に戻す</button>
+                ) : (
+                  <button onClick={() => toggleFactCheck(p, 'verified')} disabled={sendBusy[p.id]} style={{
+                    padding: '4px 10px', borderRadius: 8, border: '1px solid #27AE60', background: '#fff', color: '#27AE60', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                  }}>事実確認済みにする</button>
+                )}
+                <button onClick={() => sendEmailNow(p)} disabled={!canSendDraft(p.contact_email, p.contact_email_confidence, p.fact_check_status) || sendBusy[p.id]} style={{
+                  padding: '6px 14px', borderRadius: 8, border: 'none',
+                  background: canSendDraft(p.contact_email, p.contact_email_confidence, p.fact_check_status) ? '#38ADA9' : '#ccc', color: '#fff', fontWeight: 700, fontSize: 12,
+                  cursor: canSendDraft(p.contact_email, p.contact_email_confidence, p.fact_check_status) && !sendBusy[p.id] ? 'pointer' : 'not-allowed',
+                }}>{sendBusy[p.id] ? '送信中…' : '送信'}</button>
+              </>
             )}
           </div>
+          {sendError[p.id] && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#E74C3C' }}>{sendError[p.id]}</p>}
           {p.email_sent_content && (
             <>
               <label style={labelStyle}>Gmailで実際に送信した本文（gmail_watch AIエージェントが自動取得・読み取り専用）</label>
@@ -784,6 +885,9 @@ export default function RelationPopulationTab({ authHeaders, focusProfileId, onF
                   </span>
                 ))}
               </div>
+              <span onClick={() => setNewFrontierOnly(v => !v)} style={pillStyle(newFrontierOnly, '#8E44AD')} title="relation_population_initiativeが空＝先行事例が見当たらない自治体だけに絞り込みます">
+                🆕 新規開拓のみ（{newFrontierCount}）
+              </span>
               <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
                 <span style={{ fontSize: 10.5, color: '#999', alignSelf: 'center' }}>並び順</span>
                 <span onClick={() => setSortKey('rank_desc')} style={pillStyle(sortKey === 'rank_desc')}>提案余地 高→低</span>

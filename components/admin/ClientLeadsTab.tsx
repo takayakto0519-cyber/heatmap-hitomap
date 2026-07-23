@@ -6,6 +6,7 @@ import { scoreLead } from '@/lib/leadTemperature';
 import { Card, inputStyle } from '@/components/admin/adminShared';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 import { promoteToCase } from '@/lib/promoteToCase';
+import { CONFIDENCE_BADGE, FACT_CHECK_BADGE, canSendDraft, subjectOf, type Confidence, type FactCheckStatus } from '@/components/admin/sales/factCheckUi';
 
 export interface ClientLead {
   id: string;
@@ -20,6 +21,13 @@ export interface ClientLead {
   updated_at: string;
   scheduling_request_detected_at?: string | null;
   origin_note?: string | null;
+  email_draft?: string | null;
+  email_sent_at?: string | null;
+  contact_email_confidence?: Confidence;
+  contact_email_source_url?: string | null;
+  fact_check_status?: FactCheckStatus;
+  fact_check_note?: string | null;
+  assigned_to?: string | null;
 }
 
 export const LEAD_STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -52,6 +60,12 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
   const [proposalError, setProposalError] = useState<Record<string, string>>({});
   const [cases, setCases] = useState<{ id: string; lead_ref: string | null; municipality_profile_id: string | null }[]>([]);
   const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingEmail, setEditingEmail] = useState<Record<string, string>>({});
+  const [editingDraft, setEditingDraft] = useState<Record<string, string>>({});
+  const [draftOpen, setDraftOpen] = useState<Record<string, boolean>>({});
+  const [sendBusy, setSendBusy] = useState<Record<string, boolean>>({});
+  const [sendError, setSendError] = useState<Record<string, string>>({});
   useEffect(() => {
     fetch('/api/admin/business-cases', { headers: authHeaders() })
       .then(r => r.json()).then(d => { if (d.ok) setCases(d.cases ?? []); }).catch(() => {});
@@ -158,6 +172,8 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
           setLeads(d.leads);
           setDemoHiddenCount(d.demoHiddenCount ?? 0);
           setEditingMemo(Object.fromEntries((d.leads as ClientLead[]).map(l => [l.id, l.memo ?? ''])));
+          setEditingEmail(Object.fromEntries((d.leads as ClientLead[]).map(l => [l.id, l.email ?? ''])));
+          setEditingDraft(Object.fromEntries((d.leads as ClientLead[]).map(l => [l.id, l.email_draft ?? ''])));
         } else setError(d.error ?? '取得に失敗しました');
       })
       .catch(() => setError('通信エラー'))
@@ -198,6 +214,45 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
     const res = await fetch(`/api/admin/client-leads/${id}`, { method: 'DELETE', headers: authHeaders() });
     const data = await res.json();
     if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
+  }
+
+  async function toggleFactCheck(l: ClientLead, status: 'verified' | 'unverified') {
+    setSendBusy(prev => ({ ...prev, [l.id]: true }));
+    setSendError(prev => ({ ...prev, [l.id]: '' }));
+    try {
+      await updateLead(l.id, { fact_check_status: status, fact_checked_at: new Date().toISOString() });
+    } finally {
+      setSendBusy(prev => ({ ...prev, [l.id]: false }));
+    }
+  }
+
+  async function saveEmail(l: ClientLead, rawValue: string) {
+    const trimmed = rawValue.trim();
+    if (trimmed === (l.email ?? '')) return;
+    const body: Record<string, unknown> = { email: trimmed || null };
+    // 会長が手入力した宛先＝目視確認済みとみなし、確度を「高」に引き上げる（フォームのみ🔴のまま残さない）。
+    if (trimmed) body.contact_email_confidence = 'high';
+    await updateLead(l.id, body);
+  }
+
+  async function saveDraft(l: ClientLead, rawValue: string) {
+    if (rawValue === (l.email_draft ?? '')) return;
+    await updateLead(l.id, { email_draft: rawValue || null });
+  }
+
+  async function sendEmailNow(l: ClientLead) {
+    if (!window.confirm(`${l.org_name} 様（${l.email}）へ、このメールを送信します。取り消せません。よろしいですか？`)) return;
+    setSendBusy(prev => ({ ...prev, [l.id]: true }));
+    setSendError(prev => ({ ...prev, [l.id]: '' }));
+    try {
+      const res = await fetch(`/api/admin/client-leads/${l.id}/send`, { method: 'POST', headers: authHeaders() });
+      const data = await res.json();
+      if (data.ok) load(); else setSendError(prev => ({ ...prev, [l.id]: data.error ?? '送信に失敗しました' }));
+    } catch {
+      setSendError(prev => ({ ...prev, [l.id]: '通信エラー' }));
+    } finally {
+      setSendBusy(prev => ({ ...prev, [l.id]: false }));
+    }
   }
 
   // AIで証拠パックの下書きを生成する（ここでは保存しない。会長が確認してから「反映」で初めてmemoに入る）
@@ -264,6 +319,7 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
 
   const visibleLeads = leads
     .filter(l => filter === 'all' || l.client_type === filter)
+    .filter(l => !searchQuery.trim() || l.org_name.includes(searchQuery.trim()))
     .sort((a, b) => (hotSort ? scoreLead(b).score - scoreLead(a).score : 0));
   const counts = {
     all: leads.length,
@@ -298,7 +354,11 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
         </label>
       )}
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="団体名で絞り込み"
+          style={{ ...inputStyle, maxWidth: 200 }}
+        />
         {([['all', `すべて（${counts.all}）`], ['school', `🏫 学校（${counts.school}）`], ['business', `🏢 法人（${counts.business}）`], ['municipality', `🏛 自治体（${counts.municipality}）`]] as [typeof filter, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setFilter(id)} style={{
             padding: '7px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
@@ -422,6 +482,71 @@ export default function ClientLeadsTab({ authHeaders }: { authHeaders: () => Hea
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: '#ccc' }}>
                   最終更新: {new Date(l.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
                 </p>
+
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#F4FAF9', border: '1px solid #DDF0EE' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#2A8580' }}>🔍 事実確認・送信</p>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#555', margin: '0 0 4px', display: 'block' }}>宛先メールアドレス</label>
+                  <input
+                    key={`email-${l.id}-${l.email ?? ''}`} defaultValue={l.email ?? ''}
+                    placeholder="判明していれば入力" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+                    onBlur={e => saveEmail(l, e.target.value)}
+                  />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#555', margin: '10px 0 4px', display: 'block' }}>メール文案（下書き・編集可）</label>
+                  <textarea
+                    value={editingDraft[l.id] ?? ''} onChange={e => setEditingDraft(prev => ({ ...prev, [l.id]: e.target.value }))}
+                    onBlur={e => saveDraft(l, e.target.value)} rows={draftOpen[l.id] ? 8 : 3}
+                    style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                  <button type="button" onClick={() => setDraftOpen(prev => ({ ...prev, [l.id]: !prev[l.id] }))} style={{
+                    marginTop: 4, border: 'none', background: 'none', color: '#38ADA9', fontSize: 11, cursor: 'pointer', padding: 0,
+                  }}>{draftOpen[l.id] ? '折りたたむ' : `本文を広げる（${subjectOf(l.email_draft ?? '')}）`}</button>
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0 4px', flexWrap: 'wrap' }}>
+                    {l.contact_email_confidence && (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: CONFIDENCE_BADGE[l.contact_email_confidence].color }}>
+                        {CONFIDENCE_BADGE[l.contact_email_confidence].label}
+                      </span>
+                    )}
+                    {l.fact_check_status === 'verified' || l.fact_check_status === 'flagged' ? (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: FACT_CHECK_BADGE[l.fact_check_status].color }}>
+                        {FACT_CHECK_BADGE[l.fact_check_status].label}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#999' }}>○ 事実確認: 未実施</span>
+                    )}
+                    {l.contact_email_source_url && (
+                      <a href={l.contact_email_source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10.5, color: '#38ADA9' }}>出典 ↗</a>
+                    )}
+                    {l.assigned_to && (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8E44AD', background: '#F3E9FA', padding: '1px 7px', borderRadius: 20 }}>👤 {l.assigned_to}</span>
+                    )}
+                  </div>
+                  {l.fact_check_note && <p style={{ margin: '0 0 4px', fontSize: 11, color: '#E5A139' }}>{l.fact_check_note}</p>}
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                    {l.email_sent_at ? (
+                      <span style={{ fontSize: 11.5, color: '#27AE60', fontWeight: 700 }}>✓ 送信済み（{new Date(l.email_sent_at).toLocaleDateString('ja-JP')}）</span>
+                    ) : (
+                      <>
+                        {l.fact_check_status === 'verified' ? (
+                          <button onClick={() => toggleFactCheck(l, 'unverified')} disabled={sendBusy[l.id]} style={{
+                            padding: '4px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#999', fontSize: 11, cursor: 'pointer',
+                          }}>未確認に戻す</button>
+                        ) : (
+                          <button onClick={() => toggleFactCheck(l, 'verified')} disabled={sendBusy[l.id]} style={{
+                            padding: '4px 10px', borderRadius: 8, border: '1px solid #27AE60', background: '#fff', color: '#27AE60', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                          }}>事実確認済みにする</button>
+                        )}
+                        <button onClick={() => sendEmailNow(l)} disabled={!canSendDraft(l.email, l.contact_email_confidence, l.fact_check_status) || sendBusy[l.id]} style={{
+                          padding: '6px 14px', borderRadius: 8, border: 'none',
+                          background: canSendDraft(l.email, l.contact_email_confidence, l.fact_check_status) ? '#38ADA9' : '#ccc', color: '#fff', fontWeight: 700, fontSize: 12,
+                          cursor: canSendDraft(l.email, l.contact_email_confidence, l.fact_check_status) && !sendBusy[l.id] ? 'pointer' : 'not-allowed',
+                        }}>{sendBusy[l.id] ? '送信中…' : '送信'}</button>
+                      </>
+                    )}
+                  </div>
+                  {sendError[l.id] && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#E74C3C' }}>{sendError[l.id]}</p>}
+                </div>
 
                 <button type="button" onClick={() => setEnrichOpen(prev => ({ ...prev, [l.id]: !prev[l.id] }))} style={{
                   marginTop: 8, padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
