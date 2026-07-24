@@ -190,7 +190,7 @@ export default function WebAnalyticsTab({ authHeaders }: { authHeaders: () => He
               <div style={{ flex: 1, minWidth: 280 }}>
                 <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>📄 よく見られているページ</p>
                 <Card>
-                  <RankedBars rows={data.pages} dimKey="route" emptyLabel="データがありません。" />
+                  <RankedBars rows={data.pages} dimKey="requestPath" emptyLabel="データがありません。" />
                 </Card>
               </div>
               <div style={{ flex: 1, minWidth: 280 }}>

@@ -52,7 +52,9 @@ export async function GET(req: NextRequest) {
     const [daily, totals, pages, referrers, devices, countries] = await Promise.all([
       queryVercel(token, 'visits/aggregate', { since, until, by: 'day' }),
       queryVercel(token, 'visits/count', { since, until }),
-      queryVercel(token, 'visits/aggregate', { since, until, by: 'route', limit: '8' }),
+      // by: 'route' はこのプロジェクトでは常に空文字1行しか返らなかった（App Routerの
+      // ルートパターン名が未設定のため？）。実URLそのものである requestPath を使う。
+      queryVercel(token, 'visits/aggregate', { since, until, by: 'requestPath', limit: '8' }),
       queryVercel(token, 'visits/aggregate', { since, until, by: 'referrerHostname', limit: '8' }),
       queryVercel(token, 'visits/aggregate', { since, until, by: 'deviceType', limit: '6' }),
       queryVercel(token, 'visits/aggregate', { since, until, by: 'country', limit: '8' }),
