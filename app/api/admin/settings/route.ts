@@ -3,7 +3,7 @@
 //   PUT ... { hero?, announcement? } を受け取り、キーごとにupsertする
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
-import { mergeSiteSettings, DEFAULT_SITE_SETTINGS, type HeroSettings, type AnnouncementSettings } from '@/lib/siteSettings';
+import { mergeSiteSettings, DEFAULT_SITE_SETTINGS, type HeroSettings, type AnnouncementSettings, type HomePhotoItem } from '@/lib/siteSettings';
 import { revalidateSitePages } from '@/lib/revalidateSite';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -25,7 +25,7 @@ export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as {
     hero?: Partial<HeroSettings>;
     announcement?: Partial<AnnouncementSettings>;
-    home_photo_grid?: string[];
+    home_photo_grid?: HomePhotoItem[];
   };
 
   const rows: { key: string; value: unknown; updated_at: string }[] = [];

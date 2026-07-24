@@ -22,12 +22,18 @@ export interface AnnouncementSettings {
   href: string;               // タップした時のリンク先（空なら文字だけ）
 }
 
+// トップページの写真グリッドに出す1枚。'trace'=投稿の痕跡写真、'post'=実績ブログ(site_posts)のカバー写真。
+export interface HomePhotoItem {
+  type: 'trace' | 'post';
+  id: string;
+}
+
 export interface SiteSettings {
   hero: HeroSettings;
   announcement: AnnouncementSettings;
-  // トップページ「いま、積み重なっている痕跡」に出す写真の並び（trace.id の配列。先頭ほど大きく出る）。
+  // トップページ「いま、積み重なっている痕跡」に出す写真の並び（先頭ほど大きく出る）。
   // 空配列なら自動選定（直近の投稿から写真つきのものを新しい順に採用）に戻る。
-  home_photo_grid: string[];
+  home_photo_grid: HomePhotoItem[];
 }
 
 // 既定文言：これまでコード内（components/corp/Hero.tsx）に固定されていた文言と同一にする。
@@ -66,7 +72,19 @@ export function mergeSiteSettings(rows: { key: string; value: unknown }[]): Site
   }
   const announcement = { ...DEFAULT_SITE_SETTINGS.announcement, ...(byKey.get('announcement') as Partial<AnnouncementSettings> | undefined) };
   const rawGrid = byKey.get('home_photo_grid');
-  const home_photo_grid = Array.isArray(rawGrid) ? rawGrid.filter((id): id is string => typeof id === 'string') : [];
+  // 旧形式（trace.idの文字列配列のみ）で保存済みの環境でも壊れないよう、文字列は type:'trace' として読み替える
+  const home_photo_grid: HomePhotoItem[] = Array.isArray(rawGrid)
+    ? rawGrid
+        .map((item): HomePhotoItem | null => {
+          if (typeof item === 'string') return { type: 'trace', id: item };
+          if (item && typeof item === 'object' && typeof (item as { id?: unknown }).id === 'string') {
+            const obj = item as { type?: unknown; id: string };
+            return { type: obj.type === 'post' ? 'post' : 'trace', id: obj.id };
+          }
+          return null;
+        })
+        .filter((x): x is HomePhotoItem => x !== null)
+    : [];
   return { hero, announcement, home_photo_grid };
 }
 

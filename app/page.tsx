@@ -71,10 +71,11 @@ export default async function HomePage() {
           事業紹介・CTA帯等）は運営がページ編集タブから自由に追加・並び替え・削除できるブロックで構成される。 */}
       <main style={{ flex: 1 }}>
         <Hero settings={settings.hero} />
+        {/* 20260725: 実際の写真＝いちばんの説得材料のため、Hero直後（MVVや機能紹介より前）に配置 */}
+        <RecentTraces curatedItems={settings.home_photo_grid} />
         <ProofBand />
         <BlockRenderer blocks={blocks} />
         <EmotionPalette />
-        <RecentTraces curatedIds={settings.home_photo_grid} />
 
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px' }}>
           <AdSlot />
