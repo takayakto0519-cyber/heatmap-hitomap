@@ -110,6 +110,12 @@ export default function SalesEntryCard({
             <p style={{ margin: 0, fontWeight: 800, fontSize: 14.5 }}>
               {entry.icon} {entry.name}
               <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: entry.statusColor }}>{entry.statusLabel}</span>
+              {/* 展開しなくても送信済みかどうか一目で分かるように（二重送信防止、2026-07-24） */}
+              {entry.emailSentAt ? (
+                <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: '#27AE60' }}>✓ 送信済み</span>
+              ) : (
+                <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: '#B7791F' }}>未送信</span>
+              )}
             </p>
             <button onClick={() => setExpanded(v => !v)} style={{
               padding: '3px 12px', borderRadius: 14, border: '1px solid #ddd', background: '#fff',

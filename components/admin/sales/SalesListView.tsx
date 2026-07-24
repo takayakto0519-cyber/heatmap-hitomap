@@ -105,6 +105,10 @@ export default function SalesListView({ authHeaders, focusMunicipalityId, onFocu
     return (patch: Record<string, unknown>) => (entry.kind === 'lead' ? patchLead(entry.id, patch) : patchMunicipality(entry.id, patch));
   }
 
+  // 送信済み・未送信を混在させると「もう送った相手にまた声をかけてしまう」事故につながるため
+  // （会長からの指摘、2026-07-24）、ここで明確に2本のリストへ分ける。未送信を常に上に出し、
+  // 送信済みは折りたたんで目立たなくする（SalesTab.tsxのledgerビューと同じ考え方）。
+  const [showSentSection, setShowSentSection] = useState(false);
   const entries = useMemo(() => buildSalesEntries(leads, profiles, opps), [leads, profiles, opps]);
   const visibleEntries = useMemo(() => {
     let list = entries;
@@ -112,6 +116,8 @@ export default function SalesListView({ authHeaders, focusMunicipalityId, onFocu
     if (searchQuery.trim()) list = list.filter(e => e.name.includes(searchQuery.trim()));
     return list;
   }, [entries, kindFilter, searchQuery]);
+  const unsentEntries = useMemo(() => visibleEntries.filter(e => !e.emailSentAt), [visibleEntries]);
+  const sentEntries = useMemo(() => visibleEntries.filter(e => e.emailSentAt), [visibleEntries]);
 
   function toggleSelect(key: string) {
     setSelected(prev => {
@@ -223,6 +229,69 @@ export default function SalesListView({ authHeaders, focusMunicipalityId, onFocu
     municipality: entries.filter(e => e.kind === 'municipality').length,
   };
 
+  function renderCard(entry: SalesEntry) {
+    const linkedCase = cases.find(c => (entry.kind === 'lead' ? c.lead_ref === entry.id : c.municipality_profile_id === entry.id));
+    const flags = factCheckFlags.filter(f => f.profile_id === entry.id && f.kind === entry.kind);
+    const municipality: MunicipalityExtras | undefined = entry.kind === 'municipality' && entry.municipality ? {
+      smoutSentAt: entry.municipality.smout_sent_at,
+      smoutReply: entry.municipality.smout_reply,
+      onHold: entry.municipality.on_hold,
+      isPriorityPick: entry.municipality.is_priority_pick,
+      municipalityCode: entry.municipality.municipality_code ?? null,
+      populationStats: entry.municipality.population_stats ?? null,
+      populationStatsFetchedAt: entry.municipality.population_stats_fetched_at ?? null,
+      followedUpAt: entry.municipality.followed_up_at,
+      linkedOpps: opps.filter(o => o.municipality_profile_id === entry.id),
+      popStatsLoading: Boolean(popStatsLoading[entry.compositeKey]),
+      popStatsError: popStatsError[entry.compositeKey],
+      onMarkSmoutSent: () => patchMunicipality(entry.id, { smout_sent_at: new Date().toISOString() }),
+      onUnmarkSmoutSent: () => patchMunicipality(entry.id, { smout_sent_at: null }),
+      onSaveSmoutReply: v => { if (v !== (entry.municipality?.smout_reply ?? '')) patchMunicipality(entry.id, { smout_reply: v || null }); },
+      onToggleOnHold: () => patchMunicipality(entry.id, { on_hold: !entry.municipality?.on_hold }),
+      onTogglePriorityPick: () => patchMunicipality(entry.id, { is_priority_pick: !entry.municipality?.is_priority_pick }),
+      onSaveMunicipalityCode: v => patchMunicipality(entry.id, { municipality_code: v || null }),
+      onFetchPopulationStats: () => fetchPopulationStats(entry),
+      onMarkFollowedUp: () => patchMunicipality(entry.id, { followed_up_at: new Date().toISOString() }),
+      onRegisterRfp: (title, deadline) => registerRfp(entry, title, deadline),
+    } : undefined;
+
+    return (
+      <SalesEntryCard
+        key={entry.compositeKey}
+        entry={entry}
+        selected={selected.has(entry.compositeKey)}
+        onToggleSelect={() => toggleSelect(entry.compositeKey)}
+        factCheckFlags={flags}
+        isCaseified={Boolean(linkedCase)}
+        caseId={linkedCase?.id}
+        caseBusy={caseBusyId === entry.compositeKey}
+        onSetStatus={status => patchFor(entry)(entry.kind === 'lead' ? { status } : { engagement_stage: status })}
+        onSetOpportunityLevel={level => patchMunicipality(entry.id, { opportunity_level: level })}
+        onSaveMemo={v => patchFor(entry)(entry.kind === 'lead' ? { memo: v || null } : { evidence_summary: v || null })}
+        onSaveEvidence={v => patchMunicipality(entry.id, { fit_assessment: v || null })}
+        onSaveSourceLinks={v => patchFor(entry)({ source_links: v || null })}
+        onSaveEmail={v => {
+          const trimmed = v.trim();
+          if (trimmed === (entry.email ?? '')) return;
+          const body: Record<string, unknown> = entry.kind === 'lead' ? { email: trimmed || null } : { contact_email: trimmed || null };
+          if (trimmed) body.contact_email_confidence = 'high';
+          patchFor(entry)(body);
+        }}
+        onSaveDraft={v => { if (v !== (entry.emailDraft ?? '')) patchFor(entry)({ email_draft: v || null }); }}
+        onToggleFactCheck={status => patchFor(entry)({ fact_check_status: status, fact_checked_at: new Date().toISOString() })}
+        onSend={() => sendEmail(entry)}
+        sendBusy={Boolean(sendBusy[entry.compositeKey])}
+        sendError={sendError[entry.compositeKey]}
+        onCaseify={() => caseify(entry)}
+        onIssueDashboardUrl={entry.kind === 'lead' ? () => issueDashboardUrl(entry) : undefined}
+        dashboardUrl={dashboardUrls[entry.compositeKey]}
+        dashboardBusy={Boolean(dashboardBusy[entry.compositeKey])}
+        dashboardError={dashboardError[entry.compositeKey]}
+        municipality={municipality}
+      />
+    );
+  }
+
   return (
     <div>
       <div style={{ background: '#fff', borderRadius: 12, padding: '12px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 16 }}>
@@ -260,71 +329,34 @@ export default function SalesListView({ authHeaders, focusMunicipalityId, onFocu
       />
 
       {loading ? <p style={{ color: '#999' }}>読み込み中…</p> : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <>
           {visibleEntries.length === 0 && <p style={{ color: '#aaa' }}>該当する営業先がありません。</p>}
-          {visibleEntries.map(entry => {
-            const linkedCase = cases.find(c => (entry.kind === 'lead' ? c.lead_ref === entry.id : c.municipality_profile_id === entry.id));
-            const flags = factCheckFlags.filter(f => f.profile_id === entry.id && f.kind === entry.kind);
-            const municipality: MunicipalityExtras | undefined = entry.kind === 'municipality' && entry.municipality ? {
-              smoutSentAt: entry.municipality.smout_sent_at,
-              smoutReply: entry.municipality.smout_reply,
-              onHold: entry.municipality.on_hold,
-              isPriorityPick: entry.municipality.is_priority_pick,
-              municipalityCode: entry.municipality.municipality_code ?? null,
-              populationStats: entry.municipality.population_stats ?? null,
-              populationStatsFetchedAt: entry.municipality.population_stats_fetched_at ?? null,
-              followedUpAt: entry.municipality.followed_up_at,
-              linkedOpps: opps.filter(o => o.municipality_profile_id === entry.id),
-              popStatsLoading: Boolean(popStatsLoading[entry.compositeKey]),
-              popStatsError: popStatsError[entry.compositeKey],
-              onMarkSmoutSent: () => patchMunicipality(entry.id, { smout_sent_at: new Date().toISOString() }),
-              onUnmarkSmoutSent: () => patchMunicipality(entry.id, { smout_sent_at: null }),
-              onSaveSmoutReply: v => { if (v !== (entry.municipality?.smout_reply ?? '')) patchMunicipality(entry.id, { smout_reply: v || null }); },
-              onToggleOnHold: () => patchMunicipality(entry.id, { on_hold: !entry.municipality?.on_hold }),
-              onTogglePriorityPick: () => patchMunicipality(entry.id, { is_priority_pick: !entry.municipality?.is_priority_pick }),
-              onSaveMunicipalityCode: v => patchMunicipality(entry.id, { municipality_code: v || null }),
-              onFetchPopulationStats: () => fetchPopulationStats(entry),
-              onMarkFollowedUp: () => patchMunicipality(entry.id, { followed_up_at: new Date().toISOString() }),
-              onRegisterRfp: (title, deadline) => registerRfp(entry, title, deadline),
-            } : undefined;
 
-            return (
-              <SalesEntryCard
-                key={entry.compositeKey}
-                entry={entry}
-                selected={selected.has(entry.compositeKey)}
-                onToggleSelect={() => toggleSelect(entry.compositeKey)}
-                factCheckFlags={flags}
-                isCaseified={Boolean(linkedCase)}
-                caseId={linkedCase?.id}
-                caseBusy={caseBusyId === entry.compositeKey}
-                onSetStatus={status => patchFor(entry)(entry.kind === 'lead' ? { status } : { engagement_stage: status })}
-                onSetOpportunityLevel={level => patchMunicipality(entry.id, { opportunity_level: level })}
-                onSaveMemo={v => patchFor(entry)(entry.kind === 'lead' ? { memo: v || null } : { evidence_summary: v || null })}
-                onSaveEvidence={v => patchMunicipality(entry.id, { fit_assessment: v || null })}
-                onSaveSourceLinks={v => patchFor(entry)({ source_links: v || null })}
-                onSaveEmail={v => {
-                  const trimmed = v.trim();
-                  if (trimmed === (entry.email ?? '')) return;
-                  const body: Record<string, unknown> = entry.kind === 'lead' ? { email: trimmed || null } : { contact_email: trimmed || null };
-                  if (trimmed) body.contact_email_confidence = 'high';
-                  patchFor(entry)(body);
-                }}
-                onSaveDraft={v => { if (v !== (entry.emailDraft ?? '')) patchFor(entry)({ email_draft: v || null }); }}
-                onToggleFactCheck={status => patchFor(entry)({ fact_check_status: status, fact_checked_at: new Date().toISOString() })}
-                onSend={() => sendEmail(entry)}
-                sendBusy={Boolean(sendBusy[entry.compositeKey])}
-                sendError={sendError[entry.compositeKey]}
-                onCaseify={() => caseify(entry)}
-                onIssueDashboardUrl={entry.kind === 'lead' ? () => issueDashboardUrl(entry) : undefined}
-                dashboardUrl={dashboardUrls[entry.compositeKey]}
-                dashboardBusy={Boolean(dashboardBusy[entry.compositeKey])}
-                dashboardError={dashboardError[entry.compositeKey]}
-                municipality={municipality}
-              />
-            );
-          })}
-        </div>
+          {/* 未送信を常に上・目立つ位置に出す。ここに無い＝まだ一度も送っていない、を一目で分かるようにする。 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {unsentEntries.map(entry => renderCard(entry))}
+          </div>
+
+          {/* 送信済みは折りたたみ、開いても薄い表示にして「もう送った」ことが誤操作を誘わないようにする
+              （会長からの二重送信防止の指摘、2026-07-24。SalesTab.tsxのledgerビューと同じ設計）。 */}
+          {sentEntries.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <button onClick={() => setShowSentSection(v => !v)} style={{
+                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 14px', borderRadius: 10, border: '1px solid #ddd', background: '#fafafa',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#666' }}>✓ 送信済み・対応中（{sentEntries.length}件）</span>
+                <span style={{ fontSize: 11, color: '#999' }}>{showSentSection ? '▲ 閉じる' : '▼ 開く'}</span>
+              </button>
+              {showSentSection && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10, opacity: 0.75 }}>
+                  {sentEntries.map(entry => renderCard(entry))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
