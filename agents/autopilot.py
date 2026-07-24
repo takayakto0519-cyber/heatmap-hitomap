@@ -21,11 +21,19 @@ import common
 
 MAX_PER_RUN = 3
 # deep-research込みのkind（validation_research/mvp_spec/mvp_content/quote_research/
-# biz_hypothesis/content_theme）は複数エージェントでの調査を伴い10分を超えることがある
+# biz_hypothesis/content_theme。.claude/skills/autopilot/SKILL.md 手順3参照）は
+# 複数エージェントでの調査を伴い10分を超えることがある
 # （2026-07-24、600秒では新規事業の需要検証が2件連続タイムアウトした教訓）。
 # タスクスケジューラ側のExecutionTimeLimit（register_tasks.ps1、HitomapAutopilotは90分）と
 # 揃えること——Python側だけ延ばしてもOSに途中で殺されては意味がない。
 TIMEOUT_SEC = 1500
+# 2026-07-24追記：biz_model_ideasの検証待ちバックログ(約9件)により、キューの上位が
+# validation_research(deep-research)で埋まり、MAX_PER_RUN=3のうち2枠が毎日重い調査に
+# 消費される事態が発生（会長「トークン消費が激しくなる」懸念）。deep-research系kindは
+# 1回の実行で1件までに絞り、残り枠は軽いkind（contact/email_draft等）に譲ることで
+# 日々のピーク消費を抑える。バックログの解消自体は日数がかかるだけで止めない。
+HEAVY_KINDS = {"evidence", "mvp_content", "quote_research", "biz_hypothesis", "validation_research", "content_theme"}
+MAX_HEAVY_PER_RUN = 1
 MAX_CONSECUTIVE_FAILURES = 3
 LOG_PATH = common.WORK_DIR / "autopilot.log"
 LOG_MAX_BYTES = 1_000_000
@@ -77,7 +85,22 @@ def main():
             common.write_result("autopilot", {"error": "proposal_queue_watchの結果が読めません。先にその番人を実行してください"})
             return
 
-        items = (queue.get("ai_queue") or [])[:MAX_PER_RUN]
+        # 優先順位（差し戻し→営業→生成）は proposal_queue_watch.py 側の並びをそのまま尊重する。
+        # ここでは「重いkindを1件に絞る」フィルタだけをかけ、溢れた重いkindは翌日以降に持ち越す
+        # （スキップした分だけ後続の軽いkindが繰り上がるので、枠を無駄にしない）。
+        full_queue = queue.get("ai_queue") or []
+        items, skipped_heavy = [], []
+        heavy_used = 0
+        for item in full_queue:
+            if len(items) >= MAX_PER_RUN:
+                break
+            if item.get("kind") in HEAVY_KINDS:
+                if heavy_used >= MAX_HEAVY_PER_RUN:
+                    skipped_heavy.append({"region_name": item.get("region_name"), "kind": item.get("kind")})
+                    continue
+                heavy_used += 1
+            items.append(item)
+
         processed, failed = [], []
         consecutive_failures = 0
 
@@ -116,8 +139,10 @@ def main():
             "queued": len(items),
             "processed": processed,
             "failed": failed,
+            "skipped_heavy": skipped_heavy,
             "aborted_early": consecutive_failures >= MAX_CONSECUTIVE_FAILURES,
-            "note": "AI APIキーは使わずclaude -pのサブスク実行のみ。送信・事実確認確定はここでは一切行わない。",
+            "note": "AI APIキーは使わずclaude -pのサブスク実行のみ。送信・事実確認確定はここでは一切行わない。"
+                    f"deep-research系kindは1回{MAX_HEAVY_PER_RUN}件までに制限（トークン消費の平準化）。",
         })
 
 
