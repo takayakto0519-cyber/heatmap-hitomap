@@ -20,7 +20,12 @@ from pathlib import Path
 import common
 
 MAX_PER_RUN = 3
-TIMEOUT_SEC = 600
+# deep-research込みのkind（validation_research/mvp_spec/mvp_content/quote_research/
+# biz_hypothesis/content_theme）は複数エージェントでの調査を伴い10分を超えることがある
+# （2026-07-24、600秒では新規事業の需要検証が2件連続タイムアウトした教訓）。
+# タスクスケジューラ側のExecutionTimeLimit（register_tasks.ps1、HitomapAutopilotは90分）と
+# 揃えること——Python側だけ延ばしてもOSに途中で殺されては意味がない。
+TIMEOUT_SEC = 1500
 MAX_CONSECUTIVE_FAILURES = 3
 LOG_PATH = common.WORK_DIR / "autopilot.log"
 LOG_MAX_BYTES = 1_000_000

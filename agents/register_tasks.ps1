@@ -7,12 +7,12 @@ if (-not $python) {
     exit 1
 }
 
-function Register-Agent($taskName, $script, $time) {
+function Register-Agent($taskName, $script, $time, $timeoutMinutes = 10) {
     $action   = New-ScheduledTaskAction -Execute $python -Argument "`"$dir\$script`"" -WorkingDirectory $dir
     $trigger  = New-ScheduledTaskTrigger -Daily -At $time
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -RestartCount 1 -StartWhenAvailable
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes $timeoutMinutes) -RestartCount 1 -StartWhenAvailable
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-    Write-Host "Registered: $taskName (daily at $time)" -ForegroundColor Green
+    Write-Host "Registered: $taskName (daily at $time, timeout ${timeoutMinutes}m)" -ForegroundColor Green
 }
 
 function Register-RepeatingAgent($taskName, $script, $startTime, $intervalHours) {
@@ -49,7 +49,7 @@ Register-Agent "HitomapOfficeDiary" "office_diary.py" "09:15"
 Register-Agent "HitomapLeadTemperature" "lead_temperature.py" "08:45"
 Register-Agent "HitomapFactCheckWatch" "fact_check_watch.py" "08:10"
 Register-Agent "HitomapProposalQueueWatch" "proposal_queue_watch.py" "08:25"
-Register-Agent "HitomapAutopilot" "autopilot.py" "09:20"
+Register-Agent "HitomapAutopilot" "autopilot.py" "09:20" 90  # deep-research込みのkind(validation_research等)は10分を超えることがあるため長めに確保
 Register-Agent "HitomapProcurementWatch" "procurement_watch.py" "06:05"
 Register-Agent "HitomapPaymentWatch" "payment_watch.py" "08:50"
 Register-Agent "HitomapLostDealArchive" "lost_deal_archive.py" "09:05"
