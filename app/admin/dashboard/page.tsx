@@ -2,38 +2,46 @@
 
 // 運営ダッシュボードのシェル：認証・サイドバーナビ・タブ切替のみを担う。
 // 各タブの中身は components/admin/*.tsx に分割済み（monolith分割）。
+//
+// 【20260726 軽量化】以前は27タブすべてを静的importしていたため、ホーム画面を開いた瞬間に
+// 全タブ分（1万行超）のJSがまとめて読み込まれていた。next/dynamicでタブごとに遅延読み込みに変え、
+// 実際に開いたタブの分だけ読み込むようにした（見た目・機能は一切変えていない）。
+// OverviewTabだけは最初に必ず表示するので静的importのまま。
 import { useCallback, useEffect, useState } from 'react';
-import BlocksTab from '@/components/admin/BlocksTab';
-import PostsTab from '@/components/admin/PostsTab';
+import dynamic from 'next/dynamic';
 import OverviewTab from '@/components/admin/OverviewTab';
-import AttachmentTab from '@/components/admin/AttachmentTab';
-import TracePatternTab from '@/components/admin/TracePatternTab';
-import SettingsTab from '@/components/admin/SettingsTab';
-import SnsTab from '@/components/admin/SnsTab';
-import AgentStatusTab from '@/components/admin/AgentStatusTab';
-import MoneyTab from '@/components/admin/MoneyTab';
-import SalesTab from '@/components/admin/SalesTab';
-import FundingCalendarTab from '@/components/admin/FundingCalendarTab';
-import SecretaryTab from '@/components/admin/SecretaryTab';
-import ReviewTab from '@/components/admin/ReviewTab';
-import TracesTab from '@/components/admin/TracesTab';
-import ReportsTab from '@/components/admin/ReportsTab';
-import CommentsTab from '@/components/admin/CommentsTab';
-import SponsorsTab from '@/components/admin/SponsorsTab';
-import RoutesTab from '@/components/admin/RoutesTab';
-import QuestsTab from '@/components/admin/QuestsTab';
-import UsersTab from '@/components/admin/UsersTab';
-import EventPlansTab from '@/components/admin/EventPlansTab';
-import BizModelIdeasTab from '@/components/admin/BizModelIdeasTab';
-import MarketingProposalsTab from '@/components/admin/MarketingProposalsTab';
-import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
-import MinutesTab from '@/components/admin/MinutesTab';
-import OrgDocsTab from '@/components/admin/OrgDocsTab';
-import DedicatedDashboardsTab from '@/components/admin/DedicatedDashboardsTab';
-import WebAnalyticsTab from '@/components/admin/WebAnalyticsTab';
-import BizModelStrengthenTab from '@/components/admin/BizModelStrengthenTab';
 import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
 import { adminColor, adminRadius, adminShadow } from '@/lib/adminTokens';
+
+const tabLoading = () => null;
+const BlocksTab = dynamic(() => import('@/components/admin/BlocksTab'), { loading: tabLoading });
+const PostsTab = dynamic(() => import('@/components/admin/PostsTab'), { loading: tabLoading });
+const AttachmentTab = dynamic(() => import('@/components/admin/AttachmentTab'), { loading: tabLoading });
+const TracePatternTab = dynamic(() => import('@/components/admin/TracePatternTab'), { loading: tabLoading });
+const SettingsTab = dynamic(() => import('@/components/admin/SettingsTab'), { loading: tabLoading });
+const SnsTab = dynamic(() => import('@/components/admin/SnsTab'), { loading: tabLoading });
+const AgentStatusTab = dynamic(() => import('@/components/admin/AgentStatusTab'), { loading: tabLoading });
+const MoneyTab = dynamic(() => import('@/components/admin/MoneyTab'), { loading: tabLoading });
+const SalesTab = dynamic(() => import('@/components/admin/SalesTab'), { loading: tabLoading });
+const FundingCalendarTab = dynamic(() => import('@/components/admin/FundingCalendarTab'), { loading: tabLoading });
+const SecretaryTab = dynamic(() => import('@/components/admin/SecretaryTab'), { loading: tabLoading });
+const ReviewTab = dynamic(() => import('@/components/admin/ReviewTab'), { loading: tabLoading });
+const TracesTab = dynamic(() => import('@/components/admin/TracesTab'), { loading: tabLoading });
+const ReportsTab = dynamic(() => import('@/components/admin/ReportsTab'), { loading: tabLoading });
+const CommentsTab = dynamic(() => import('@/components/admin/CommentsTab'), { loading: tabLoading });
+const SponsorsTab = dynamic(() => import('@/components/admin/SponsorsTab'), { loading: tabLoading });
+const RoutesTab = dynamic(() => import('@/components/admin/RoutesTab'), { loading: tabLoading });
+const QuestsTab = dynamic(() => import('@/components/admin/QuestsTab'), { loading: tabLoading });
+const UsersTab = dynamic(() => import('@/components/admin/UsersTab'), { loading: tabLoading });
+const EventPlansTab = dynamic(() => import('@/components/admin/EventPlansTab'), { loading: tabLoading });
+const BizModelIdeasTab = dynamic(() => import('@/components/admin/BizModelIdeasTab'), { loading: tabLoading });
+const MarketingProposalsTab = dynamic(() => import('@/components/admin/MarketingProposalsTab'), { loading: tabLoading });
+const StrategyProposalsTab = dynamic(() => import('@/components/admin/StrategyProposalsTab'), { loading: tabLoading });
+const MinutesTab = dynamic(() => import('@/components/admin/MinutesTab'), { loading: tabLoading });
+const OrgDocsTab = dynamic(() => import('@/components/admin/OrgDocsTab'), { loading: tabLoading });
+const DedicatedDashboardsTab = dynamic(() => import('@/components/admin/DedicatedDashboardsTab'), { loading: tabLoading });
+const WebAnalyticsTab = dynamic(() => import('@/components/admin/WebAnalyticsTab'), { loading: tabLoading });
+const BizModelStrengthenTab = dynamic(() => import('@/components/admin/BizModelStrengthenTab'), { loading: tabLoading });
 
 type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'webAnalytics' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'strengthen' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs' | 'dashboards';
 
