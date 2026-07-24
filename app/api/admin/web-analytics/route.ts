@@ -18,8 +18,11 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function queryVercel(token: string, path: string, params: Record<string, string>) {
+// by は複数指定できる（例: referrerHostname と requestPath の掛け合わせ＝クロス集計）。
+// Vercel側はカンマ区切りではなく by= を複数回渡す形式を期待するため、配列で受けて都度追加する。
+async function queryVercel(token: string, path: string, params: Record<string, string>, by?: string | string[]) {
   const search = new URLSearchParams({ slug: VERCEL_TEAM_SLUG, projectId: VERCEL_PROJECT_ID, ...params });
+  for (const b of by ? (Array.isArray(by) ? by : [by]) : []) search.append('by', b);
   const res = await fetch(`${API_BASE}/${path}?${search.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -27,6 +30,22 @@ async function queryVercel(token: string, path: string, params: Record<string, s
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error?.message ?? `Vercel API ${path} が失敗しました（${res.status}）`);
   return data;
+}
+
+interface HourRow { timestamp: string; pageviews: number; visitors: number }
+
+// hour単位のaggregateはlimit<=100の制約があるため、長い期間を一括では取れない
+// （例: 31日 = 744時間）。日本時間の「何時に見られているか」を知りたいだけなので、
+// 直近4日分（96時間）だけ取ってJSTの時間帯に振り分ける。
+function bucketByJstHour(rows: HourRow[]): { hour: number; pageviews: number; visitors: number }[] {
+  const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, pageviews: 0, visitors: 0 }));
+  for (const row of rows) {
+    const utcHour = new Date(row.timestamp).getUTCHours();
+    const jstHour = (utcHour + 9) % 24;
+    buckets[jstHour].pageviews += row.pageviews;
+    buckets[jstHour].visitors += row.visitors;
+  }
+  return buckets;
 }
 
 export async function GET(req: NextRequest) {
@@ -48,16 +67,25 @@ export async function GET(req: NextRequest) {
   const since = isoDaysAgo(days);
   const until = isoDaysAgo(0);
 
+  // 時間帯（時刻ごと）は集計行数の上限(100行)にすぐ当たるため、直近の短い固定期間だけで見る。
+  const hourlySince = isoDaysAgo(Math.min(days, 4));
+
   try {
-    const [daily, totals, pages, referrers, devices, countries] = await Promise.all([
-      queryVercel(token, 'visits/aggregate', { since, until, by: 'day' }),
+    const [daily, totals, pages, referrers, devices, countries, os, hourly, referrerPages] = await Promise.all([
+      queryVercel(token, 'visits/aggregate', { since, until }, 'day'),
       queryVercel(token, 'visits/count', { since, until }),
       // by: 'route' はこのプロジェクトでは常に空文字1行しか返らなかった（App Routerの
       // ルートパターン名が未設定のため？）。実URLそのものである requestPath を使う。
-      queryVercel(token, 'visits/aggregate', { since, until, by: 'requestPath', limit: '8' }),
-      queryVercel(token, 'visits/aggregate', { since, until, by: 'referrerHostname', limit: '8' }),
-      queryVercel(token, 'visits/aggregate', { since, until, by: 'deviceType', limit: '6' }),
-      queryVercel(token, 'visits/aggregate', { since, until, by: 'country', limit: '8' }),
+      queryVercel(token, 'visits/aggregate', { since, until, limit: '8' }, 'requestPath'),
+      queryVercel(token, 'visits/aggregate', { since, until, limit: '8' }, 'referrerHostname'),
+      queryVercel(token, 'visits/aggregate', { since, until, limit: '6' }, 'deviceType'),
+      queryVercel(token, 'visits/aggregate', { since, until, limit: '8' }, 'country'),
+      queryVercel(token, 'visits/aggregate', { since, until, limit: '6' }, 'osName'),
+      queryVercel(token, 'visits/aggregate', { since: hourlySince, until, limit: '100' }, 'hour'),
+      // 「どのサイトから来た人が、どのページを最初に見たか」のクロス集計。他サイト運営者が
+      // 参考にしているページ＝HP改善のヒントになる。referrerHostnameは取れてもURLそのもの
+      // （どの記事か等）はAPIから取得できないため、これが読み取れる限界。
+      queryVercel(token, 'visits/aggregate', { since, until, limit: '15' }, ['referrerHostname', 'requestPath']),
     ]);
 
     return NextResponse.json({
@@ -69,6 +97,10 @@ export async function GET(req: NextRequest) {
       referrers: referrers.data,
       devices: devices.data,
       countries: countries.data,
+      os: os.data,
+      hourly: bucketByJstHour(hourly.data as HourRow[]),
+      hourlyRangeDays: Math.min(days, 4),
+      referrerPages: referrerPages.data,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : '取得に失敗しました' }, { status: 500 });

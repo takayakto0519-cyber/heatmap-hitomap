@@ -10,6 +10,7 @@ const TEAL = '#38ADA9';
 
 interface DailyPoint { timestamp: string; pageviews: number; visitors: number }
 interface DimRow { pageviews: number; visitors: number; [key: string]: unknown }
+interface HourBucket { hour: number; pageviews: number; visitors: number }
 interface AnalyticsData {
   since: string; until: string; days: number;
   totals: { pageviews: number; visitors: number };
@@ -18,6 +19,10 @@ interface AnalyticsData {
   referrers: DimRow[];
   devices: DimRow[];
   countries: DimRow[];
+  os: DimRow[];
+  hourly: HourBucket[];
+  hourlyRangeDays: number;
+  referrerPages: DimRow[];
 }
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -107,6 +112,75 @@ function RankedBars({ rows, dimKey, formatLabel, emptyLabel }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// 24時間・JST基準の棒グラフ。ピーク3時間帯をアンバーで強調する。
+function HourlyChart({ buckets }: { buckets: HourBucket[] }) {
+  const [hoverHour, setHoverHour] = useState<number | null>(null);
+  if (buckets.length === 0 || buckets.every(b => b.pageviews === 0)) {
+    return <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>データがありません。</p>;
+  }
+  const max = Math.max(1, ...buckets.map(b => b.pageviews));
+  const top3 = [...buckets].sort((a, b) => b.pageviews - a.pageviews).slice(0, 3).map(b => b.hour);
+  const hovered = hoverHour !== null ? buckets[hoverHour] : null;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 130 }}>
+        {buckets.map(b => {
+          const isTop = top3.includes(b.hour);
+          const h = Math.max(2, Math.round((b.pageviews / max) * 115));
+          return (
+            <div key={b.hour}
+              onMouseEnter={() => setHoverHour(b.hour)}
+              onMouseLeave={() => setHoverHour(null)}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', cursor: 'default' }}>
+              <div style={{ width: '100%', height: h, borderRadius: '3px 3px 0 0', background: isTop ? '#E5A139' : `${TEAL}${hoverHour === b.hour ? 'ff' : 'b3'}` }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+        {buckets.map(b => (
+          <div key={b.hour} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: top3.includes(b.hour) ? '#B7791F' : '#bbb', fontWeight: top3.includes(b.hour) ? 700 : 400 }}>
+            {b.hour % 3 === 0 ? b.hour : ''}
+          </div>
+        ))}
+      </div>
+      <p style={{ margin: '8px 0 0', fontSize: 11, color: '#999' }}>
+        {hovered
+          ? <><b style={{ color: '#333' }}>{hovered.hour}時台</b> — {hovered.pageviews}PV・{hovered.visitors}人</>
+          : <>ピーク：<b style={{ color: '#B7791F' }}>{top3.sort((a, c) => a - c).map(h => `${h}時`).join('・')}</b>台</>}
+      </p>
+    </div>
+  );
+}
+
+// 流入元ホスト × 最初に見たページ のクロス集計。他サイトの参考リンク元を推測するための表。
+function CrosstabTable({ rows }: { rows: DimRow[] }) {
+  if (rows.length === 0) return <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>データがありません。</p>;
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid #eee' }}>
+            <th style={{ textAlign: 'left', padding: '4px 8px', color: '#999', fontWeight: 700 }}>流入元</th>
+            <th style={{ textAlign: 'left', padding: '4px 8px', color: '#999', fontWeight: 700 }}>最初に見たページ</th>
+            <th style={{ textAlign: 'right', padding: '4px 8px', color: '#999', fontWeight: 700 }}>PV</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>{r.referrerHostname ? String(r.referrerHostname) : '直接アクセス・不明'}</td>
+              <td style={{ padding: '5px 8px', color: '#666', fontFamily: 'monospace', fontSize: 11 }}>{r.requestPath ? String(r.requestPath) : '（不明）'}</td>
+              <td style={{ padding: '5px 8px', textAlign: 'right', color: '#999' }}>{r.pageviews}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -211,6 +285,31 @@ export default function WebAnalyticsTab({ authHeaders }: { authHeaders: () => He
                 <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🌏 訪問者の国・地域</p>
                 <Card>
                   <RankedBars rows={data.countries} dimKey="country" emptyLabel="データがありません。" />
+                </Card>
+              </div>
+              <div style={{ flex: 1, minWidth: 280 }}>
+                <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🖥 OS</p>
+                <Card>
+                  <RankedBars rows={data.os} dimKey="osName" emptyLabel="データがありません。" />
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {data && !loading && (
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 16 }}>
+              <div style={{ flex: 1, minWidth: 340 }}>
+                <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🕒 時間帯別の閲覧傾向（JST）</p>
+                <Card>
+                  <p style={{ margin: '0 0 10px', fontSize: 11, color: '#aaa' }}>直近{data.hourlyRangeDays}日分の集計</p>
+                  <HourlyChart buckets={data.hourly} />
+                </Card>
+              </div>
+              <div style={{ flex: 1, minWidth: 340 }}>
+                <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🔎 流入元 × 最初に見たページ</p>
+                <Card>
+                  <p style={{ margin: '0 0 10px', fontSize: 11, color: '#aaa' }}>他サイト運営者が参考にしている可能性のあるページの手がかりに</p>
+                  <CrosstabTable rows={data.referrerPages} />
                 </Card>
               </div>
             </div>
