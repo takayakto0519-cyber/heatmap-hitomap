@@ -30,10 +30,11 @@ import StrategyProposalsTab from '@/components/admin/StrategyProposalsTab';
 import MinutesTab from '@/components/admin/MinutesTab';
 import OrgDocsTab from '@/components/admin/OrgDocsTab';
 import DedicatedDashboardsTab from '@/components/admin/DedicatedDashboardsTab';
+import WebAnalyticsTab from '@/components/admin/WebAnalyticsTab';
 import BizModelStrengthenTab from '@/components/admin/BizModelStrengthenTab';
 import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
 
-type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'strengthen' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs' | 'dashboards';
+type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'webAnalytics' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'strengthen' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs' | 'dashboards';
 
 // 旧タブIDからの後方互換：
 // - ?tab=aiops / ?tab=agentstatus → agents（AIエージェント2タブ統合）
@@ -49,6 +50,7 @@ const TAB_META: Record<Tab, { label: string; icon: string; group: string; desc: 
   blocks: { label: 'ページ編集', icon: '🧩', group: 'サイト編集', desc: '各ページのセクションを追加・並び替え（プレビュー付き）' },
   posts: { label: '実績ブログ', icon: '📝', group: 'サイト編集', desc: 'イベント記録・参加者の声を書いて公開' },
   sns: { label: 'SNS投稿', icon: '📣', group: 'サイト編集', desc: 'Instagram等のキャプション・画像をコピペしてすぐ投稿' },
+  webAnalytics: { label: 'アクセス状況', icon: '🌐', group: 'サイト編集', desc: 'hitomap.comの訪問者・ページビュー・流入元をVercel Analyticsから確認する' },
   review: { label: '承認待ち', icon: '✅', group: '投稿・安全', desc: '全国公開の申請を承認/却下' },
   traces: { label: '投稿管理', icon: '📍', group: '投稿・安全', desc: '投稿を検索・削除・復元' },
   reports: { label: '通報', icon: '🚨', group: '投稿・安全', desc: '寄せられた通報の対応' },
@@ -313,6 +315,7 @@ export default function AdminDashboardPage() {
           {tab === 'funding' && <FundingCalendarTab authHeaders={authHeaders} goTab={goTab} />}
           {tab === 'dashboards' && <DedicatedDashboardsTab authHeaders={authHeaders} />}
           {tab === 'sales' && <SalesTab authHeaders={authHeaders} goTab={goTab} />}
+          {tab === 'webAnalytics' && <WebAnalyticsTab authHeaders={authHeaders} />}
           {tab === 'attachment' && <AttachmentTab authHeaders={authHeaders} />}
           {tab === 'patterns' && <TracePatternTab authHeaders={authHeaders} />}
           {tab === 'agents' && <AgentStatusTab authHeaders={authHeaders} />}
