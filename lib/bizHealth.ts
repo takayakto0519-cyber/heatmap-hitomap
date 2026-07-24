@@ -3,6 +3,8 @@
 // 新テーブルは使わず、既存の biz_model_ideas / ai_deliverables / strategy_proposals /
 // business_line_pnl の組み合わせだけで「磨き込み度」を導出する。
 
+import { hasBmc } from '@/lib/bmcCanvas';
+
 export interface BizModelIdeaForHealth {
   id: string;
   title: string;
@@ -43,6 +45,7 @@ export interface IdeaScoreBreakdown {
   mvp: boolean;
   freshness: boolean; // 14日以内に更新
   plan: boolean;      // report_md あり
+  bmc: boolean;        // ビジネスモデルキャンバス9ブロックのうち5つ以上の見出しがあるか（参考表示のみ、スコアには加点しない）
 }
 
 export interface IdeaScore {
@@ -77,7 +80,10 @@ export function computeIdeaScore(idea: BizModelIdeaForHealth, now: Date = new Da
   return {
     score,
     rank,
-    breakdown: { phase: phase > 0, validation: hasValidation, mvp: phase === 0 ? true : hasMvp, freshness: isFresh, plan: hasPlan },
+    breakdown: {
+      phase: phase > 0, validation: hasValidation, mvp: phase === 0 ? true : hasMvp, freshness: isFresh, plan: hasPlan,
+      bmc: hasBmc(idea.report_md),
+    },
   };
 }
 
@@ -115,6 +121,15 @@ export function detectWeaknesses(
         ideaId: idea.id, ideaTitle: idea.title, severity: 3,
         label: '需要検証が未記録（検証中ステータスなのにvalidation_summaryが空）',
         action: { type: 'copyPrompt', text: `この事業案『${idea.title}』(id: ${idea.id})の需要検証をNB2トラックで実行して。` },
+      });
+    }
+
+    if (phase >= 1 && !hasBmc(idea.report_md)) {
+      weaknesses.push({
+        ideaId: idea.id, ideaTitle: idea.title, severity: 2,
+        label: 'ビジネスモデルキャンバスが未作成（顧客・価値提案・収益の流れなどが整理されていない）',
+        // BMCの雛形挿入ボタンは「ビジネスモデル案」タブのIdeaReportEditorにあるため、専用ダッシュボードではなくそちらへ誘導する。
+        action: { type: 'goTab', tab: 'bizmodels' },
       });
     }
 

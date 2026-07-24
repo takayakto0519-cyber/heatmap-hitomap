@@ -5,6 +5,7 @@
 // そのセクションだけテキストエリアに変わる。生のMarkdownをまとめて触る必要がないようにする。
 import { useState } from 'react';
 import { MarkdownLite, splitTopLevelSections } from '@/lib/markdownLite';
+import { buildBmcTemplateSections, hasBmc } from '@/lib/bmcCanvas';
 
 export interface BizIdea {
   id: string;
@@ -56,6 +57,13 @@ export function IdeaReportEditor({
     onSave({ report_md: rebuilt });
     setAddingSection(false);
     setNewSectionText('# 新しいセクション\n\n');
+  }
+
+  // 事業計画（report_md）の中に、ビジネスモデルキャンバス9ブロックをセクションとして丸ごと追加する。
+  // 新しいテーブル・カラムは作らず、既存のセクション機構に乗せる（lib/bmcCanvas.ts参照）。
+  function insertBmcTemplate() {
+    const rebuilt = [...sections.map(s => s.raw), ...buildBmcTemplateSections()].join('\n\n---\n\n');
+    onSave({ report_md: rebuilt });
   }
 
   const statusInfo = STATUS_LABELS[idea.status] ?? STATUS_LABELS.idea;
@@ -135,6 +143,13 @@ export function IdeaReportEditor({
           );
         })}
       </div>
+
+      {!hasBmc(idea.report_md) && (
+        <button onClick={insertBmcTemplate} style={{
+          width: '100%', marginTop: 10, padding: '10px 0', borderRadius: 10, border: '1.5px dashed #4A69BD',
+          background: '#fff', color: '#4A69BD', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+        }}>🧩 ビジネスモデルキャンバスの雛形を追加（9ブロック）</button>
+      )}
 
       <div style={{ marginTop: 10 }}>
         {addingSection ? (

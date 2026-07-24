@@ -182,6 +182,7 @@ export default function BizModelStrengthenTab({ authHeaders, goTab }: {
                   <span>{breakdown.validation ? '🔍✅' : '🔍—'} 検証</span>
                   <span>{breakdown.mvp ? '📐✅' : '📐—'} MVP</span>
                   <span>{breakdown.plan ? '📋✅' : '📋—'} 計画</span>
+                  <span>{breakdown.bmc ? '🧩✅' : '🧩—'} BMC</span>
                   <span>{breakdown.freshness ? '⏱✅' : '⏱—'} 鮮度</span>
                 </div>
                 <a href={`/admin/bizmodel/${idea.id}`} target="_blank" rel="noopener noreferrer" style={{
