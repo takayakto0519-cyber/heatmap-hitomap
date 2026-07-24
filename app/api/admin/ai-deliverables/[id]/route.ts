@@ -50,9 +50,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // 既存の行がある提案（メール下書き等）→ 該当カラムを更新する
       const target = REFLECT_TO[kind];
       if (target) {
+        const extra: Record<string, unknown> = {};
+        // 新規事業開発トラック（lib/tracks/newBizDev.ts）の段階完了を示す日時カラムも同時に立てる。
+        // mvp_specはMVP設計まで完了した合図なので、そのままフェーズ1（MVP）へ進める
+        // （biz_model_ideas.phaseは元々会長がボタンで手動更新するものだが、MVP仕様が
+        // 承認された瞬間＝会長がその内容を読んで良しとした瞬間でもあるため、ここだけ自動で進める）。
+        if (kind === 'validation_research') extra.validated_at = new Date().toISOString();
+        if (kind === 'mvp_spec') {
+          extra.mvp_spec_at = new Date().toISOString();
+          const { data: idea } = await supabaseServer.from('biz_model_ideas').select('phase').eq('id', current.entity_id).single();
+          if (idea && (idea.phase ?? 0) < 1) extra.phase = 1;
+        }
         const { error: reflectError } = await supabaseServer
           .from(target.table)
-          .update({ [target.column]: effectiveBody, updated_at: new Date().toISOString() })
+          .update({ [target.column]: effectiveBody, updated_at: new Date().toISOString(), ...extra })
           .eq('id', current.entity_id);
         if (reflectError) {
           return NextResponse.json({ ok: false, error: `反映に失敗しました: ${reflectError.message}` }, { status: 500 });

@@ -1,10 +1,10 @@
-"""AI成果物パイプライン・検知番人 — municipality_profiles の各自治体営業先が
-lib/tracks/govOutreach.ts の11段トラックのどこにいるかを判定し、
-「次にAIがやるべき作業」をキューにして work/proposal_queue_watch.json に書き出す。
+"""AI成果物パイプライン・検知番人 — 営業（municipality_profiles）・新規事業開発
+（biz_model_ideas）・マーケ（SNS投稿）それぞれの「次にAIがやるべき作業」をキューにして
+work/proposal_queue_watch.json に書き出す。
 
-【重要】lib/tracks/govOutreach.ts に同じ判定ロジックのTypeScript実装がある。
-片方だけ直すと番人の検知結果と画面表示がずれるので、必ず両方を同時に直すこと
-（lib/leadTemperature.ts ↔ agents/lead_temperature.py と同じ既存の割り切り）。
+【重要】営業トラックは lib/tracks/govOutreach.ts、新規事業トラックは lib/tracks/newBizDev.ts に
+同じ判定ロジックのTypeScript実装がある。片方だけ直すと番人の検知結果と画面表示がずれるので、
+必ず両方を同時に直すこと（lib/leadTemperature.ts ↔ agents/lead_temperature.py と同じ既存の割り切り）。
 
 この番人はAI APIを一切呼ばず、Supabase REST の読み取りのみを行う。DBへの書き込みもしない。
 実際にAIを呼んで成果物を作るのは agents/autopilot.py（この番人の出力を読むだけの別プロセス）。
@@ -33,6 +33,14 @@ TRACK = [
     ("M9", "MVPデモ提示", "ai", "mvp_content"),
     ("M10", "見積提出", "chairman", "quote_research"),
     ("M11", "契約", "chairman", None),
+]
+
+
+# lib/tracks/newBizDev.ts の NEW_BIZ_TRACK と対応する判定。仮説(NB1)はbiz_model_ideasの
+# 行そのものが実体なのでここには含めない（対象なし提案として別枠で生成する）。
+NB_TRACK = [
+    ("NB2", "需要検証", "validation_research"),
+    ("NB3", "MVP設計", "mvp_spec"),
 ]
 
 
@@ -108,6 +116,23 @@ def derive(row: dict, now: datetime) -> dict:
     if owner == "ai" and kind:
         return {"reached": reached, "milestone": mid, "owner": "ai", "kind": kind, "reason": f"{label}を作る"}
     return {"reached": reached, "milestone": mid, "owner": "chairman", "kind": None, "reason": f"{label}（会長の手番）"}
+
+
+def _newbiz_done(mid: str, idea: dict) -> bool:
+    if mid == "NB2":
+        return _filled(idea.get("validation_summary"))
+    if mid == "NB3":
+        return _filled(idea.get("mvp_spec_md"))
+    return False
+
+
+def derive_newbiz(idea: dict) -> dict | None:
+    """1件の新規事業案(biz_model_ideas)の次の一手を返す（NB2→NB3の順、先頭から見て最初の未達）。
+    完了済み(NB2・NB3とも埋まっている)ならNone。"""
+    for mid, label, kind in NB_TRACK:
+        if not _newbiz_done(mid, idea):
+            return {"milestone": mid, "kind": kind, "reason": f"{label}を進める"}
+    return None
 
 
 def _get(url: str, key: str, path: str) -> list:
@@ -250,32 +275,133 @@ def main():
 
         ai_queue.sort(key=lambda x: (not x["is_priority_pick"], x["opportunity_level"] != "高"))
 
-        # 新規事業の仮説（entity_type='new_biz'）とSNS投稿案（entity_type='sns'）は、
-        # 特定の自治体・リードに紐づかない「対象なし」の提案（entity_id=None）。
+        # 新規事業・マーケの差し戻し（entity_type='new_biz'/'sns'）も同様に最優先で拾う。
+        # こちらは自治体トラックのように次の一手を導出し直さず、差し戻された時と同じkindを
+        # そのまま再生成する（改善点はfeedbackに入っているのでautopilot側がそれを読む）。
+        try:
+            other_revise = _get(
+                url, key,
+                "ai_deliverables?select=id,entity_id,entity_type,kind,title"
+                "&entity_type=in.(new_biz,sns)&status=eq.revise",
+            )
+        except Exception:
+            other_revise = []
+        for r in other_revise:
+            revise_queue.append({
+                "entity_type": r["entity_type"], "entity_id": r.get("entity_id"), "region_name": r.get("title"),
+                "milestone": None, "kind": r["kind"], "reason": "会長の差し戻し・作り直し",
+                "is_priority_pick": False, "opportunity_level": None, "revise": True,
+            })
+
         # 営業トラック（自治体11件）を差し置いてまで毎日作らせると会長のチェックが埋もれるので、
-        # 直近3日以内に同じ種類の提案（どのstatusでも）が無いときだけ1件キューに積む。
-        # 憲法の「新しい仕組みより既存の送信可能案件を先に」の精神に沿って、営業キューの後ろに置く。
+        # 新規事業・マーケの自動生成は控えめなペースにする。憲法の「新しい仕組みより
+        # 既存の送信可能案件を先に」の精神に沿って、営業キューの後ろに積む。
         GENERATIVE_COOLDOWN_DAYS = 3
         generative_queue = []
-        for entity_type, kind, reason in [
-            ("new_biz", "biz_hypothesis", "新規事業の仮説をひとつ作る"),
-            ("sns", "sns_post", "SNS投稿案をひとつ作る"),
-        ]:
-            try:
-                recent = _get(
-                    url, key,
-                    f"ai_deliverables?select=created_at&entity_type=eq.{entity_type}&kind=eq.{kind}"
-                    "&order=created_at.desc&limit=1",
-                )
-            except Exception:
-                recent = []  # ai_deliverables未作成でも本業を止めない
-            if recent and _days_since(recent[0]["created_at"], now) < GENERATIVE_COOLDOWN_DAYS:
-                continue
+
+        # --- 新規事業（entity_type='new_biz'）---
+        # NB1(仮説)は対象の行が無い提案として生まれ、承認された瞬間にbiz_model_ideasへ新規登録される
+        # （lib/deliverables.tsのCREATE_IN）。NB2(需要検証)・NB3(MVP設計)はその行に対する追加提案。
+        try:
+            newbiz_pending = _get(
+                url, key,
+                "ai_deliverables?select=entity_id,status&entity_type=eq.new_biz&status=in.(proposed,revise)",
+            )
+            newbiz_pending_ids = {p["entity_id"] for p in newbiz_pending}  # entity_id=Noneも含む(NB1用)
+        except Exception:
+            newbiz_pending_ids = set()
+
+        try:
+            recent_hyp = _get(
+                url, key,
+                "ai_deliverables?select=created_at&entity_type=eq.new_biz&kind=eq.biz_hypothesis"
+                "&order=created_at.desc&limit=1",
+            )
+        except Exception:
+            recent_hyp = []
+        hyp_on_cooldown = recent_hyp and _days_since(recent_hyp[0]["created_at"], now) < GENERATIVE_COOLDOWN_DAYS
+        if None not in newbiz_pending_ids and not hyp_on_cooldown:
             generative_queue.append({
-                "entity_type": entity_type, "entity_id": None, "region_name": None,
-                "milestone": None, "kind": kind, "reason": reason,
+                "entity_type": "new_biz", "entity_id": None, "region_name": None,
+                "milestone": "NB1", "kind": "biz_hypothesis", "reason": "新規事業の仮説をひとつ作る",
                 "is_priority_pick": False, "opportunity_level": None, "revise": False,
             })
+
+        try:
+            ideas = _get_tolerant(
+                url, key,
+                "biz_model_ideas?select=id,title,status,validation_summary,mvp_spec_md"
+                "&status=in.(idea,validating)",
+            )
+        except Exception:
+            ideas = []
+        for idea in ideas:
+            if idea["id"] in newbiz_pending_ids:
+                continue  # 会長の確認待ち・差し戻し済みは二重生成しない
+            nb = derive_newbiz(idea)
+            if nb:
+                generative_queue.append({
+                    "entity_type": "new_biz", "entity_id": idea["id"], "region_name": idea["title"],
+                    "milestone": nb["milestone"], "kind": nb["kind"], "reason": nb["reason"],
+                    "is_priority_pick": False, "opportunity_level": None, "revise": False,
+                })
+
+        # --- マーケ（entity_type='sns'）--- テーマ発案(content_theme) → 承認されたテーマを
+        # 素材にSNS投稿案(sns_post)を作る、の2段。「何のためのテーマか」を素通りさせないため。
+        try:
+            latest_theme_rows = _get(
+                url, key,
+                "ai_deliverables?select=id,title,body,status,created_at,updated_at"
+                "&entity_type=eq.sns&kind=eq.content_theme&order=created_at.desc&limit=1",
+            )
+        except Exception:
+            latest_theme_rows = []
+        latest_theme = latest_theme_rows[0] if latest_theme_rows else None
+
+        try:
+            latest_post_rows = _get(
+                url, key,
+                "ai_deliverables?select=created_at&entity_type=eq.sns&kind=eq.sns_post"
+                "&order=created_at.desc&limit=1",
+            )
+        except Exception:
+            latest_post_rows = []
+        latest_post = latest_post_rows[0] if latest_post_rows else None
+
+        if latest_theme is None:
+            generative_queue.append({
+                "entity_type": "sns", "entity_id": None, "region_name": None,
+                "milestone": "MK1", "kind": "content_theme", "reason": "SNS企画テーマをひとつ考える",
+                "is_priority_pick": False, "opportunity_level": None, "revise": False,
+            })
+        elif latest_theme["status"] in ("proposed", "revise"):
+            pass  # 会長の確認待ち、または差し戻し済み（revise_queue側で別途最優先キュー化される）
+        elif latest_theme["status"] == "archived":
+            if _days_since(latest_theme["created_at"], now) >= GENERATIVE_COOLDOWN_DAYS:
+                generative_queue.append({
+                    "entity_type": "sns", "entity_id": None, "region_name": None,
+                    "milestone": "MK1", "kind": "content_theme", "reason": "SNS企画テーマをひとつ考える（前回は却下）",
+                    "is_priority_pick": False, "opportunity_level": None, "revise": False,
+                })
+        elif latest_theme["status"] == "approved":
+            theme_used = bool(latest_post) and latest_post["created_at"] > latest_theme.get("updated_at", latest_theme["created_at"])
+            if not theme_used:
+                # entity_idはNoneのままにする（sns_postはCREATE_IN経由でsns_draftsに新規作成する
+                # kindのため。ここにentity_idを入れるとlib/deliverables.tsのREFLECT_TO分岐に
+                # 誤って入り、承認しても何も反映されなくなる）。テーマの内容はtheme_title/theme_body
+                # として渡すだけにし、autopilotスキルが本文執筆時の材料として読む。
+                generative_queue.append({
+                    "entity_type": "sns", "entity_id": None, "region_name": None,
+                    "milestone": "MK2", "kind": "sns_post", "reason": "承認済みテーマでSNS投稿案を作る",
+                    "is_priority_pick": False, "opportunity_level": None, "revise": False,
+                    "theme_title": latest_theme["title"], "theme_body": latest_theme["body"],
+                })
+            elif _days_since(latest_post["created_at"], now) >= GENERATIVE_COOLDOWN_DAYS:
+                generative_queue.append({
+                    "entity_type": "sns", "entity_id": None, "region_name": None,
+                    "milestone": "MK1", "kind": "content_theme", "reason": "SNS企画テーマをひとつ考える",
+                    "is_priority_pick": False, "opportunity_level": None, "revise": False,
+                })
 
         full_queue = revise_queue + ai_queue + generative_queue
 

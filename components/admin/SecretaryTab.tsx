@@ -65,7 +65,9 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   // 🤖 AIが今日やったこと — proposal_queue_watch/autopilotが積んだ確認待ち提案を、
   // 自治体営業・新規事業・マーケの区別なく1箇所に集約する（それぞれの持ち場タブに散っているのを見なくて済むように）。
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
-  const [regionNameById, setRegionNameById] = useState<Map<string, string>>(new Map());
+  // 自治体（municipality_profile）と新規事業案（new_biz、NB2/NB3のentity_id）の両方を
+  // 1つの名前解決マップにまとめる。idが衝突する心配はない（別テーブルのuuid）。
+  const [subjectNameById, setSubjectNameById] = useState<Map<string, string>>(new Map());
 
   function jsonHeaders(): HeadersInit {
     return { ...authHeaders(), 'Content-Type': 'application/json' };
@@ -78,10 +80,15 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
   }, [authHeaders]);
   useEffect(() => {
     loadDeliverables();
-    fetch('/api/admin/municipality-profiles', { headers: authHeaders() })
-      .then(r => r.json())
-      .then(d => { if (d.ok) setRegionNameById(new Map((d.profiles ?? []).map((p: { id: string; region_name: string }) => [p.id, p.region_name]))); })
-      .catch(() => {});
+    Promise.all([
+      fetch('/api/admin/municipality-profiles', { headers: authHeaders() }).then(r => r.json()).catch(() => null),
+      fetch('/api/admin/biz-model-ideas', { headers: authHeaders() }).then(r => r.json()).catch(() => null),
+    ]).then(([profilesRes, ideasRes]) => {
+      const entries: [string, string][] = [];
+      if (profilesRes?.ok) for (const p of profilesRes.profiles ?? []) entries.push([p.id, p.region_name]);
+      if (ideasRes?.ok) for (const i of ideasRes.ideas ?? []) entries.push([i.id, i.title]);
+      setSubjectNameById(new Map(entries));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDeliverables]);
   async function patchDeliverable(id: string, fields: Record<string, unknown>) {
@@ -169,7 +176,7 @@ export default function SecretaryTab({ authHeaders, goTab }: { authHeaders: () =
               <DeliverableCard
                 key={dv.id}
                 deliverable={dv}
-                subjectName={dv.entity_id ? regionNameById.get(dv.entity_id) : undefined}
+                subjectName={dv.entity_id ? subjectNameById.get(dv.entity_id) : undefined}
                 onApprove={() => patchDeliverable(dv.id, { status: 'approved' })}
                 onRevise={(feedback, rebuild) => patchDeliverable(dv.id, { status: 'revise', feedback, rebuild })}
                 onArchive={() => patchDeliverable(dv.id, { status: 'archived' })}

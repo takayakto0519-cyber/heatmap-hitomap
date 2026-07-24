@@ -48,6 +48,9 @@ interface BizModelIdea {
   contest: string | null;
   idea_no: number | null;
   report_md: string | null;
+  // 新規事業開発トラック（lib/tracks/newBizDev.ts）NB2・NB3の反映先。
+  validation_summary?: string | null;
+  mvp_spec_md?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +158,28 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
     if (data.ok) load(); else setError(data.error ?? '削除に失敗しました');
   }
 
+  // 新規事業開発トラック（NB2需要検証・NB3 MVP設計）の内容を読み取り専用で見せる。
+  // 編集はさせない——直したい場合はAI提案カードの「自分で書き直す」か、次のAI実行の差し戻しで行う。
+  function renderNewBizProgress(i: BizModelIdea) {
+    if (!i.validation_summary && !i.mvp_spec_md) return null;
+    return (
+      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {i.validation_summary && (
+          <details style={{ background: '#F4F6F5', borderRadius: 8, padding: '8px 12px' }}>
+            <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#4A69BD' }}>🔍 需要検証の結果</summary>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: '#444', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{i.validation_summary}</p>
+          </details>
+        )}
+        {i.mvp_spec_md && (
+          <details style={{ background: '#F4F6F5', borderRadius: 8, padding: '8px 12px' }} open>
+            <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#38ADA9' }}>📐 MVP仕様書</summary>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: '#444', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{i.mvp_spec_md}</p>
+          </details>
+        )}
+      </div>
+    );
+  }
+
   if (loading) return <p style={{ color: '#999' }}>読み込み中…</p>;
 
   return (
@@ -165,16 +190,18 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
       {error && <p style={{ color: '#E74C3C', fontSize: 13 }}>{error}</p>}
       {migrationFile && <MigrationNotice title="ビジネスモデル案のテーブルがまだ作成されていません" migrationFile={migrationFile} />}
 
-      {/* AIオートパイロット（agents/autopilot.py）が数日おきに自動生成する新規事業仮説の確認待ち。
-          承認するとそのままこの下の一覧（biz_model_ideasではなくstrategy_proposals）に新規登録される。 */}
+      {/* AIオートパイロット（agents/autopilot.py）が新規事業開発トラック（NB1仮説→NB2需要検証→
+          NB3 MVP設計）で自動生成した提案の確認待ち。NB1（仮説）を承認するとbiz_model_ideasに
+          新規登録され、NB2・NB3はその行に対する追加提案として続く（lib/tracks/newBizDev.ts）。 */}
       {hypotheses.length > 0 && (
         <Card style={{ marginBottom: 14 }}>
-          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14 }}>🤖 AI提案（新規事業の仮説・確認待ち {hypotheses.length}件）</p>
+          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 14 }}>🤖 AI提案（新規事業開発・確認待ち {hypotheses.length}件）</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {hypotheses.map(h => (
               <DeliverableCard
                 key={h.id}
                 deliverable={h}
+                subjectName={h.entity_id ? ideas.find(i => i.id === h.entity_id)?.title : undefined}
                 onApprove={() => patchHypothesis(h.id, { status: 'approved' })}
                 onRevise={(feedback, rebuild) => patchHypothesis(h.id, { status: 'revise', feedback, rebuild })}
                 onArchive={() => patchHypothesis(h.id, { status: 'archived' })}
@@ -239,6 +266,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
                     hideTitle
                     onSave={fields => updateIdea(i.id, fields)}
                   />
+                  {renderNewBizProgress(i)}
                 </CollapsibleIdeaCard>
               ))}
             </div>
@@ -286,6 +314,7 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
                 />
               </>
             )}
+            {renderNewBizProgress(i)}
             <p style={{ margin: '8px 0 0', fontSize: 10, color: '#ccc' }}>
               最終更新: {new Date(i.updated_at).toLocaleString('ja-JP')}（欄外をタップすると自動保存されます）
             </p>

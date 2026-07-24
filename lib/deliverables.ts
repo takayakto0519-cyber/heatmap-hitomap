@@ -6,6 +6,7 @@
 export const KINDS = [
   'email_draft', 'followup_draft', 'reply_draft', 'evidence', 'contact',
   'requirements', 'mvp_content', 'quote_research', 'sns_post', 'biz_hypothesis',
+  'validation_research', 'mvp_spec', 'content_theme',
 ] as const;
 export type DeliverableKind = typeof KINDS[number];
 
@@ -23,6 +24,9 @@ export const KIND_LABEL: Record<DeliverableKind, string> = {
   quote_research: '見積のための競合調査',
   sns_post: 'SNS投稿案',
   biz_hypothesis: '新規事業の仮説',
+  validation_research: '需要検証',
+  mvp_spec: 'MVP仕様書',
+  content_theme: 'SNS企画テーマ',
 };
 
 /**
@@ -43,6 +47,10 @@ export const REFLECT_TO: Partial<Record<DeliverableKind, { table: string; column
   evidence: { table: 'municipality_profiles', column: 'evidence_summary' },
   contact: { table: 'municipality_profiles', column: 'contact_email' },
   requirements: { table: 'municipality_profiles', column: 'requirements_memo' },
+  validation_research: { table: 'biz_model_ideas', column: 'validation_summary' },
+  mvp_spec: { table: 'biz_model_ideas', column: 'mvp_spec_md' },
+  // content_theme は反映先を持たない（承認＝会長がテーマにゴーサインを出しただけの記録。
+  // 次のsns_post生成でオートパイロットがこの承認済みテーマ本文を読みに行く）。
 };
 
 /**
@@ -55,9 +63,12 @@ export const CREATE_IN: Partial<Record<DeliverableKind, {
   table: string;
   build: (d: { title: string; body: string }) => Record<string, unknown>;
 }>> = {
+  // 新規事業の登録先は必ずbiz_model_ideas（strategy_proposalsに新規事業カテゴリを
+  // 重複登録しない——2026-07-23、登録先が2系統に分かれ見落とした反省。
+  // .claude/skills/new-biz-hypothesis/SKILL.md に明記）。
   biz_hypothesis: {
-    table: 'strategy_proposals',
-    build: d => ({ category: 'new_biz', source_skill: 'autopilot', title: d.title, body: d.body, status: 'unread' }),
+    table: 'biz_model_ideas',
+    build: d => ({ title: d.title, memo: d.body, status: 'idea' }),
   },
   sns_post: {
     table: 'sns_drafts',
