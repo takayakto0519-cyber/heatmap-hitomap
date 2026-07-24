@@ -251,6 +251,92 @@ function TentacleTree({ floor, floorAgents, nameOf }: { floor: Floor; floorAgent
   );
 }
 
+// 🧭 仕組みの説明 — 「番人検知→AI作成→会長承認」のパイプラインが自治体営業・新規事業・
+// マーケティングの3系統でどう動いているかを常時確認できる静的な説明パネル。DBは持たず、
+// lib/tracks/govOutreach.ts・lib/tracks/newBizDev.ts の実際のトラック定義を文面化したもの
+// （トラックの中身を変えたらここも合わせて直す）。
+function TrackStep({ label, owner, note }: { label: string; owner: 'ai' | 'chairman'; note?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
+      <span style={{
+        fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, flexShrink: 0, minWidth: 44, textAlign: 'center',
+        background: owner === 'ai' ? '#38ADA918' : '#8E44AD18', color: owner === 'ai' ? '#38ADA9' : '#8E44AD',
+      }}>{owner === 'ai' ? 'AI' : '会長'}</span>
+      <span style={{ fontSize: 12.5, color: '#333', fontWeight: 700 }}>{label}</span>
+      {note && <span style={{ fontSize: 11, color: '#999' }}>— {note}</span>}
+    </div>
+  );
+}
+
+function PipelineExplainer() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+      }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#444' }}>🧭 仕組みの説明（この自動化はどう動いているか）</p>
+        <span style={{ fontSize: 12, color: '#999' }}>{open ? '▲ 閉じる' : '▼ 開く'}</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ margin: '0 0 14px', fontSize: 12, color: '#666', lineHeight: 1.8 }}>
+            すべての系統に共通する型：<b>①番人が「次にやるべき一段」を検知</b>
+            →<b>②AIがその一段だけ作って06_実行待機_Approvalに保管</b>
+            →<b>③会長が承認／差し戻し／却下</b>。<br />
+            承認は<b>「次の段に進む権利を得る」だけ</b>で、その場でAIが次を作り始めるわけではない。
+            次のAIの動きは翌朝以降、次回の巡回で1段ずつ進む。1回の巡回で作るのは全系統合わせて最大3件まで
+            （他の案件と枠を取り合う）。飛び級はしない＝先頭から見て最初の未達の段だけを常に扱う。
+          </p>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 12.5, fontWeight: 800, color: '#555' }}>🏛️ 自治体営業（M1〜M11）</p>
+              <p style={{ margin: '0 0 6px', fontSize: 10.5, color: '#aaa' }}>M0：既存11件とは別に、まだ登録していない自治体・事業者候補そのものをAIが発掘（7日クールダウン）</p>
+              <div>
+                <TrackStep label="M1 調査" owner="ai" />
+                <TrackStep label="M2 宛先確保" owner="ai" />
+                <TrackStep label="M3 提案メール下書き" owner="ai" />
+                <TrackStep label="M4 事実確認" owner="chairman" />
+                <TrackStep label="M5 初回送信" owner="chairman" />
+                <TrackStep label="M6 反応・フォロー" owner="ai" note="返信待ち日数で自動判定" />
+                <TrackStep label="M7 ヒアリング面談" owner="chairman" />
+                <TrackStep label="M8 要件メモ" owner="ai" />
+                <TrackStep label="M9 MVPデモ提示" owner="ai" note="/region/[name]が実デモ画面" />
+                <TrackStep label="M10 見積提出" owner="chairman" />
+                <TrackStep label="M11 契約" owner="chairman" note="以降は商流ボードへ引き継ぎ" />
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 12.5, fontWeight: 800, color: '#555' }}>🚀 新規事業開発（NB1〜NB3）</p>
+              <p style={{ margin: '0 0 6px', fontSize: 10.5, color: '#aaa' }}>NB1承認＝biz_model_ideasに新規行が作られた瞬間で、まだ「ショーケース（仮説）」段階</p>
+              <div>
+                <TrackStep label="NB1 仮説" owner="ai" note="3日クールダウンで新規発掘" />
+                <TrackStep label="NB2 需要検証" owner="ai" note="具体事例・競合をdeep-researchで調査" />
+                <TrackStep label="NB3 MVP設計" owner="ai" note="承認でphaseが0→1に上がる" />
+              </div>
+
+              <p style={{ margin: '18px 0 4px', fontSize: 12.5, fontWeight: 800, color: '#555' }}>📣 マーケティング（MK1〜MK2）</p>
+              <div>
+                <TrackStep label="MK1 コンテンツテーマ" owner="ai" note="3日クールダウン" />
+                <TrackStep label="MK2 SNS投稿案" owner="ai" />
+              </div>
+            </div>
+          </div>
+
+          <p style={{ margin: '16px 0 0', fontSize: 11, color: '#B7791F', background: '#FFF8E8', padding: '8px 10px', borderRadius: 8, lineHeight: 1.7 }}>
+            ⚠ AIは会長の明示的な承認なしに契約・発注・外部送信を進めない（プロジェクト憲法）。
+            この画面のAI行動はすべて「提案の作成」までで、実行（送信・契約）は必ず会長の手番。
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 📅 本日のタイムテーブル — 番人が何時に何をするかを一覧で見て、時刻を変更できるパネル。
 // 変更はここで即座には反映されない。agent_schedule_overrides に保存され、
 // 翌朝いちばん早く動く agents/schedule_sync.py がWindowsタスクスケジューラへ反映する
@@ -565,6 +651,7 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
             )}
           </div>
 
+          <PipelineExplainer />
           <ScheduleTimetable authHeaders={authHeaders} />
 
           <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
