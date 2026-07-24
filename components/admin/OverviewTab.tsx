@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { ErrorBanner, LoadingLine, type TabBadgeCounts, type AttentionItem, ATTENTION_JUMP } from '@/components/admin/adminShared';
 import { computePipelineSummary, computeCashflow, type DealCase } from '@/lib/dealMetrics';
+import { adminColor, adminRadius, adminShadow } from '@/lib/adminTokens';
 
 interface RegionValence { region: string; valence: { positive: number; negative: number; neutral: number; total: number } }
 
@@ -51,7 +52,7 @@ const LEAD_PIPELINE: { key: string; label: string; color: string }[] = [
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', ...style }}>
+    <div style={{ background: adminColor.surface, borderRadius: adminRadius.md, padding: 16, boxShadow: adminShadow.card, ...style }}>
       {children}
     </div>
   );
@@ -71,15 +72,17 @@ function Kpi({ label, value, urgent, onClick }: { label: string; value: number |
     <button
       onClick={onClick}
       disabled={!onClick}
+      className={onClick ? 'hm-lift' : undefined}
       style={{
-        textAlign: 'left', padding: '12px 14px', borderRadius: 12,
-        border: urgent ? '1px solid #FFD9D0' : '1px solid #eee',
-        background: urgent ? '#FFF5F3' : '#fff',
+        textAlign: 'left', padding: '12px 14px', borderRadius: adminRadius.md,
+        border: urgent ? `1px solid ${adminColor.danger}33` : `1px solid ${adminColor.line}`,
+        background: urgent ? adminColor.dangerSoft : adminColor.surface,
+        boxShadow: adminShadow.card,
         cursor: onClick ? 'pointer' : 'default', fontFamily: 'inherit',
       }}
     >
-      <div style={{ fontSize: 24, fontWeight: 800, color: urgent ? '#E55039' : '#222' }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: urgent ? '#E55039' : '#888', marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: urgent ? adminColor.danger : adminColor.ink }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: urgent ? adminColor.danger : adminColor.inkSoft, marginTop: 2, fontWeight: urgent ? 700 : 400 }}>{label}</div>
     </button>
   );
 }
@@ -295,17 +298,18 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
                 // 二重に書かれていて、バッジを増やすたび2箇所直す必要があった）
                 const count = badgeCounts?.[id] ?? 0;
                 return (
-                  <button key={id} onClick={() => goTab(id)} style={{
-                    textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
-                    border: count > 0 ? '1px solid #FFD9D0' : '1px solid #eee',
-                    background: count > 0 ? '#FFF5F3' : '#fff',
+                  <button key={id} onClick={() => goTab(id)} className="hm-lift" style={{
+                    textAlign: 'left', padding: '12px 14px', borderRadius: adminRadius.md, cursor: 'pointer', fontFamily: 'inherit',
+                    border: count > 0 ? `1px solid ${adminColor.danger}33` : `1px solid ${adminColor.line}`,
+                    background: count > 0 ? adminColor.dangerSoft : adminColor.surface,
+                    boxShadow: adminShadow.card,
                   }}>
                     <div style={{ fontSize: 18 }}>{tabMeta[id].icon}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: count > 0 ? '#E55039' : '#222' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: count > 0 ? adminColor.danger : adminColor.ink }}>
                       {tabMeta[id].label}
-                      {count > 0 && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11, background: '#E55039', color: '#fff' }}>{count}</span>}
+                      {count > 0 && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11, background: adminColor.danger, color: '#fff' }}>{count}</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{tabMeta[id].desc}</div>
+                    <div style={{ fontSize: 11, color: adminColor.inkSoft, marginTop: 2 }}>{tabMeta[id].desc}</div>
                   </button>
                 );
               })}
@@ -319,13 +323,14 @@ export default function OverviewTab({ authHeaders, goTab, badgeCounts, tabMeta, 
         <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 14 }}>🌐 本体サイトを見る</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
           {siteLinks.map(link => (
-            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" style={{
-              textAlign: 'left', padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-              border: '1px solid #eee', background: '#fff', textDecoration: 'none', color: 'inherit', display: 'block',
+            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="hm-lift" style={{
+              textAlign: 'left', padding: '12px 14px', borderRadius: adminRadius.md, cursor: 'pointer',
+              border: `1px solid ${adminColor.line}`, background: adminColor.surface, boxShadow: adminShadow.card,
+              textDecoration: 'none', color: 'inherit', display: 'block',
             }}>
               <div style={{ fontSize: 18 }}>{link.icon}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: '#222' }}>{link.label} ↗</div>
-              <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{link.desc}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: adminColor.ink }}>{link.label} ↗</div>
+              <div style={{ fontSize: 11, color: adminColor.inkSoft, marginTop: 2 }}>{link.desc}</div>
             </a>
           ))}
         </div>

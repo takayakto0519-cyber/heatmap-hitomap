@@ -33,6 +33,7 @@ import DedicatedDashboardsTab from '@/components/admin/DedicatedDashboardsTab';
 import WebAnalyticsTab from '@/components/admin/WebAnalyticsTab';
 import BizModelStrengthenTab from '@/components/admin/BizModelStrengthenTab';
 import { inputStyle, type TabBadgeCounts } from '@/components/admin/adminShared';
+import { adminColor, adminRadius, adminShadow } from '@/lib/adminTokens';
 
 type Tab = 'overview' | 'settings' | 'blocks' | 'posts' | 'sns' | 'webAnalytics' | 'review' | 'traces' | 'reports' | 'comments' | 'sponsors' | 'routes' | 'quests' | 'users' | 'events' | 'bizmodels' | 'marketing' | 'proposals' | 'funding' | 'sales' | 'money' | 'strengthen' | 'attachment' | 'patterns' | 'agents' | 'minutes' | 'secretary' | 'orgdocs' | 'dashboards';
 
@@ -150,20 +151,24 @@ export default function AdminDashboardPage() {
 
   if (!unlocked) {
     return (
-      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', padding: 16, boxSizing: 'border-box' }}>
+      <div style={{
+        minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `linear-gradient(160deg, ${adminColor.sidebarFrom}, ${adminColor.sidebarTo})`, padding: 16, boxSizing: 'border-box',
+      }}>
         <form
           onSubmit={e => { e.preventDefault(); tryUnlock(password); }}
-          style={{ background: '#fff', padding: 24, borderRadius: 16, width: '100%', maxWidth: 320, boxSizing: 'border-box', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}
+          style={{ background: adminColor.surface, padding: 28, borderRadius: adminRadius.lg, width: '100%', maxWidth: 320, boxSizing: 'border-box', boxShadow: adminShadow.cardHover }}
         >
-          <h1 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>運営ダッシュボード（パスワード）</h1>
+          <p style={{ margin: '0 0 4px', fontSize: 22 }}>🛠</p>
+          <h1 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 14px', color: adminColor.ink }}>運営ダッシュボード</h1>
           <input
             type="password" value={password} onChange={e => setPassword(e.target.value)}
             placeholder="パスワード" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
           />
           {unlockError && <p style={{ color: '#E74C3C', fontSize: 12, margin: '0 0 8px' }}>{unlockError}</p>}
-          <button type="submit" disabled={unlocking} style={{
-            width: '100%', padding: 10, borderRadius: 8, border: 'none',
-            background: '#38ADA9', color: '#fff', fontWeight: 700, cursor: 'pointer',
+          <button type="submit" disabled={unlocking} className="hm-btn hm-magnet" style={{
+            width: '100%', padding: 11, borderRadius: adminRadius.sm, border: 'none',
+            background: adminColor.accent, color: '#fff', fontWeight: 700, cursor: 'pointer',
           }}>{unlocking ? '確認中…' : '入る'}</button>
         </form>
       </div>
@@ -190,18 +195,22 @@ export default function AdminDashboardPage() {
 
   const navButtonStyle = (active: boolean, urgent: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-    padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
-    background: active ? 'rgba(255,255,255,0.16)' : 'transparent',
+    padding: '10px 14px', borderRadius: adminRadius.sm, cursor: 'pointer',
+    background: active ? adminColor.sidebarActive : 'transparent',
+    borderLeft: active ? `3px solid ${adminColor.accent}` : '3px solid transparent',
     color: active ? '#fff' : urgent ? '#FFB4A8' : 'rgba(255,255,255,0.75)',
     fontWeight: active ? 800 : 600, fontSize: 13,
+    transition: 'background .18s ease, border-color .18s ease, color .18s ease',
   });
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#f4f6f5', display: 'flex' }}>
+    <div style={{ minHeight: '100dvh', background: adminColor.bg, display: 'flex' }}>
       <style>{`
         .hm-sidebar { position: sticky; top: 0; height: 100dvh; transition: transform .2s ease; }
         .hm-hamburger { display: none; }
         .hm-overlay { display: none; }
+        .hm-admin-navbtn:not([disabled]):hover { background: ${adminColor.sidebarHover} !important; }
+        .hm-admin-badge { animation: hm-pop .4s cubic-bezier(.22,1,.36,1) both; }
         @media (max-width: 880px) {
           .hm-sidebar { position: fixed; top: 0; left: 0; bottom: 0; height: 100dvh; z-index: 40; transform: translateX(-100%); }
           .hm-sidebar.open { transform: translateX(0); }
@@ -218,17 +227,19 @@ export default function AdminDashboardPage() {
 
       {/* サイドバー */}
       <aside className={`hm-sidebar${navOpen ? ' open' : ''}`} style={{
-        width: 232, flexShrink: 0, background: '#1F2A2A', color: '#fff',
+        width: 232, flexShrink: 0, color: '#fff',
+        background: `linear-gradient(180deg, ${adminColor.sidebarFrom}, ${adminColor.sidebarTo})`,
+        boxShadow: '2px 0 24px -14px rgba(0,0,0,.4)',
         display: 'flex', flexDirection: 'column', overflowY: 'auto',
       }}>
-        <div style={{ padding: '20px 16px 12px' }}>
+        <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
             onClick={() => goTab('overview')}>🛠 運営ダッシュボード</p>
           <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>ヒトマップ</p>
         </div>
 
-        <nav style={{ flex: 1, padding: '4px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <button onClick={() => goTab('overview')} style={navButtonStyle(tab === 'overview', false)}>
+        <nav style={{ flex: 1, padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <button className="hm-admin-navbtn" onClick={() => goTab('overview')} style={navButtonStyle(tab === 'overview', false)}>
             {TAB_META.overview.icon} {TAB_META.overview.label}
           </button>
 
@@ -239,11 +250,11 @@ export default function AdminDashboardPage() {
                 const count = badgeFor(id);
                 const urgent = count > 0 && tab !== id;
                 return (
-                  <button key={id} onClick={() => goTab(id)} title={TAB_META[id].desc} style={navButtonStyle(tab === id, urgent)}>
+                  <button key={id} className="hm-admin-navbtn" onClick={() => goTab(id)} title={TAB_META[id].desc} style={navButtonStyle(tab === id, urgent)}>
                     <span>{TAB_META[id].icon}</span>
                     <span style={{ flex: 1 }}>{TAB_META[id].label}</span>
                     {count > 0 && (
-                      <span style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, background: '#E55039', color: '#fff', fontWeight: 700 }}>{count}</span>
+                      <span className={`hm-admin-badge${urgent ? ' hm-pulse' : ''}`} style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, background: adminColor.danger, color: '#fff', fontWeight: 700 }}>{count}</span>
                     )}
                   </button>
                 );
@@ -253,15 +264,15 @@ export default function AdminDashboardPage() {
         </nav>
 
         <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <button onClick={() => setSiteMenuOpen(v => !v)} style={navButtonStyle(siteMenuOpen, false)}>
+          <button className="hm-admin-navbtn" onClick={() => setSiteMenuOpen(v => !v)} style={navButtonStyle(siteMenuOpen, false)}>
             🌐 <span style={{ flex: 1 }}>本体サイトを見る</span> {siteMenuOpen ? '▴' : '▾'}
           </button>
           {siteMenuOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
               {SITE_LINKS.map(link => (
-                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" style={{
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="hm-admin-navbtn" style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 8px 30px', borderRadius: 10,
-                  textDecoration: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12,
+                  textDecoration: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background .18s ease',
                 }}>
                   <span>{link.icon}</span>{link.label} ↗
                 </a>
@@ -275,14 +286,15 @@ export default function AdminDashboardPage() {
       <main className="hm-main" style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           position: 'sticky', top: 0, zIndex: 10, background: 'rgba(244,246,245,0.92)', backdropFilter: 'blur(6px)',
-          padding: '14px 20px', borderBottom: '1px solid #e5e8e7', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          padding: '14px 20px', borderBottom: `1px solid ${adminColor.line}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          boxShadow: `0 1px 0 ${adminColor.accent}14`,
         }}>
           <button className="hm-hamburger" onClick={() => setNavOpen(v => !v)} style={{
             width: 34, height: 34, borderRadius: 8, border: '1px solid #ddd', background: '#fff',
             alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16,
           }}>☰</button>
           <h1 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{TAB_META[tab].icon} {TAB_META[tab].label}</h1>
-          <span style={{ fontSize: 12, color: '#999' }}>{TAB_META[tab].desc}</span>
+          <span style={{ fontSize: 12, color: adminColor.inkSoft }}>{TAB_META[tab].desc}</span>
         </div>
 
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 20px 60px' }}>
