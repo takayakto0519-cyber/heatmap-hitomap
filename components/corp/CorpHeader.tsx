@@ -142,7 +142,7 @@ export default function CorpHeader() {
 
           <a
             href="/login"
-            className="hm-lift hm-btn"
+            className="hm-lift hm-btn hm-magnet"
             style={{
               flexShrink: 0,
               display: 'inline-block',

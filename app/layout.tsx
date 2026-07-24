@@ -142,6 +142,8 @@ h1, h2, h3 { font-feature-settings: "palt" 1; }
 /* 苔の淡い明滅（MapArtの痕跡が"灯る"） */
 @keyframes hm-glow { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
 .hm-glow { animation: hm-glow 3.2s ease-in-out infinite; }
+/* 20260724: CTAボタンのマグネット追従（カーソルに数px引き寄せられる） */
+.hm-magnet { transition: transform .18s cubic-bezier(.22,1,.36,1); }
 /* 感情パレットのセル：ホバーでドットが膨らむ微演出 */
 .hm-swatch { transition: background .25s ease; }
 .hm-swatch:hover { background: #FAF9F6; }
@@ -151,8 +153,10 @@ h1, h2, h3 { font-feature-settings: "palt" 1; }
 a:focus-visible, button:focus-visible, [role="button"]:focus-visible { outline: 2px solid #566246; outline-offset: 3px; border-radius: 4px; }
 
 /* --- 20260718 Leaflet地図のブランド化（白基調ミニマル） --- */
-/* 淡色タイルを無彩色寄りに整える（継ぎ目回避のためpane単位） */
-.leaflet-tile-pane { filter: saturate(.88) contrast(1.02); }
+/* 淡色タイルを無彩色寄りに整える（継ぎ目回避のためpane単位）。
+   20260724: 国土地理院タイルは行政信頼性のため差し替えず維持。無彩色寄りの色調はそのままに、
+   ごくわずかな暖色(生成り)を足してブランドの苔・生成りトーンに馴染ませる。 */
+.leaflet-tile-pane { filter: saturate(.85) contrast(1.02) sepia(.05) hue-rotate(-6deg); }
 /* ズーム/現在地などのコントロールを白・角丸・淡い影・ブランド調に */
 .leaflet-bar { border: none !important; border-radius: 12px !important; box-shadow: 0 4px 16px -6px rgba(35,35,31,.28) !important; overflow: hidden; }
 .leaflet-bar a, .leaflet-bar a:hover { background: #FBFAF6; color: #23231F; border-bottom: 1px solid #E9E6DD; width: 34px; height: 34px; line-height: 34px; font-weight: 700; transition: background .2s; }
@@ -165,10 +169,16 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible { outline: 
 .leaflet-popup-content { margin: 12px 14px !important; line-height: 1.6; }
 .leaflet-popup-tip { box-shadow: 0 10px 34px -12px rgba(35,35,31,.34); }
 .leaflet-container a.leaflet-popup-close-button { color: #8C8677; }
+/* 20260724: ピンをタップした瞬間、吹き出しがふわっと立ち上がる（開閉のたび同じ動きで馴染ませる） */
+@keyframes hm-popup-in { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { animation: hm-popup-in .28s cubic-bezier(.22,1,.36,1) both; }
+/* 写真つき投稿：ポップアップ上端いっぱいに写真を敷く（TracePopupContentのhm-popup-photoと対） */
+.leaflet-popup-content .hm-popup-photo { margin: -12px -14px 8px; width: calc(100% + 28px); border-radius: 13px 13px 0 0; display: block; }
 
 @media (prefers-reduced-motion: reduce) {
   .hm-lift, .hm-photo-zoom img, .hm-btn { transition: none; }
   .hm-lift:hover { transform: none; box-shadow: none; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { animation: none; }
   .hm-drift, .hm-drift-slow, .hm-marquee, .hm-pulse, .hm-pop, .hm-glow { animation: none; }
   .hm-pop { opacity: 1; transform: none; }
   .hm-glow { opacity: 1; }
@@ -194,6 +204,24 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible { outline: 
   }, { passive: true });
   document.addEventListener('pointerout', function(e){
     var el = e.target && e.target.closest ? e.target.closest('.hm-tilt') : null;
+    if (!el) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    el.style.transform = '';
+  }, { passive: true });
+  // 20260724: CTAボタンのマグネット追従。ボタン中心からのカーソル距離の一部だけ動かす（最大10px）
+  var MAG_MAX = 10;
+  document.addEventListener('pointermove', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('.hm-magnet') : null;
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    var dx = e.clientX - (r.left + r.width / 2);
+    var dy = e.clientY - (r.top + r.height / 2);
+    var mx = Math.max(-MAG_MAX, Math.min(MAG_MAX, dx * 0.3));
+    var my = Math.max(-MAG_MAX, Math.min(MAG_MAX, dy * 0.3));
+    el.style.transform = 'translate(' + mx.toFixed(1) + 'px,' + my.toFixed(1) + 'px)';
+  }, { passive: true });
+  document.addEventListener('pointerout', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('.hm-magnet') : null;
     if (!el) return;
     if (e.relatedTarget && el.contains(e.relatedTarget)) return;
     el.style.transform = '';

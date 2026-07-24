@@ -74,7 +74,7 @@ export default async function HomePage() {
         <ProofBand />
         <BlockRenderer blocks={blocks} />
         <EmotionPalette />
-        <RecentTraces />
+        <RecentTraces curatedIds={settings.home_photo_grid} />
 
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px' }}>
           <AdSlot />

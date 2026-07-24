@@ -25,12 +25,14 @@ export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as {
     hero?: Partial<HeroSettings>;
     announcement?: Partial<AnnouncementSettings>;
+    home_photo_grid?: string[];
   };
 
   const rows: { key: string; value: unknown; updated_at: string }[] = [];
   const now = new Date().toISOString();
   if (body.hero) rows.push({ key: 'hero', value: body.hero, updated_at: now });
   if (body.announcement) rows.push({ key: 'announcement', value: body.announcement, updated_at: now });
+  if (body.home_photo_grid) rows.push({ key: 'home_photo_grid', value: body.home_photo_grid, updated_at: now });
   if (rows.length === 0) return NextResponse.json({ ok: false, error: '保存する項目がありません' }, { status: 400 });
 
   const { supabaseServer } = await import('@/lib/supabase/server');

@@ -1,7 +1,7 @@
 import { corpColor, corpFont, corpRadius, corpShadow, corpSpace } from './tokens';
 import Reveal from './Reveal';
 import MapArt from './MapArt';
-import CharReveal from './CharReveal';
+import ScrambleReveal from './ScrambleReveal';
 import Parallax from './Parallax';
 import { IconWalk, IconCamera, IconLayers, IconBuilding } from './icons';
 import { DEFAULT_SITE_SETTINGS, type HeroSettings } from '@/lib/siteSettings';
@@ -73,7 +73,7 @@ export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settin
             </p>
           </Reveal>
 
-          <CharReveal
+          <ScrambleReveal
             lines={settings.headline_lines}
             baseDelay={200}
             charDelay={55}
@@ -151,7 +151,7 @@ export default function Hero({ settings = DEFAULT_SITE_SETTINGS.hero }: { settin
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
               <a
                 href={settings.cta_href}
-                className="hm-lift hm-btn"
+                className="hm-lift hm-btn hm-magnet"
                 style={{
                   display: 'inline-block',
                   padding: '16px 36px',

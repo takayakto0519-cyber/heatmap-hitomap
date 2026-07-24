@@ -10,9 +10,10 @@ interface Props {
   delay?: number;      // ms。カードの時間差表示（stagger）に使う
   immediate?: boolean; // true = スクロールを待たずマウント直後に再生（ヒーロー用）
   y?: number;          // 立ち上がり距離(px)
+  style?: React.CSSProperties; // 呼び出し側でgrid-column等をこの要素自体に効かせたい場合に使う
 }
 
-export default function Reveal({ children, delay = 0, immediate = false, y = 28 }: Props) {
+export default function Reveal({ children, delay = 0, immediate = false, y = 28, style }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
@@ -45,8 +46,9 @@ export default function Reveal({ children, delay = 0, immediate = false, y = 28 
     <div
       ref={ref}
       style={{
+        ...style,
         opacity: shown ? 1 : 0,
-        transform: shown ? 'none' : `translateY(${y}px)`,
+        transform: shown ? (style?.transform ?? 'none') : `translateY(${y}px)`,
         transition: 'opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1)',
         willChange: shown ? undefined : 'opacity, transform',
       }}

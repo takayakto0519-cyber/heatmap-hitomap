@@ -25,6 +25,9 @@ export interface AnnouncementSettings {
 export interface SiteSettings {
   hero: HeroSettings;
   announcement: AnnouncementSettings;
+  // トップページ「いま、積み重なっている痕跡」に出す写真の並び（trace.id の配列。先頭ほど大きく出る）。
+  // 空配列なら自動選定（直近の投稿から写真つきのものを新しい順に採用）に戻る。
+  home_photo_grid: string[];
 }
 
 // 既定文言：これまでコード内（components/corp/Hero.tsx）に固定されていた文言と同一にする。
@@ -49,6 +52,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     text: '',
     href: '',
   },
+  home_photo_grid: [],
 };
 
 // DBの値（部分的な上書き）と既定値を項目単位で合成する。
@@ -61,7 +65,9 @@ export function mergeSiteSettings(rows: { key: string; value: unknown }[]): Site
     hero.headline_lines = DEFAULT_SITE_SETTINGS.hero.headline_lines;
   }
   const announcement = { ...DEFAULT_SITE_SETTINGS.announcement, ...(byKey.get('announcement') as Partial<AnnouncementSettings> | undefined) };
-  return { hero, announcement };
+  const rawGrid = byKey.get('home_photo_grid');
+  const home_photo_grid = Array.isArray(rawGrid) ? rawGrid.filter((id): id is string => typeof id === 'string') : [];
+  return { hero, announcement, home_photo_grid };
 }
 
 // サーバー側（ページ描画時）にサイト設定を読む。Supabase未設定・エラー時は既定値。

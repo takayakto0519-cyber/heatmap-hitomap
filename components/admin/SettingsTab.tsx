@@ -8,6 +8,7 @@ import LivePreview from './LivePreview';
 import LineSettingsSection from './LineSettingsSection';
 import TeamMembersSection from './TeamMembersSection';
 import SalesTargetSection from './SalesTargetSection';
+import HomePhotoGridSection from './HomePhotoGridSection';
 import type { SiteSettings } from '@/lib/siteSettings';
 
 const inputStyle: React.CSSProperties = {
@@ -86,6 +87,7 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
             headline_lines: settings.hero.headline_lines.filter(l => l.trim() !== ''),
           },
           announcement: settings.announcement,
+          home_photo_grid: settings.home_photo_grid,
         }),
       });
       const data = await res.json();
@@ -173,6 +175,14 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
         <input value={hero.biz_link_label} onChange={e => setHero({ biz_link_label: e.target.value })} style={inputStyle} />
         <label style={labelStyle}>法人・自治体向けリンク（行き先）</label>
         <input value={hero.biz_link_href} onChange={e => setHero({ biz_link_href: e.target.value })} style={inputStyle} />
+      </Card>
+
+      <Card title="🖼 トップページの写真" desc="「いま、積み重なっている痕跡」に出す写真を選び、並び替えられます。">
+        <HomePhotoGridSection
+          value={settings.home_photo_grid}
+          onChange={ids => setSettings({ ...settings, home_photo_grid: ids })}
+          authHeaders={authHeaders}
+        />
       </Card>
 
       {demoData?.exists && (

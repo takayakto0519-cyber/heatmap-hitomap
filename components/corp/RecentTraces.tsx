@@ -2,134 +2,175 @@
 
 import { useEffect, useState } from 'react';
 import { corpColor, corpFont, corpRadius, corpShadow } from './tokens';
+import Reveal from './Reveal';
+import ParallaxItem from './ParallaxItem';
 import { getEmotion } from '@/lib/emotions';
 import type { Trace } from '@/lib/types';
 
 // YAMAPトップの「活動日記（コミュニティの実記録）」枠を踏襲。
 // 数字の実績を捏造する代わりに、実際に投稿された直近の痕跡そのものを社会的証明として見せる。
 // 取得に失敗した場合・0件の場合はセクションごと消す（空の飾り枠を残さない）。
+//
+// 【20260724 フォトグリッド化】
+// 横スクロールの均一カードから、SANU等の参考サイトに倣った非対称フォトグリッドへ。
+// 「痕跡が積み重なる」実感は、テキストカードの羅列より写真そのものの物量で伝わる。
+// 写真の無い投稿はグリッドに混ぜず除外する（テキストのみの空セルは物量感を薄める）。
+// curatedIds（運営ダッシュボード「サイト設定」→トップページの写真）が指定されていれば、
+// 自動選定の代わりにその並び順で表示する。
+const GRID_LIMIT = 8;
 
-export default function RecentTraces() {
+export default function RecentTraces({ curatedIds = [] }: { curatedIds?: string[] }) {
   const [traces, setTraces] = useState<Trace[]>([]);
 
   useEffect(() => {
-    fetch('/api/traces?limit=6')
+    const url = curatedIds.length > 0
+      ? `/api/traces?ids=${curatedIds.slice(0, GRID_LIMIT).join(',')}`
+      : `/api/traces?limit=${GRID_LIMIT * 2}`;
+    fetch(url)
       .then(r => r.json())
-      .then(d => { if (d.ok) setTraces((d.traces ?? []).slice(0, 6)); })
+      .then(d => {
+        if (!d.ok) return;
+        const list = (d.traces ?? []) as Trace[];
+        setTraces(curatedIds.length > 0 ? list.filter(t => t.photo_url) : list.filter(t => t.photo_url).slice(0, GRID_LIMIT));
+      })
       .catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curatedIds.join(',')]);
 
   if (traces.length === 0) return null;
 
   return (
     <section style={{ background: corpColor.ground, padding: '72px 0', borderTop: `1px solid ${corpColor.line}` }}>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px' }}>
-        <p
-          style={{
-            margin: '0 0 8px',
-            fontSize: 12,
-            letterSpacing: '0.2em',
-            color: corpColor.moss,
-            fontFamily: corpFont.body,
-            fontWeight: 700,
-          }}
-        >
-          いま、積み重なっている痕跡
-        </p>
-        <h2
-          style={{
-            margin: '0 0 32px',
-            fontFamily: corpFont.body,
-            fontSize: 'clamp(20px, 2.8vw, 26px)',
-            fontWeight: 700,
-            color: corpColor.ink,
-          }}
-        >
-          誰かが今日も、まちを歩いて記録しています。
-        </h2>
+        <Reveal>
+          <p
+            style={{
+              margin: '0 0 8px',
+              fontSize: 12,
+              letterSpacing: '0.2em',
+              color: corpColor.moss,
+              fontFamily: corpFont.body,
+              fontWeight: 700,
+            }}
+          >
+            いま、積み重なっている痕跡
+          </p>
+        </Reveal>
+        <Reveal delay={80}>
+          <h2
+            style={{
+              margin: '0 0 32px',
+              fontFamily: corpFont.body,
+              fontSize: 'clamp(20px, 2.8vw, 26px)',
+              fontWeight: 700,
+              color: corpColor.ink,
+            }}
+          >
+            誰かが今日も、まちを歩いて記録しています。
+          </h2>
+        </Reveal>
       </div>
 
+      {/* 最初の1枚を大きく、残りを密に詰める非対称グリッド。
+          grid-auto-flow: dense で、写真の枚数が増減しても自動的に隙間なく敷き詰まる。 */}
       <div
         style={{
           maxWidth: 960,
           margin: '0 auto',
           padding: '0 24px',
-          display: 'flex',
-          gap: 16,
-          overflowX: 'auto',
-          scrollbarWidth: 'thin',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridAutoRows: 150,
+          gridAutoFlow: 'dense',
+          gap: 12,
         }}
       >
-        {traces.map(t => {
+        {traces.map((t, i) => {
           const keys = t.emotion_keys ?? (t.emotion_key ? [t.emotion_key] : []);
           const emotion = getEmotion(keys[0]);
+          const big = i === 0;
           return (
-            <a
+            <Reveal
               key={t.id}
-              href={`/t/${t.id}`}
-              className="hm-lift hm-tilt"
-              style={{
-                flex: '0 0 220px',
-                background: corpColor.white,
-                border: `1px solid ${corpColor.lineSoft}`,
-                borderRadius: corpRadius.md,
-                boxShadow: corpShadow.card,
-                overflow: 'hidden',
-                textDecoration: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
+              delay={i * 70}
+              y={16}
+              style={{ gridColumn: big ? 'span 2' : undefined, gridRow: big ? 'span 2' : undefined, height: '100%' }}
             >
-              {t.photo_url && (
-                <div className="hm-photo-zoom" style={{ height: 168 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={t.photo_url}
-                    alt=""
-                    loading="lazy"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
-                </div>
-              )}
-              <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                <p
+              {/* 大きいタイルほど動くと違和感が出るため控えめに、残りは奇数/偶数でわずかに速度差をつける */}
+              <ParallaxItem speed={big ? 0.025 : i % 2 === 0 ? 0.05 : 0.07} max={big ? 6 : 10}>
+              <a
+                href={`/t/${t.id}`}
+                className="hm-lift hm-tilt hm-photo-zoom"
+                style={{
+                  display: 'block',
+                  position: 'relative',
+                  height: '100%',
+                  borderRadius: corpRadius.md,
+                  boxShadow: corpShadow.card,
+                  overflow: 'hidden',
+                  textDecoration: 'none',
+                  background: corpColor.white,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={t.photo_url!}
+                  alt=""
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+                {/* 下端の暗いグラデーション（写真の上に文字を重ねても常に読めるように） */}
+                <div
+                  aria-hidden="true"
                   style={{
-                    margin: 0,
-                    fontSize: 13.5,
-                    fontWeight: 700,
-                    color: corpColor.ink,
-                    fontFamily: corpFont.body,
-                    lineHeight: 1.5,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(180deg, transparent 55%, rgba(20,22,17,.78) 100%)',
                   }}
-                >
-                  {t.title}
-                </p>
-                <p style={{ margin: 0, fontSize: 11, color: corpColor.inkSoft, fontFamily: corpFont.body }}>
-                  {[t.region, new Date(t.created_at).toLocaleDateString('ja-JP')].filter(Boolean).join(' · ')}
-                </p>
-                {emotion && (
-                  <span
+                />
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: big ? '18px 20px' : '10px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {emotion && (
+                    <span
+                      style={{
+                        alignSelf: 'flex-start',
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        color: '#fff',
+                        background: emotion.color + 'CC',
+                        padding: '2px 9px',
+                        borderRadius: 999,
+                        fontFamily: corpFont.body,
+                      }}
+                    >
+                      {emotion.label}
+                    </span>
+                  )}
+                  <p
                     style={{
-                      alignSelf: 'flex-start',
-                      marginTop: 'auto',
-                      fontSize: 11,
+                      margin: 0,
+                      fontSize: big ? 16 : 12.5,
                       fontWeight: 700,
-                      color: emotion.color,
-                      background: emotion.color + '1A',
-                      padding: '2px 9px',
-                      borderRadius: 999,
+                      color: '#fff',
                       fontFamily: corpFont.body,
+                      lineHeight: 1.4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: big ? 2 : 1,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textShadow: '0 1px 6px rgba(0,0,0,.35)',
                     }}
                   >
-                    {emotion.label}
-                  </span>
-                )}
-              </div>
-            </a>
+                    {t.title}
+                  </p>
+                  {big && (
+                    <p style={{ margin: 0, fontSize: 11.5, color: 'rgba(255,255,255,.82)', fontFamily: corpFont.body }}>
+                      {[t.region, new Date(t.created_at).toLocaleDateString('ja-JP')].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+              </a>
+              </ParallaxItem>
+            </Reveal>
           );
         })}
       </div>

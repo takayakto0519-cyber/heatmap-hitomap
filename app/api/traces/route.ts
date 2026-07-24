@@ -232,6 +232,10 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
   const userIdFilter = req.nextUrl.searchParams.get('user_id');
   const revisitOf = req.nextUrl.searchParams.get('revisit_of');
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
+  // トップページ「いま、積み重なっている痕跡」の運営キュレーション用：特定IDを指定して取得する。
+  // 運営が選んだ写真は必ず全国公開のものだけを想定するため、visibility=publicに固定する
+  // （followers/private混入や、閲覧者のフォロー関係に応じたOR条件と衝突させないため通常経路とは分ける）。
+  const idsParam = req.nextUrl.searchParams.get('ids');
 
   // Supabase未設定時はサンプルを返す（ブラウザでの動作確認用）
   if (!SUPABASE_READY) {
@@ -242,6 +246,25 @@ export async function GET(req: NextRequest): Promise<NextResponse<ListTracesResp
   }
 
   const supabaseServer = await getServerClient();
+
+  if (idsParam) {
+    const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    const { data, error } = await supabaseServer
+      .from('traces')
+      .select('*')
+      .eq('is_deleted', false)
+      .eq('visibility', 'public')
+      .in('id', ids);
+    if (error) {
+      notifyDiscordError('GET /api/traces?ids', error);
+      return NextResponse.json({ ok: false, traces: [], error: error.message }, { status: 500 });
+    }
+    // .in()は指定順を保証しないため、運営が選んだ並び順に揃え直す
+    const byId = new Map((data ?? []).map(t => [t.id, t as Trace]));
+    const ordered = ids.map(id => byId.get(id)).filter((t): t is Trace => Boolean(t));
+    return NextResponse.json({ ok: true, traces: ordered });
+  }
+
   const userId = await getCurrentUserId();
 
   let query = supabaseServer

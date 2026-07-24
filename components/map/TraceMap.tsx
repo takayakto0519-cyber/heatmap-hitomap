@@ -178,8 +178,8 @@ function TracePopupContent({ t, reactionCount, onTraceClick, teamColor }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {t.photo_url && (
-        <img src={t.photo_url} alt={t.title} loading="lazy"
-          style={{ width: '100%', borderRadius: 8, objectFit: 'cover', maxHeight: 130 }} />
+        <img src={t.photo_url} alt={t.title} loading="lazy" className="hm-popup-photo"
+          style={{ objectFit: 'cover', height: 140 }} />
       )}
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
         {t.team && (

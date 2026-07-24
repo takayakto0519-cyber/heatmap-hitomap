@@ -21,13 +21,20 @@ export async function GET(req: NextRequest) {
   // 商談デモの直前など、あえて見たいときだけ ?includeDemo=true を付けて呼ぶ（lib/demoDataと同じ流儀）
   const includeDemo = req.nextUrl.searchParams.get('includeDemo') === 'true';
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 200);
+  // トップページ写真グリッドの編集画面で、選択済みIDのサムネイルをまとめて引くために使う
+  const idsParam = req.nextUrl.searchParams.get('ids');
 
   const { supabaseServer } = await import('@/lib/supabase/server');
   let query = supabaseServer.from('traces').select('*');
-  if (status !== 'all') query = query.eq('visibility', status);
-  if (userId) query = query.eq('user_id', userId);
-  if (!includeDeleted) query = query.eq('is_deleted', false);
-  if (q) query = query.ilike('title', `%${q}%`);
+  if (idsParam) {
+    const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    query = query.in('id', ids);
+  } else {
+    if (status !== 'all') query = query.eq('visibility', status);
+    if (userId) query = query.eq('user_id', userId);
+    if (!includeDeleted) query = query.eq('is_deleted', false);
+    if (q) query = query.ilike('title', `%${q}%`);
+  }
   query = query.order('created_at', { ascending: false }).limit(limit);
 
   const { data, error } = await query;
