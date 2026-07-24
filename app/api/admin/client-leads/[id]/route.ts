@@ -4,7 +4,7 @@ import { checkAdmin } from '@/lib/adminAuth';
 
 const SUPABASE_READY = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-const ALLOWED_FIELDS = ['client_type', 'org_name', 'contact_name', 'email', 'phone', 'status', 'memo', 'email_sent_at', 'email_reply', 'followed_up_at', 'reply_handled_at', 'website_url', 'contact_email_confidence', 'contact_email_source_url', 'email_draft', 'fact_check_status', 'fact_check_note', 'fact_checked_at', 'assigned_to', 'hook', 'drafted', 'sent', 'origin_proposal_id', 'origin_note'];
+const ALLOWED_FIELDS = ['client_type', 'org_name', 'contact_name', 'email', 'phone', 'status', 'memo', 'email_sent_at', 'email_reply', 'followed_up_at', 'reply_handled_at', 'website_url', 'contact_email_confidence', 'contact_email_source_url', 'email_draft', 'fact_check_status', 'fact_check_note', 'fact_checked_at', 'assigned_to', 'hook', 'drafted', 'sent', 'origin_proposal_id', 'origin_note', 'evidence_summary', 'source_links'];
 
 export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   if (!SUPABASE_READY) return NextResponse.json({ ok: false, error: 'Supabase未設定' }, { status: 503 });

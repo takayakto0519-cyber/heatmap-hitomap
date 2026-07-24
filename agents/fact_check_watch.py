@@ -70,6 +70,45 @@ def _get(url: str, key: str, path: str) -> list:
         return json.loads(res.read())
 
 
+def _sync_flags_to_db(url: str, key: str, needs_review: list) -> None:
+    """work/fact_check_watch.jsonへのローカル書き出しに加え、fact_check_flagsテーブルへも反映する。
+    本番（Vercel等）はこのPCのローカルファイルを読めないため、ダッシュボードはこのテーブルだけを見る。
+    fact_check_status自体はここでも一切変更しない（読み取り専用の指摘テーブル）。
+    対象はmunicipality_profilesのみ。既存のkind=municipalityの行を全置換する単純な設計。
+    """
+    headers_common = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    try:
+        req = urllib.request.Request(
+            f"{url}/rest/v1/fact_check_flags?kind=eq.municipality",
+            headers=headers_common, method="DELETE",
+        )
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:
+        return  # テーブル未作成（マイグレーション未適用）等。ローカルJSON書き出しには影響させない。
+
+    if not needs_review:
+        return
+
+    rows = [
+        {
+            "profile_id": item["id"],
+            "kind": "municipality",
+            "claim": "・".join(item["missing_claims"]),
+            "reason": item["note"],
+        }
+        for item in needs_review
+    ]
+    try:
+        body = json.dumps(rows).encode("utf-8")
+        req = urllib.request.Request(
+            f"{url}/rest/v1/fact_check_flags",
+            data=body, headers={**headers_common, "Prefer": "return=minimal"}, method="POST",
+        )
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:
+        pass
+
+
 def main():
     with common.running("fact_check_watch"):
         env = common.load_env_local()
@@ -128,6 +167,8 @@ def main():
                 })
             else:
                 clean.append({"id": row["id"], "region_name": row["region_name"]})
+
+        _sync_flags_to_db(url, key, needs_review)
 
         common.write_result("fact_check_watch", {
             "checked": len(rows),

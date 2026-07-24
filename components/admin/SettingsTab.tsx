@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import LivePreview from './LivePreview';
 import LineSettingsSection from './LineSettingsSection';
 import TeamMembersSection from './TeamMembersSection';
+import SalesTargetSection from './SalesTargetSection';
 import type { SiteSettings } from '@/lib/siteSettings';
 
 const inputStyle: React.CSSProperties = {
@@ -219,6 +220,15 @@ export default function SettingsTab({ authHeaders }: { authHeaders: () => Header
           To-Doの担当・カレンダーの予定担当者として選べる名簿です。「代表」に指定した1名が各一覧の先頭に表示されます。
         </p>
         <TeamMembersSection authHeaders={authHeaders} />
+      </div>
+
+      {/* 🎯 営業ノルマ（app_settings）。営業タブの「今日送る◯件」の目標値をここで変更する。 */}
+      <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid #eee' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>🎯 営業ノルマ</h2>
+        <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+          営業タブに表示する「今日送るべき件数」の目標値です。
+        </p>
+        <SalesTargetSection authHeaders={authHeaders} />
       </div>
 
       {/* LINE縁ミッションの設定（AIエージェント運営タブから移設）。

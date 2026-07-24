@@ -17,7 +17,7 @@ import { computeMrr, computePipelineSummary } from '@/lib/dealMetrics';
 import { buildUnifiedFollowQueue, type FollowQueueItem } from '@/lib/followQueue';
 import OutreachStatus from '@/components/admin/OutreachStatus';
 import FlowBoard from '@/components/admin/sales/FlowBoard';
-import UnifiedTargetsTab from '@/components/admin/sales/UnifiedTargetsTab';
+import SalesListView from '@/components/admin/sales/SalesListView';
 import DossiersSection from '@/components/admin/sales/DossiersSection';
 import EmailTargetsEditor from '@/components/admin/sales/EmailTargetsEditor';
 
@@ -167,6 +167,15 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
   const [needsMigration, setNeedsMigration] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // 🎯営業ノルマ（app_settings.sales_targets）。設定タブで変更可能、既定10件。
+  const [dailySendTarget, setDailySendTarget] = useState(10);
+  useEffect(() => {
+    fetch('/api/admin/sales-settings', { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.ok) setDailySendTarget(d.settings.dailySendTarget); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // ナビ整理で独立タブ「学校・法人」を廃止し、営業ハブのサブビューに吸収（サイドバー整理2026-07-20）
   const [view, setView] = useState<SalesView>('ledger');
   const [showEmailEditor, setShowEmailEditor] = useState(false);
@@ -511,7 +520,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
     }
     return items.sort((a, b) => (a.confidence === 'high' ? 0 : 1) - (b.confidence === 'high' ? 0 : 1));
   }, [leads, emails, municipalityProfiles]);
-  const sendableTop10 = sendableToday.slice(0, 10);
+  const sendableTop10 = sendableToday.slice(0, dailySendTarget);
 
   // ---------- 今週の4つの数字（送信数・返信数・商談数・パイプライン金額） ----------
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -650,7 +659,7 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
       </div>
 
       {view === 'targets' && (
-        <UnifiedTargetsTab authHeaders={authHeaders} focusMunicipalityId={focusMunicipalityId} onFocusMunicipalityHandled={() => setFocusMunicipalityId(null)} />
+        <SalesListView authHeaders={authHeaders} focusMunicipalityId={focusMunicipalityId} onFocusMunicipalityHandled={() => setFocusMunicipalityId(null)} />
       )}
       {view === 'cases' && <FlowBoard authHeaders={authHeaders} />}
       {view === 'dossiers' && <DossiersSection authHeaders={authHeaders} />}
@@ -712,10 +721,10 @@ export default function SalesTab({ authHeaders, goTab }: { authHeaders: () => He
         </div>
       )}
 
-      {/* ---------- 🎯 今日送る10件 ---------- */}
+      {/* ---------- 🎯 今日送るN件（ノルマは設定タブのapp_settings.sales_targetsで変更可） ---------- */}
       {sendableToday.length === 0 && sentTodayCount > 0 && (
         <div style={{ ...cardStyle, marginTop: 14, background: '#EAFBF3', border: '1.5px solid #27AE60', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#27AE60' }}>🎉 今日の営業ノルマ達成！（{sentTodayCount}件送信）</p>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#27AE60' }}>🎉 本日のノルマ（{dailySendTarget}件）分、送れるものは送信済みです（{sentTodayCount}件送信）</p>
           <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#666' }}>送信可能な下書きは今日すべて送り切りました。ここから先は開発や新規開拓に時間を使って構いません。</p>
         </div>
       )}
