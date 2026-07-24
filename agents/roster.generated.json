@@ -273,6 +273,14 @@
       "schedule": "毎日 06:00"
     },
     {
+      "id": "schedule_sync",
+      "name": "スケジュール同期AI（ダッシュボードの変更を反映）",
+      "emoji": "🕐",
+      "floor": "GA",
+      "kind": "script",
+      "schedule": "毎日 05:00"
+    },
+    {
       "id": "procurement_watch",
       "name": "公募・実証実験監視AI",
       "emoji": "📋",

@@ -50,6 +50,7 @@ Register-Agent "HitomapLeadTemperature" "lead_temperature.py" "08:45"
 Register-Agent "HitomapFactCheckWatch" "fact_check_watch.py" "08:10"
 Register-Agent "HitomapProposalQueueWatch" "proposal_queue_watch.py" "08:25"
 Register-Agent "HitomapAutopilot" "autopilot.py" "09:20" 90  # deep-research込みのkind(validation_research等)は10分を超えることがあるため長めに確保
+Register-Agent "HitomapScheduleSync" "schedule_sync.py" "05:00"  # 会長がダッシュボードで変更した実行時刻を他タスクへ反映（一番早く動く）
 Register-Agent "HitomapProcurementWatch" "procurement_watch.py" "06:05"
 Register-Agent "HitomapPaymentWatch" "payment_watch.py" "08:50"
 Register-Agent "HitomapLostDealArchive" "lost_deal_archive.py" "09:05"

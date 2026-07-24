@@ -27,6 +27,11 @@ interface AgentStatus {
   level: number; xp: number;
 }
 interface VacantAgent { floor: string; num: number; name: string }
+interface ScheduleAgent {
+  id: string; name: string; emoji: string; floor: string;
+  scheduleLabel: string; defaultTime: string | null; overrideTime: string | null;
+  effectiveTime: string | null; editable: boolean;
+}
 
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' };
 const pillStyle = (active: boolean, color: string): React.CSSProperties => ({
@@ -246,6 +251,131 @@ function TentacleTree({ floor, floorAgents, nameOf }: { floor: Floor; floorAgent
   );
 }
 
+// 📅 本日のタイムテーブル — 番人が何時に何をするかを一覧で見て、時刻を変更できるパネル。
+// 変更はここで即座には反映されない。agent_schedule_overrides に保存され、
+// 翌朝いちばん早く動く agents/schedule_sync.py がWindowsタスクスケジューラへ反映する
+// （このNext.jsアプリからは会長のPCのタスクスケジューラを直接いじれないため）。
+function ScheduleTimetable({ authHeaders }: { authHeaders: () => HeadersInit }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<ScheduleAgent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [needsMigration, setNeedsMigration] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/agent-schedule', { headers: authHeaders() });
+      const data = await res.json();
+      setItems(data.agents ?? []);
+      setNeedsMigration(data.needsMigration ? data.migrationFile : null);
+    } catch {
+      setMessage('通信エラー');
+    } finally {
+      setLoading(false);
+    }
+  }, [authHeaders]);
+
+  useEffect(() => { if (open && items.length === 0) load(); }, [open, items.length, load]);
+
+  async function save(agentId: string, time: string | null) {
+    setSaving(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/admin/agent-schedule', {
+        method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agentId, time }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setMessage(data.error ?? '保存に失敗しました'); return; }
+      setEditingId(null);
+      setMessage('保存しました（反映は翌朝のスケジュール同期後です）');
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+      }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#444' }}>📅 本日のタイムテーブル（実行時刻の一覧・変更）</p>
+        <span style={{ fontSize: 12, color: '#999' }}>{open ? '▲ 閉じる' : '▼ 開く'}</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 11.5, color: '#999' }}>
+            時刻を変更しても即座には切り替わりません。翌朝いちばん早く動く「スケジュール同期AI」が反映するので、変更は翌日から有効になります。
+          </p>
+          {needsMigration && (
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: '#B7791F', background: '#FFF8E8', padding: 8, borderRadius: 8 }}>
+              ⚠ スケジュール変更のテーブルが未作成です。<code>{needsMigration}</code> をSQL Editorで実行してください。それまでは時刻の一覧表示のみで、変更は保存できません。
+            </p>
+          )}
+          {message && <p style={{ margin: '0 0 10px', fontSize: 12, color: '#38ADA9' }}>{message}</p>}
+          {loading ? (
+            <p style={{ fontSize: 12, color: '#999' }}>読み込み中…</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {items.map(a => (
+                <div key={a.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8,
+                  background: a.overrideTime ? '#38ADA918' : 'transparent',
+                }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>{a.emoji}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.name}
+                  </span>
+                  {editingId === a.id ? (
+                    <>
+                      <input type="time" value={editValue} onChange={e => setEditValue(e.target.value)}
+                        style={{ fontSize: 12, padding: '3px 6px', borderRadius: 6, border: '1px solid #ddd', fontFamily: 'inherit' }} />
+                      <button disabled={saving} onClick={() => save(a.id, editValue)} style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 12, border: 'none',
+                        background: '#38ADA9', color: '#fff', cursor: 'pointer',
+                      }}>保存</button>
+                      <button onClick={() => setEditingId(null)} style={{
+                        fontSize: 11, padding: '3px 8px', borderRadius: 12, border: '1px solid #ddd',
+                        background: '#fff', color: '#888', cursor: 'pointer',
+                      }}>やめる</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="mono" style={{ fontSize: 12.5, fontWeight: 700, color: a.overrideTime ? '#38ADA9' : '#666', minWidth: 42, textAlign: 'right' }}>
+                        {a.effectiveTime}
+                      </span>
+                      {a.overrideTime && <span style={{ fontSize: 10, color: '#38ADA9' }}>変更済み</span>}
+                      {a.editable ? (
+                        <button onClick={() => { setEditingId(a.id); setEditValue(a.effectiveTime ?? ''); }} style={{
+                          fontSize: 11, padding: '3px 8px', borderRadius: 12, border: '1px solid #ddd',
+                          background: '#fff', color: '#888', cursor: 'pointer',
+                        }}>変更</button>
+                      ) : null}
+                      {a.overrideTime && (
+                        <button onClick={() => save(a.id, null)} style={{
+                          fontSize: 10.5, padding: '3px 6px', borderRadius: 12, border: 'none',
+                          background: 'none', color: '#ccc', cursor: 'pointer',
+                        }}>既定に戻す</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AgentStatusTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [floors, setFloors] = useState<Floor[]>([]);
   const [agents, setAgents] = useState<AgentStatus[]>([]);
@@ -434,6 +564,8 @@ export default function AgentStatusTab({ authHeaders }: { authHeaders: () => Hea
               </div>
             )}
           </div>
+
+          <ScheduleTimetable authHeaders={authHeaders} />
 
           <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={load} style={{

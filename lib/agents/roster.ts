@@ -64,6 +64,7 @@ export const SCRIPTS: AgentDef[] = [
   { id: 'relation_population', name: '63. 関係人口ダッシュボードAI', emoji: '🦚', floor: 'SALES', kind: 'script', schedule: '毎日 02:40' },
   { id: 'calendar_watch', name: '29. カレンダー番人', emoji: '🦉', floor: 'GA', kind: 'script', schedule: '毎日 06:50' },
   { id: 'competitor_market_research', name: '9. 競合・市場調査エージェント', emoji: '🦫', floor: 'PR', kind: 'script', schedule: '毎日 06:00' },
+  { id: 'schedule_sync', name: 'スケジュール同期AI（ダッシュボードの変更を反映）', emoji: '🕐', floor: 'GA', kind: 'script', schedule: '毎日 05:00' },
   { id: 'procurement_watch', name: '公募・実証実験監視AI', emoji: '📋', floor: 'SALES', kind: 'script', schedule: '毎日 06:05' },
   { id: 'marketing_digest', name: 'マーケティング日報', emoji: '🦔', floor: 'PR', kind: 'script', schedule: '毎日 08:40', reads: ['competitor_market_research', 'competitor_feature_monitor', 'trace_pattern', 'relation_population', 'news_digest'] },
   { id: 'competitor_feature_monitor', name: '42. 競合プロダクト機能差分モニタAI', emoji: '🦎', floor: 'GA', kind: 'script', schedule: '毎日 06:10' },

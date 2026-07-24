@@ -6,9 +6,15 @@
 export const KINDS = [
   'email_draft', 'followup_draft', 'reply_draft', 'evidence', 'contact',
   'requirements', 'mvp_content', 'quote_research', 'sns_post', 'biz_hypothesis',
-  'validation_research', 'mvp_spec', 'content_theme',
+  'validation_research', 'mvp_spec', 'content_theme', 'new_target',
 ] as const;
 export type DeliverableKind = typeof KINDS[number];
+
+// 自治体営業トラック（M0・新規開拓）が新しい候補を見つけたとき、どの事業ライン
+// （biz_model_ideas）に紐付けて登録するか。2026-07-24時点で稼働中のキャンペーンは
+// これ1本（デジタル観光大使AI・飛騨市おっちゃんレンタルモデル）なので固定値にしている。
+// 2本目のキャンペーンを走らせる場合は、ここを配列/選択式に拡張すること。
+export const NEW_TARGET_BIZ_MODEL_IDEA_ID = '2c376659-e952-449f-a88d-a4d574de0205';
 
 export const STATUSES = ['proposed', 'approved', 'revise', 'archived'] as const;
 export type DeliverableStatus = typeof STATUSES[number];
@@ -27,6 +33,7 @@ export const KIND_LABEL: Record<DeliverableKind, string> = {
   validation_research: '需要検証',
   mvp_spec: 'MVP仕様書',
   content_theme: 'SNS企画テーマ',
+  new_target: '新規自治体候補',
 };
 
 /**
@@ -73,6 +80,16 @@ export const CREATE_IN: Partial<Record<DeliverableKind, {
   sns_post: {
     table: 'sns_drafts',
     build: d => ({ platform: 'instagram', title: d.title, caption: d.body, status: 'draft' }),
+  },
+  // 新規自治体候補（M0）。titleに自治体名、bodyに証拠パック（lead-scoutと同じ「事実ベースで
+  // 誇張しない」書き方）を入れる。engagement_stage='lead'で登録し、以降は既存のM1〜M11
+  // トラックにそのまま乗る（承認済みなので既にM0達成＝次はM1調査から）。
+  new_target: {
+    table: 'municipality_profiles',
+    build: d => ({
+      region_name: d.title, evidence_summary: d.body, engagement_stage: 'lead',
+      opportunity_level: '中', linked_biz_model_idea_id: NEW_TARGET_BIZ_MODEL_IDEA_ID,
+    }),
   },
 };
 

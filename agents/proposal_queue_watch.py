@@ -275,14 +275,16 @@ def main():
 
         ai_queue.sort(key=lambda x: (not x["is_priority_pick"], x["opportunity_level"] != "高"))
 
-        # 新規事業・マーケの差し戻し（entity_type='new_biz'/'sns'）も同様に最優先で拾う。
+        # 新規事業・マーケ・自治体M0(新規開拓)の差し戻しも同様に最優先で拾う。
         # こちらは自治体トラックのように次の一手を導出し直さず、差し戻された時と同じkindを
         # そのまま再生成する（改善点はfeedbackに入っているのでautopilot側がそれを読む）。
+        # 自治体の既存11件の差し戻し（entity_idあり）は上のrevise_queueで別途処理済みなので、
+        # ここは entity_id が無い(=対象なし提案)ものだけに絞る。
         try:
             other_revise = _get(
                 url, key,
                 "ai_deliverables?select=id,entity_id,entity_type,kind,title"
-                "&entity_type=in.(new_biz,sns)&status=eq.revise",
+                "&entity_type=in.(new_biz,sns,municipality_profile)&status=eq.revise&entity_id=is.null",
             )
         except Exception:
             other_revise = []
@@ -298,6 +300,35 @@ def main():
         # 既存の送信可能案件を先に」の精神に沿って、営業キューの後ろに積む。
         GENERATIVE_COOLDOWN_DAYS = 3
         generative_queue = []
+
+        # --- 自治体営業M0（新規開拓）--- 既存11件の空欄埋めとは別に、週1件だけ新しい候補自治体を
+        # 提案する（entity_type='municipality_profile', kind='new_target', entity_id=None）。
+        # 承認されるとlib/deliverables.tsのCREATE_INでmunicipality_profilesに新規登録され、
+        # 以降は既存のM1〜M11トラックにそのまま乗る。2026-07-24、会長の要望で追加。
+        NEW_TARGET_COOLDOWN_DAYS = 7
+        try:
+            nt_pending = _get(
+                url, key,
+                "ai_deliverables?select=id&entity_type=eq.municipality_profile&kind=eq.new_target"
+                "&status=in.(proposed,revise)",
+            )
+        except Exception:
+            nt_pending = []
+        try:
+            nt_recent = _get(
+                url, key,
+                "ai_deliverables?select=created_at&entity_type=eq.municipality_profile&kind=eq.new_target"
+                "&order=created_at.desc&limit=1",
+            )
+        except Exception:
+            nt_recent = []
+        nt_on_cooldown = nt_recent and _days_since(nt_recent[0]["created_at"], now) < NEW_TARGET_COOLDOWN_DAYS
+        if not nt_pending and not nt_on_cooldown:
+            generative_queue.append({
+                "entity_type": "municipality_profile", "entity_id": None, "region_name": None,
+                "milestone": "M0", "kind": "new_target", "reason": "新しい自治体候補をひとつ探す",
+                "is_priority_pick": False, "opportunity_level": None, "revise": False,
+            })
 
         # --- 新規事業（entity_type='new_biz'）---
         # NB1(仮説)は対象の行が無い提案として生まれ、承認された瞬間にbiz_model_ideasへ新規登録される
