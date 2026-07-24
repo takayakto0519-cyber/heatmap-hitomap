@@ -52,3 +52,27 @@ export function bmcBlockCount(reportMd: string | null | undefined): number {
 export function hasBmc(reportMd: string | null | undefined): boolean {
   return bmcBlockCount(reportMd) >= 5;
 }
+
+export interface BmcBlockContent extends BmcBlock {
+  body: string; // 見出し行を除いた本文。未記入なら空文字。
+}
+
+/** report_md から9ブロック分の本文を取り出す（BmcCanvasGridの一覧表示用）。 */
+export function parseBmcBlocks(reportMd: string | null | undefined): BmcBlockContent[] {
+  const sections = splitTopLevelSections(reportMd ?? '');
+  return BMC_BLOCKS.map(block => {
+    const section = sections.find(s => s.heading === `${BMC_HEADING_PREFIX}${block.label}`);
+    const body = section ? section.raw.replace(/^#\s+.+(\r?\n)?/, '').trim() : '';
+    return { ...block, body };
+  });
+}
+
+// 標準的なビジネスモデルキャンバスの5列×3行レイアウトに対応するCSS grid-area名。
+// コスト構造は左3ブロック(パートナー/活動・リソース)、収益の流れは右4ブロック
+// (価値提案/関係・チャネル/セグメント)の下に配置する（Osterwalderの原典配置）。
+export const BMC_GRID_AREAS: Record<string, string> = {
+  key_partners: 'kp', key_activities: 'ka', key_resources: 'kr',
+  value_proposition: 'vp', customer_relationships: 'cr', channels: 'ch',
+  customer_segments: 'cs', cost_structure: 'cost', revenue_streams: 'rs',
+};
+export const BMC_GRID_TEMPLATE_AREAS = '"kp ka vp cr cs" "kp kr vp ch cs" "cost cost rs rs rs"';

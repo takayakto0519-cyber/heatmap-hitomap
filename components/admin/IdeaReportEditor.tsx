@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { MarkdownLite, splitTopLevelSections } from '@/lib/markdownLite';
 import { buildBmcTemplateSections, hasBmc } from '@/lib/bmcCanvas';
+import BmcCanvasGrid from '@/components/admin/BmcCanvasGrid';
 
 export interface BizIdea {
   id: string;
@@ -144,7 +145,14 @@ export function IdeaReportEditor({
         })}
       </div>
 
-      {!hasBmc(idea.report_md) && (
+      {hasBmc(idea.report_md) ? (
+        <div style={{ marginTop: 10 }}>
+          <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#999' }}>
+            🧩 ビジネスモデルキャンバス（一覧表示・編集は下のセクションカードから）
+          </p>
+          <BmcCanvasGrid reportMd={idea.report_md} />
+        </div>
+      ) : (
         <button onClick={insertBmcTemplate} style={{
           width: '100%', marginTop: 10, padding: '10px 0', borderRadius: 10, border: '1.5px dashed #4A69BD',
           background: '#fff', color: '#4A69BD', fontWeight: 700, fontSize: 13, cursor: 'pointer',
