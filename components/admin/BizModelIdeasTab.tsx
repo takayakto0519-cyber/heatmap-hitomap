@@ -2,7 +2,7 @@
 
 // ビジネスモデル案：新しい事業案を書き溜め、検証状況を追う。page.tsx monolith分割で切り出し。
 import { useCallback, useEffect, useState } from 'react';
-import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
+import { Card, MigrationNotice, inputStyle, StatusPillRow, BIZMODEL_STATUS_LABELS } from '@/components/admin/adminShared';
 import { IdeaReportEditor } from '@/components/admin/IdeaReportEditor';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 import DeliverableCard, { type Deliverable } from '@/components/admin/DeliverableCard';
@@ -59,14 +59,6 @@ const CONTEST_LABELS: Record<string, string> = {
   makichalle2026: '🍵 まきチャレ2026（牧之原市チャレンジビジネスコンテスト）',
 };
 const IDEA_NO_MARKS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
-
-const BIZMODEL_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  idea: { label: '💡 アイデア', color: '#8E44AD' },
-  validating: { label: '🔍 検証中', color: '#F6B93B' },
-  building: { label: '🛠 構築中', color: '#4A69BD' },
-  live: { label: '🚀 稼働中', color: '#38ADA9' },
-  shelved: { label: '📦 保留', color: '#aaa' },
-};
 
 export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
   const [ideas, setIdeas] = useState<BizModelIdea[]>([]);
@@ -293,15 +285,8 @@ export default function BizModelIdeasTab({ authHeaders }: { authHeaders: () => H
               />
             ) : (
               <>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px' }}>
-                  {Object.entries(BIZMODEL_STATUS_LABELS).map(([key, info]) => (
-                    <button key={key} onClick={() => updateIdea(i.id, { status: key })} style={{
-                      padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
-                      border: `1.5px solid ${i.status === key ? info.color : '#ddd'}`,
-                      background: i.status === key ? info.color + '18' : '#fff',
-                      color: i.status === key ? info.color : '#999', fontWeight: i.status === key ? 700 : 400,
-                    }}>{info.label}</button>
-                  ))}
+                <div style={{ margin: '0 0 8px' }}>
+                  <StatusPillRow labels={BIZMODEL_STATUS_LABELS} current={i.status} onSelect={key => updateIdea(i.id, { status: key })} />
                 </div>
 
                 <textarea

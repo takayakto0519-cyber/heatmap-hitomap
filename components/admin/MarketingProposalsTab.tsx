@@ -5,7 +5,7 @@
 // 新規事業は「💡ビジネスモデル案」、競合・価格は「🔍競合・価格インサイト」タブへそれぞれ一本化済み。
 // 登録・更新はAI APIの自動呼び出しではなく、会長がチャットで「登録して」と指示した時にClaude Codeが書き込む運用。
 import { useCallback, useEffect, useState } from 'react';
-import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
+import { Card, MigrationNotice, inputStyle, StatusPillRow, PROPOSAL_STATUS_LABELS } from '@/components/admin/adminShared';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 
 // ニュースAIエージェントは9分野を集めてくるので、マーケ関連の分野だけに絞る。
@@ -23,11 +23,10 @@ interface StrategyProposal {
   updated_at: string;
 }
 
+// 「実行」ラベルはマーケ文脈での言い回しだが、色はPROPOSAL_STATUS_LABELSのadoptedに揃える（teal統一）。
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  unread: { label: '📥 未読', color: '#999' },
-  reviewing: { label: '🔍 検討中', color: '#F6B93B' },
-  adopted: { label: '🚀 実行', color: '#E67E22' },
-  shelved: { label: '📦 見送り', color: '#ccc' },
+  ...PROPOSAL_STATUS_LABELS,
+  adopted: { label: '🚀 実行', color: PROPOSAL_STATUS_LABELS.adopted.color },
 };
 
 export default function MarketingProposalsTab({ authHeaders }: { authHeaders: () => HeadersInit }) {
@@ -96,7 +95,6 @@ export default function MarketingProposalsTab({ authHeaders }: { authHeaders: ()
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {proposals.map(p => {
-          const statusInfo = STATUS_LABELS[p.status] ?? STATUS_LABELS.unread;
           const isOpen = !!expanded[p.id];
           return (
             <Card key={p.id}>
@@ -110,15 +108,8 @@ export default function MarketingProposalsTab({ authHeaders }: { authHeaders: ()
                 }}>削除</button>
               </div>
 
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
-                {Object.entries(STATUS_LABELS).map(([key, info]) => (
-                  <button key={key} onClick={() => updateProposal(p.id, { status: key })} style={{
-                    padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
-                    border: `1.5px solid ${p.status === key ? info.color : '#ddd'}`,
-                    background: p.status === key ? info.color + '18' : '#fff',
-                    color: p.status === key ? info.color : '#999', fontWeight: p.status === key ? 700 : 400,
-                  }}>{info.label}</button>
-                ))}
+              <div style={{ margin: '8px 0' }}>
+                <StatusPillRow labels={STATUS_LABELS} current={p.status} onSelect={key => updateProposal(p.id, { status: key })} />
               </div>
 
               <button onClick={() => setExpanded(prev => ({ ...prev, [p.id]: !prev[p.id] }))} style={{

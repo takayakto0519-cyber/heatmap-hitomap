@@ -9,6 +9,7 @@ import MilestoneTrack from '@/components/admin/MilestoneTrack';
 import OutreachStatus from '@/components/admin/OutreachStatus';
 import DeliverableCard, { type Deliverable } from '@/components/admin/DeliverableCard';
 import { deriveMilestone, isReadyToSend, type OutreachTarget } from '@/lib/tracks/govOutreach';
+import { inputStyle as sharedInputStyle } from '@/components/admin/adminShared';
 
 interface BizModelIdea {
   id: string; title: string; memo: string | null; status: string; report_md: string | null; phase: number;
@@ -32,12 +33,11 @@ const EVENT_TYPE_META: Record<string, { label: string; icon: string }> = {
 };
 const EVENT_TYPES = Object.keys(EVENT_TYPE_META);
 
-const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 16, border: '1px solid #eee', padding: 18, marginBottom: 16 };
+// adminShared.Card と同じ見た目（radius12・boxShadow）に揃える。ここは <Card> を使わず定数のままにしているのは
+// 呼び出し側が既に <div style={cardStyle}> の形で複数箇所にあり、tag差し替えより値の統一を優先したため。
+const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' };
 const labelStyle: React.CSSProperties = { fontSize: 11.5, fontWeight: 700, color: '#777', margin: '8px 0 4px', display: 'block' };
-const inputStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8,
-  border: '1.5px solid #ddd', fontSize: 13, fontFamily: 'inherit',
-};
+const inputStyle: React.CSSProperties = { ...sharedInputStyle, width: '100%', boxSizing: 'border-box' };
 const btnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' };
 
 export default function BizModelDashboardPage() {

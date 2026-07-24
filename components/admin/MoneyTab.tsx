@@ -5,11 +5,10 @@
 // 文脈なので独立タブにした。中身の挙動は移設前と同じ。
 import { useEffect, useState } from 'react';
 import { computeMrr, computeCashflow, type DealCase } from '@/lib/dealMetrics';
+import { inputStyle as sharedInputStyle } from '@/components/admin/adminShared';
 
-const inputStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '9px 11px', borderRadius: 8,
-  border: '1.5px solid #ddd', fontSize: 13, fontFamily: 'inherit',
-};
+// adminShared.inputStyle には width/boxSizing が無いため、このタブの用途（フォーム全幅）に合わせて足す。
+const inputStyle: React.CSSProperties = { ...sharedInputStyle, width: '100%', boxSizing: 'border-box' };
 const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: '#555', margin: '12px 0 5px', display: 'block' };
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 16, marginBottom: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' };
 const btnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#38ADA9', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' };

@@ -168,6 +168,47 @@ export function MigrationNotice({ title, migrationFile }: { title: string; migra
   );
 }
 
+/** 各タブがバラバラに手書きしていたステータス色をここに一本化する。 */
+export const ADMIN_COLORS = {
+  teal: '#38ADA9', blue: '#4A69BD', orange: '#E5A139', red: '#E74C3C',
+  purple: '#8E44AD', yellow: '#F6B93B', gray: '#999', green: '#27AE60',
+} as const;
+
+/** ビジネスモデル案のステータス（BizModelIdeasTab・強化タブ共通）。 */
+export const BIZMODEL_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  idea: { label: '💡 アイデア', color: ADMIN_COLORS.purple },
+  validating: { label: '🔍 検証中', color: ADMIN_COLORS.yellow },
+  building: { label: '🛠 構築中', color: ADMIN_COLORS.blue },
+  live: { label: '🚀 稼働中', color: ADMIN_COLORS.teal },
+  shelved: { label: '📦 保留', color: '#aaa' },
+};
+
+/** strategy_proposals の受信トレイ系タブ共通ステータス。「採用/実行」の色を teal に統一。 */
+export const PROPOSAL_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  unread: { label: '📥 未読', color: ADMIN_COLORS.gray },
+  reviewing: { label: '🔍 検討中', color: ADMIN_COLORS.yellow },
+  adopted: { label: '✅ 採用', color: ADMIN_COLORS.teal },
+  shelved: { label: '📦 見送り', color: '#ccc' },
+};
+
+/**
+ * ステータス切替のピル列。BizModelIdeasTab・StrategyProposalsTab・MarketingProposalsTab が
+ * 同じ見た目（{Object.entries(...).map(StatusPill)}）を各自手書きしていたのを1部品にまとめたもの。
+ */
+export function StatusPillRow({ labels, current, onSelect }: {
+  labels: Record<string, { label: string; color: string }>;
+  current: string;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {Object.entries(labels).map(([key, info]) => (
+        <StatusPill key={key} label={info.label} color={info.color} active={current === key} onClick={() => onSelect(key)} />
+      ))}
+    </div>
+  );
+}
+
 export function LoadingLine({ label = '読み込み中…' }: { label?: string }) {
   return <p style={{ color: '#999', fontSize: 12, margin: '8px 0' }}>{label}</p>;
 }

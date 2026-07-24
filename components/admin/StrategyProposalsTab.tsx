@@ -5,7 +5,7 @@
 // 新規事業は「💡ビジネスモデル案」、マーケティングは「📣マーケティング」タブへそれぞれ一本化済み（このタブは競合・価格専用）。
 // 登録・更新はAI APIの自動呼び出しではなく、会長がチャットで「登録して」と指示した時にClaude Codeが書き込む運用。
 import { useCallback, useEffect, useState } from 'react';
-import { Card, MigrationNotice, inputStyle } from '@/components/admin/adminShared';
+import { Card, MigrationNotice, inputStyle, StatusPillRow, PROPOSAL_STATUS_LABELS } from '@/components/admin/adminShared';
 import AgentDigestPanel from '@/components/admin/AgentDigestPanel';
 
 interface StrategyProposal {
@@ -23,13 +23,6 @@ interface StrategyProposal {
 const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
   competitor_insight: { label: '🔍 競合・市場', color: '#4A69BD' },
   pricing: { label: '💴 価格', color: '#38ADA9' },
-};
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  unread: { label: '📥 未読', color: '#999' },
-  reviewing: { label: '🔍 検討中', color: '#F6B93B' },
-  adopted: { label: '✅ 採用', color: '#38ADA9' },
-  shelved: { label: '📦 見送り', color: '#ccc' },
 };
 
 // 競合・市場調査系は近縁スキルが4つあり、重複実行や抜け漏れに気づきにくい。
@@ -145,8 +138,7 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {proposals.map(p => {
-          const catInfo = CATEGORY_LABELS[p.category] ?? CATEGORY_LABELS.competitor_insight;
-          const statusInfo = STATUS_LABELS[p.status] ?? STATUS_LABELS.unread;
+    const catInfo = CATEGORY_LABELS[p.category] ?? CATEGORY_LABELS.competitor_insight;
           const isOpen = !!expanded[p.id];
           return (
             <Card key={p.id}>
@@ -163,15 +155,8 @@ export default function StrategyProposalsTab({ authHeaders }: { authHeaders: () 
                 }}>削除</button>
               </div>
 
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
-                {Object.entries(STATUS_LABELS).map(([key, info]) => (
-                  <button key={key} onClick={() => updateProposal(p.id, { status: key })} style={{
-                    padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
-                    border: `1.5px solid ${p.status === key ? info.color : '#ddd'}`,
-                    background: p.status === key ? info.color + '18' : '#fff',
-                    color: p.status === key ? info.color : '#999', fontWeight: p.status === key ? 700 : 400,
-                  }}>{info.label}</button>
-                ))}
+              <div style={{ margin: '8px 0' }}>
+                <StatusPillRow labels={PROPOSAL_STATUS_LABELS} current={p.status} onSelect={key => updateProposal(p.id, { status: key })} />
               </div>
 
               <button onClick={() => setExpanded(prev => ({ ...prev, [p.id]: !prev[p.id] }))} style={{

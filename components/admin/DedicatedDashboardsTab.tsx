@@ -5,12 +5,14 @@
 // 1箇所に集約する。増えるたびに直接URLを覚える必要がないようにするためのハブ。
 import { useEffect, useState } from 'react';
 import { CASE_STAGE_ORDER } from '@/lib/dealMetrics';
+import { Card } from '@/components/admin/adminShared';
 
 interface BizModelIdea { id: string; title: string; status: string; phase?: number; }
 interface BusinessCase { id: string; org_name: string; stage: string; client_type: string; }
 
 const PHASE_LABELS = ['ショーケース確立', 'MVP', '展開', 'スケール'];
 
+// アンカー(<a>)と合成する用。adminShared.Card と同じ値（radius12・同影）で揃えている。
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: '#444', margin: '22px 0 10px' };
 const linkCardStyle: React.CSSProperties = {
@@ -68,7 +70,7 @@ export default function DedicatedDashboardsTab({ authHeaders }: { authHeaders: (
 
       <h2 style={sectionTitleStyle}>📊 事業ライン専用（{ideas.length}件）</h2>
       {ideas.length === 0 ? (
-        <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>まだビジネスモデル案がありません。「ビジネスモデル案」タブから作成してください。</p></div>
+        <Card><p style={{ margin: 0, fontSize: 13, color: '#999' }}>まだビジネスモデル案がありません。「ビジネスモデル案」タブから作成してください。</p></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {ideas.map(idea => (
@@ -87,7 +89,7 @@ export default function DedicatedDashboardsTab({ authHeaders }: { authHeaders: (
 
       <h2 style={sectionTitleStyle}>📇 案件専用（商談以降・{negotiatingCases.length}件）</h2>
       {negotiatingCases.length === 0 ? (
-        <div style={cardStyle}><p style={{ margin: 0, fontSize: 13, color: '#999' }}>商談段階（提案以降）に進んだ案件はまだありません。</p></div>
+        <Card><p style={{ margin: 0, fontSize: 13, color: '#999' }}>商談段階（提案以降）に進んだ案件はまだありません。</p></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {negotiatingCases.map(c => (
