@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdmin } from '@/lib/adminAuth';
 
-const VERCEL_PROJECT_ID = 'prj_gfyDwk45fDah1bfCU9SX3d88VoQJ';
+const VERCEL_PROJECT_ID = 'prj_gfyDwk45fDahlbfCU9SX3d88VoQJ';
 const VERCEL_TEAM_SLUG = 'hitomap';
 const API_BASE = 'https://api.vercel.com/v1/query/web-analytics';
 
@@ -41,7 +41,10 @@ export async function GET(req: NextRequest) {
     }, { status: 200 });
   }
 
-  const days = Number(req.nextUrl.searchParams.get('days') ?? 30);
+  // VercelのHobbyプランはWeb Analytics APIで直近31日分までしか見られない
+  // （"the hobby plan only grants access to the latest 31 days of data"）。
+  // それを超える範囲を渡すと400になるので、ここで必ず31日以内に丸める。
+  const days = Math.min(31, Number(req.nextUrl.searchParams.get('days') ?? 30));
   const since = isoDaysAgo(days);
   const until = isoDaysAgo(0);
 

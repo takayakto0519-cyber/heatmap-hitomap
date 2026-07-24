@@ -118,7 +118,7 @@ export default function WebAnalyticsTab({ authHeaders }: { authHeaders: () => He
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [needsToken, setNeedsToken] = useState(false);
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useState(31);
 
   const load = useCallback(async (range: number) => {
     setLoading(true);
@@ -160,7 +160,8 @@ export default function WebAnalyticsTab({ authHeaders }: { authHeaders: () => He
       {!needsToken && (
         <>
           <div style={{ display: 'flex', gap: 6, margin: '16px 0 8px' }}>
-            {[7, 30, 90].map(d => (
+            {/* Vercel Hobbyプランは直近31日までしか見られないため、それより長い範囲は選べない */}
+            {[7, 14, 31].map(d => (
               <button key={d} onClick={() => setDays(d)} style={{
                 padding: '5px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
                 background: days === d ? TEAL : '#fff', color: days === d ? '#fff' : '#666',
